@@ -18,6 +18,9 @@ asking, and what only a human can do.
 | Report | Subject | Filed |
 |--------|---------|-------|
 | `0001-correction-acceptance-blocks-receipt.md` | Bounded review in `correction_required` can never reach a receipt; `status` and `finalize` disagree about captured evidence | [#2478](https://github.com/Gentleman-Programming/gentle-ai/issues/2478) — open, `status:needs-review` |
+| `0002-duplicated-review-lens-rules.md` | Generated `CLAUDE.md` states review-lens selection twice with divergent tier wording | not filed yet |
+| `0003-generated-rules-pin-contract-v1.md` | Generated agent rules hardcode `review-integration/v1`, which 2.3.0-rc.1 documents as `/v2`, while forbidding discovery | not filed yet |
+| `0004-opencode-text-in-claude-code-block.md` | OpenCode-specific instructions ship inside a block that declares itself Claude Code only | not filed yet |
 
 ## What upstream requires
 

@@ -28,20 +28,20 @@ where to look and what you are allowed to trust.
 | `AGENTS.md` | Root instructions, rules, frontmatter schema | Yes | active |
 | `MAP.md` | This index | Yes | active |
 | `setup.sh` | Generates per-tool symlinks; committed, output is not | Yes | active |
-| `skills/` | Tool-neutral skills, one dir per skill (`SKILL.md` + optional `assets/`, `references/`) | Yes, when `validated` | empty |
+| `skills/` | Tool-neutral skills, one dir per skill (`SKILL.md` + optional `assets/`, `references/`) | Yes, when `validated` | 1 skill (`context-checkpoint`, draft) |
 | `theory/llm/` | How models behave: context, tokens, sampling, failure modes | Yes, when `validated` | empty |
 | `theory/agents/` | Single-agent design: tools, memory, context isolation | Yes, when `validated` | empty |
 | `theory/orchestration/` | Multi-agent coordination, delegation, handoffs | Yes, when `validated` | empty |
 | `theory/loops/` | Iteration shapes: plan/act/verify, review loops, termination | Yes, when `validated` | empty |
 | `research/` | Received links, contrasted against evidence, each with a verdict | Verdict only, as evidence | empty |
 | `decisions/` | Numbered ADRs (`NNNN-slug.md`) — the WHY | Yes | `0001`–`0007` ratified |
-| `journal/` | Dated conversations and brainstorms | **Never as authority**; valid as provenance (ADR 0007) | 3 entries (2026-08-04, 2026-08-05 ×2) |
+| `journal/` | Dated conversations and brainstorms | **Never as authority**; valid as provenance (ADR 0007) | 6 entries (2026-08-04, 2026-08-05 ×5) |
 | `blocks/_shared/` | Target-agnostic minimal blocks with a contract | Yes, when `validated` | empty |
 | `blocks/react/` | React-specific blocks | Yes, when `validated` | empty |
 | `blocks/react-native/` | React Native-specific blocks | Yes, when `validated` | empty |
 | `templates/` | Compositions of blocks, ready to copy | Yes, when `validated` | empty |
 | `sdd/` | SDD cycles: proposal, spec, design, tasks, verification | No — process record | empty |
-| `upstream/` | Experiments against `gentle-ai` / `engram` / `gga`, staged bug reports | No — experiments | 1 report (`gentle-ai`), filed as [#2478](https://github.com/Gentleman-Programming/gentle-ai/issues/2478) |
+| `upstream/` | Experiments against `gentle-ai` / `engram` / `gga`, staged bug reports | No — experiments | 4 reports (`gentle-ai`); `0001` filed as [#2478](https://github.com/Gentleman-Programming/gentle-ai/issues/2478), `0002`–`0004` staged |
 
 ## Target coverage
 

@@ -11,7 +11,8 @@ sources: []
 
 Dated conversations, brainstorms and thinking-out-loud. **Raw material.**
 
-One entry: `2026-08-04-repo-skeleton-design.md`, the design conversation behind ADRs 0001–0007.
+Entries are not enumerated here. Listing them by hand duplicates the filesystem and goes stale
+(it already had). `MAP.md` carries the count; the directory carries the truth.
 
 ## Citability — authority vs provenance
 
