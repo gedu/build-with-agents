@@ -3,7 +3,7 @@ id: decisions/index
 type: index
 targets: [any]
 status: draft
-verified: 2026-08-04
+verified: 2026-08-05
 sources: []
 ---
 
@@ -11,7 +11,7 @@ sources: []
 
 Numbered ADRs. This is the **WHY** of the repo, and it is citable as truth.
 
-`0001`–`0007` record the decisions that shaped the repo skeleton. Read them in order before
+`0001`–`0007` record the decisions that shaped the repo skeleton; `0008` onward record decisions taken while using it. Read them in order before
 proposing structural changes. No list of them is kept here — the files are the index, and a
 hand-maintained table would go stale (ADR 0004).
 
@@ -44,7 +44,7 @@ id: decisions/NNNN-<slug>
 type: decision
 targets: [react, react-native, any]
 status: validated
-verified: 2026-08-04
+verified: 2026-08-05
 sources: []
 ---
 ```
