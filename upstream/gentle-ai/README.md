@@ -82,9 +82,10 @@ Requirements for a report to count as ready:
 - Secondary defects found on the way are kept separate from the primary defect, with a note on
   whether they should be folded into an existing issue instead.
 
-Redact before committing: absolute paths containing a username, tokens, and hostnames. Use
-`<repo>` for the repository root. This is not cosmetic — a staged report is a public artifact
-the moment it is pushed.
+Redact before committing. The rule is repo-wide and lives in `AGENTS.md`; ADR 0009 carries the
+reasoning. Nothing below narrows it — a staged report has one additional exposure, which is that
+its body is copied verbatim into a public issue tracker, so the redaction is checked twice: once
+before committing and once before filing.
 
 ## Division of labour
 

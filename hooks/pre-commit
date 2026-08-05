@@ -1,0 +1,144 @@
+#!/usr/bin/env bash
+#
+# hooks/pre-commit — deterministic redaction gate for a public repository.
+#
+# Enforces the redaction rule in AGENTS.md. The reasoning, and the honest account of
+# what this does and does not close, are in
+# decisions/0009-redaction-is-a-repo-wide-rule.md.
+#
+# WHAT THIS CATCHES
+#   * absolute home-directory paths, POSIX and Windows
+#   * a small set of well-known secret prefixes and PEM private-key headers
+#
+# WHAT IT DELIBERATELY DOES NOT CATCH — read this before treating a pass as clean:
+#   * a private project or client name written as a bare word. No pattern can tell a
+#     public repository name from a client's, so that stays a judgment call and lives
+#     in AGENTS.md as an ask-before-writing rule. This is the class that survived a
+#     previous audit; a pass here is not evidence about it.
+#   * hostnames. Every URL contains one, so a generic pattern is all false positives.
+#
+# WHY THIS FILE CAN NAME WHAT IT FORBIDS
+#   Every pattern requires a real path segment or a real token body, so the documented
+#   placeholder forms (angle-bracketed) never match, and no pattern matches its own
+#   source text. That is a property of the patterns, not an exemption for this file:
+#   this file is scanned like any other, in both modes. Keep every example here and in
+#   AGENTS.md in placeholder form, or this file will correctly block its own commit.
+#
+# EXIT CODES
+#   0  clean
+#   1  a finding — something forbidden is present
+#   2  the check could not run. NOT a pass. Never conflate with 0.
+#
+# SCOPE
+#   Added lines in the staged diff only, so an unrelated commit is never blocked by a
+#   pre-existing finding. `--all` scans every tracked file instead, for an audit.
+#
+# PORTABILITY
+#   POSIX `grep -E`, not `rg`. A committed hook must run on a machine that has not
+#   installed anything.
+#
+# ESCAPE HATCH
+#   `git commit --no-verify`. Not reimplemented here — a second bypass path would be
+#   one more thing to keep honest.
+
+set -euo pipefail
+
+# Print the header block by scanning for it rather than by line number, so editing the
+# header cannot silently start printing executable lines.
+show_help() {
+  awk 'NR>1 && /^#/ { sub(/^# ?/, ""); print; next } NR>1 { exit }' "$0"
+}
+
+die_cannot_run() {
+  printf '\n  REDACTION CHECK COULD NOT RUN: %s\n  This is exit 2, not a pass.\n' "$1" >&2
+  exit 2
+}
+
+case "${1:-}" in
+  "")       MODE="staged" ;;
+  --all)    MODE="all" ;;
+  --help)   show_help; exit 0 ;;
+  *)        die_cannot_run "unknown argument '${1}'. Use no argument, --all, or --help." ;;
+esac
+
+# Each entry: <label>|<extended regex>
+# Home-path patterns require at least one character from a real path-segment class
+# after the separator, which is what exempts the angle-bracketed placeholders.
+PATTERNS=(
+  'absolute home path (POSIX)|(/Users|/home)/[A-Za-z0-9._-]'
+  'absolute home path (Windows)|[A-Za-z]:\\Users\\[A-Za-z0-9._-]'
+  'GitHub token|(ghp_|gho_|ghs_|github_pat_)[A-Za-z0-9_]{16,}'
+  'Slack token|xox[baprs]-[A-Za-z0-9-]{10,}'
+  'OpenAI-style key|sk-[A-Za-z0-9_-]{20,}'
+  'AWS access key id|AKIA[0-9A-Z]{16}'
+  'PEM private key|-----BEGIN [A-Z ]*PRIVATE KEY-----'
+)
+
+# Emits `path:line:content` for every added line in the staged diff.
+# Filter letters: Added, Copied, Modified, Renamed, and Typechange. `T` matters because
+# replacing a tracked symlink with a regular file is an added-content change that ACMR
+# alone would skip entirely. Deletions carry no added lines and are excluded.
+staged_added_lines() {
+  git diff --cached -U0 --no-color --diff-filter=ACMRT | awk '
+    /^\+\+\+ b\// { file = substr($0, 7); next }
+    /^@@ / {
+      match($0, /\+[0-9]+/)
+      line = substr($0, RSTART + 1, RLENGTH - 1) + 0
+      next
+    }
+    /^\+/ { print file ":" line ":" substr($0, 2); line++ }
+  '
+}
+
+# Emits `path:line:content` for every line of every tracked file.
+all_tracked_lines() {
+  git ls-files -z | while IFS= read -r -d '' f; do
+    [ -f "$f" ] || continue
+    grep -nH '' -- "$f" 2>/dev/null || :
+  done
+}
+
+# A failure to read the candidate is exit 2, never an empty haystack that scans clean.
+case "$MODE" in
+  staged) HAYSTACK="$(staged_added_lines)" || die_cannot_run "could not read the staged diff" ;;
+  all)    HAYSTACK="$(all_tracked_lines)"  || die_cannot_run "could not enumerate tracked files" ;;
+esac
+
+FOUND=0
+for entry in "${PATTERNS[@]}"; do
+  label="${entry%%|*}"
+  regex="${entry#*|}"
+  # grep exits 0 on match, 1 on no match, and >1 on error. Collapsing all three with
+  # `|| :` would read a broken pattern as "nothing found" and pass the commit, so the
+  # error case is separated and escalated instead.
+  set +e
+  hits="$(printf '%s\n' "$HAYSTACK" | grep -E -- "$regex")"
+  rc=$?
+  set -e
+  [ "$rc" -le 1 ] || die_cannot_run "grep exited $rc on the '$label' pattern"
+  [ -n "$hits" ] || continue
+  if [ "$FOUND" -eq 0 ]; then
+    printf '\n  REDACTION CHECK FAILED — this repo is public.\n' >&2
+    FOUND=1
+  fi
+  printf '\n  %s:\n' "$label" >&2
+  printf '%s\n' "$hits" | sed 's/^/    /' >&2
+done
+
+if [ "$FOUND" -eq 1 ]; then
+  cat >&2 <<'MSG'
+
+  Fix, per AGENTS.md:
+    * inside this project   -> a repo-relative path
+    * outside, public       -> the canonical name (owner/repo), never a path
+    * outside, private      -> describe its role
+    * a secret              -> remove it, then rotate it. It is already on disk.
+
+  Not covered by this check: a private project or client name as a bare word.
+  Ask how to refer to a shared source before writing it. See AGENTS.md.
+MSG
+  exit 1
+fi
+
+[ "$MODE" = "all" ] && printf '  redaction check: clean across %s tracked files\n' "$(git ls-files | wc -l | tr -d ' ')"
+exit 0

@@ -3,8 +3,8 @@ id: agents/root
 type: index
 targets: [any]
 status: validated
-verified: 2026-08-04
-sources: ["decisions/0001-agents-md-as-single-source-of-truth.md", "decisions/0004-mandatory-frontmatter-as-query-interface.md", "journal/2026-08-04-repo-skeleton-design.md"]
+verified: 2026-08-05
+sources: ["decisions/0001-agents-md-as-single-source-of-truth.md", "decisions/0004-mandatory-frontmatter-as-query-interface.md", "decisions/0009-redaction-is-a-repo-wide-rule.md", "journal/2026-08-04-repo-skeleton-design.md"]
 ---
 
 # AGENTS.md — root instructions
@@ -40,6 +40,65 @@ Scope today: **React** and **React Native** only. See `MAP.md` for planned targe
 | No invented knowledge | Do not write a practice you have not verified. Unverified content stays `status: draft` with sources empty and an explicit "Not yet written" note. |
 | Tables are generated or absent | Never hand-maintain a table that duplicates data already living in frontmatter. Stale hand-written indexes are worse than no index. |
 | Schema = doc | If a schema is documented, the doc and the schema are one artifact. Changing the fields tooling reads means changing this file in the same commit. |
+| Redaction | This repo is **public**. No committed file may contain a home-directory path, a private project or client name, a token, or a hostname — in prose, in frontmatter, or in a commit message. See below. |
+
+## Redaction
+
+Every committed file is published the moment it is pushed, and pushing is not reversible in any
+way that matters. Applies repo-wide, to every directory and every `status`. ADR 0009 carries the
+reasoning.
+
+Half of this is enforced. `hooks/pre-commit` blocks a commit containing an absolute home path or a
+known secret shape — install it with `./setup.sh --hooks`, audit the whole tree with
+`./hooks/pre-commit --all`. The other half, a private name written as a bare word, **cannot** be
+pattern-matched and stays a judgment call. A clean check is not evidence about that half.
+
+| Never commit | Write instead |
+|---|---|
+| `/Users/<name>/…`, `/home/<name>/…`, `C:\Users\<name>\…` | `<repo>` for this repository root, `~` or `<home>` for a home directory |
+| The name of a private repository, project or client | A description of its role. Do not name it |
+| Tokens, credentials, API keys, session identifiers | Nothing. There is no safe abbreviation |
+| Hostnames, machine names, internal URLs a reader cannot resolve | Omit, or describe the class of host |
+| A machine-local path cited as evidence | A repo-relative path, a URL, or a `journal/` entry recording what was observed |
+
+Two rules that are not obvious and both cost something already:
+
+- **A citation must resolve for a reader who has only this repo.** A path that works on one machine
+  is decorative, and `decisions/` is citable as truth unconditionally.
+- **Never paste a real value in order to describe how to find it.** Redaction patterns, search
+  commands and incident write-ups describe the *shape* of a forbidden string and never contain an
+  instance of it. A file explaining a redaction is the likeliest place in the repo to reintroduce
+  what it redacts.
+
+Not covered: a bare first name. Authorship is already public through the remote and the commit
+trailer. This rule targets machine paths, private names and secrets.
+
+### Shared material — ask before writing, then remember the answer
+
+A path does not say whether what it points at is public. A directory under a home directory may be
+a clone of a public repository, a client's private code, or a scratch copy — and the three have
+different handling with identical-looking paths. **An agent cannot classify it by looking.**
+
+So when the operator shares a repository, document or path from outside this project:
+
+1. **Ask how to refer to it, before writing it anywhere** — before a doc, an ADR, a journal entry, a
+   commit message or a `sources` field. Asking is not optional and does not wait for a draft.
+2. **Never write the full path**, whatever the answer is.
+3. Once the answer is known, use it in this form:
+
+| Where it lives | How to refer to it |
+|---|---|
+| Outside this project, and the operator confirmed the name is public | The repository or document name alone. No path |
+| Outside this project, and the name is private or unconfirmed | Its role, described. No name, no path |
+| Inside this project | A project-relative path |
+
+4. **Record the answer** so it is not asked twice and so later documents stay consistent with the
+   earlier ones. A classification given once governs every subsequent mention.
+
+Why asking is the rule rather than defaulting to redaction: a blanket "never name it" throws away
+citable evidence when the source is public, and a public source that cannot be named cannot be
+checked by a reader. Redaction and citability pull in opposite directions here, and only the
+operator knows which applies.
 
 ## Citability
 

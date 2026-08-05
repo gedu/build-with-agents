@@ -31,8 +31,8 @@ Every content file carries mandatory frontmatter: `id`, `type`, `targets`, `stat
 | Consequence | Detail |
 |---|---|
 | Frontmatter is the query interface | Fields exist to serve queries, not decoration. Do not add fields tooling does not read. |
-| **Every table in this repo is either generated or does not exist** | Never hand-maintain a table duplicating data that lives in frontmatter. Prowler's hand-maintained skill tables went stale. |
-| **A schema and its documentation are one artifact** | Documented fields and the fields tooling reads change together, in the same commit. Prowler's `skill-creator` template omitted fields its generator required, and the resulting skills were silently skipped. |
+| **Every table in this repo is either generated or does not exist** | Never hand-maintain a table duplicating data that lives in frontmatter. The cited repository's hand-maintained skill tables went stale. |
+| **A schema and its documentation are one artifact** | Documented fields and the fields tooling reads change together, in the same commit. Its `skill-creator` template omitted fields its generator required, and the resulting skills were silently skipped. |
 | Every file pays a small tax | Six fields, including README index files. |
 
 ## Alternatives
@@ -40,4 +40,4 @@ Every content file carries mandatory frontmatter: `id`, `type`, `targets`, `stat
 | Rejected | Reason |
 |---|---|
 | Good folder structure, no metadata | Still forces blind grep; no query can answer "validated blocks for react-native". |
-| A hand-maintained index table instead of frontmatter | Prowler proves it goes stale. |
+| A hand-maintained index table instead of frontmatter | The cited repository proves it goes stale. |

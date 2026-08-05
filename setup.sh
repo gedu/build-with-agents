@@ -21,10 +21,11 @@ DRY_RUN=0
 TOOLS=""
 WARNINGS=0
 IGNORE_ENTRIES=""
+INSTALL_HOOKS=0
 
 usage() {
   cat <<'USAGE'
-Usage: ./setup.sh [--claude] [--gemini] [--codex] [--copilot] [--all] [--dry-run] [--help]
+Usage: ./setup.sh [--claude] [--gemini] [--codex] [--copilot] [--hooks] [--all] [--dry-run] [--help]
 
 Generates the tool-specific entrypoints that this repo deliberately does not commit.
 With no tool flag, this help is printed and nothing on disk is touched.
@@ -34,7 +35,8 @@ Flags:
   --gemini    GEMINI.md -> AGENTS.md (root and every nested AGENTS.md), .gemini/skills -> ../skills
   --codex     .codex/skills -> ../skills  (Codex reads AGENTS.md natively; no alias needed)
   --copilot   .github/copilot-instructions.md -> ../AGENTS.md  (repo root only)
-  --all       every tool above
+  --hooks     .git/hooks/pre-commit -> ../../hooks/pre-commit  (redaction gate, ADR 0009)
+  --all       every tool above, plus --hooks
   --dry-run   report the actions without touching the filesystem
   --help      this message
 
@@ -178,6 +180,21 @@ tool_copilot() {
   say "note  Copilot resolves only the repo-root instructions file; nested AGENTS.md are not aliased."
 }
 
+# The redaction gate from decisions/0009. Not a "tool" entrypoint: it is a git hook,
+# so it is linked into .git/hooks/ and is deliberately NOT registered in .gitignore —
+# nothing under .git/ is trackable, and an entry there would be noise in the managed
+# block.
+#
+# link() carries the safety contract that matters here: `gga install` writes a real
+# .git/hooks/pre-commit for AI code review, and if one already exists this warns and
+# skips rather than silently replacing someone's review hook. Chain them by hand if
+# both are wanted — they check different things at different layers.
+install_hooks() {
+  say "[hooks]"
+  link "../../hooks/pre-commit" "$REPO_ROOT/.git/hooks/pre-commit" || :
+  say "note  redaction gate only. Run ./hooks/pre-commit --all to audit the whole tree."
+}
+
 list_contains() {
   local needle="$1"
   shift
@@ -292,7 +309,8 @@ main() {
       --gemini)  add_tool gemini ;;
       --codex)   add_tool codex ;;
       --copilot) add_tool copilot ;;
-      --all)     add_tool claude; add_tool gemini; add_tool codex; add_tool copilot ;;
+      --hooks)   INSTALL_HOOKS=1 ;;
+      --all)     add_tool claude; add_tool gemini; add_tool codex; add_tool copilot; INSTALL_HOOKS=1 ;;
       --dry-run) DRY_RUN=1 ;;
       -h|--help) usage; exit 0 ;;
       *)
@@ -304,7 +322,7 @@ main() {
     shift
   done
 
-  if [ -z "$TOOLS" ]; then
+  if [ -z "$TOOLS" ] && [ "$INSTALL_HOOKS" -eq 0 ]; then
     usage
     exit 0
   fi
@@ -316,6 +334,19 @@ main() {
   for tool in $TOOLS; do
     "tool_$tool"
   done
+
+  [ "$INSTALL_HOOKS" -eq 1 ] && install_hooks
+
+  # Hooks contribute no gitignore entries, so a --hooks-only run has nothing to sync
+  # and must not rewrite the managed block.
+  if [ -z "$TOOLS" ]; then
+    if [ "$WARNINGS" -gt 0 ]; then
+      printf '\nDone with %s warning(s). Nothing was overwritten.\n' "$WARNINGS" >&2
+      exit 1
+    fi
+    printf '\nDone. Run this again any time; it is idempotent.\n'
+    return 0
+  fi
 
   say "[gitignore]"
   # `|| :` keeps the warn-and-continue contract: sync_gitignore already warned and
