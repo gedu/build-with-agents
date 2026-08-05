@@ -1,0 +1,35 @@
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+desktop.ini
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.atl/
+
+# Dependencies / build
+node_modules/
+dist/
+build/
+coverage/
+*.log
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Local agent state (not the tool-neutral sources)
+.codegraph/
+
+# >>> generated AI tool assets (managed by setup.sh) >>>
+# Do not edit inside this block by hand; `./setup.sh` owns it.
+# <<< generated AI tool assets (managed by setup.sh) <<<
