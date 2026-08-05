@@ -3,7 +3,7 @@ id: research/index
 type: index
 targets: [any]
 status: draft
-verified: 2026-08-04
+verified: 2026-08-05
 sources: []
 ---
 
@@ -12,7 +12,7 @@ sources: []
 Incoming material — links, papers, threads, vendor docs — contrasted against evidence and
 closed with a **verdict**. A link with no verdict is an open tab, not research.
 
-**Not yet written.** No entry has been recorded here.
+Entries are not enumerated here; the directory carries the truth and `MAP.md` carries the count.
 
 ## Required shape
 
@@ -43,7 +43,7 @@ id: research/<slug>
 type: research
 targets: [react, react-native, any]
 status: draft
-verified: 2026-08-04
+verified: 2026-08-05
 sources: []
 ---
 ```

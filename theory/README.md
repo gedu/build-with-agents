@@ -3,7 +3,7 @@ id: theory/index
 type: index
 targets: [any]
 status: draft
-verified: 2026-08-04
+verified: 2026-08-05
 sources: []
 ---
 
@@ -13,7 +13,7 @@ Verified understanding of how models, agents and orchestration actually behave. 
 with `decisions/`, this is the only place in the repo that can be cited as truth — and
 only for files with `status: validated`.
 
-**Not yet written.** Every subdirectory is an empty stub.
+First entries landed 2026-08-05 in `llm/` and `agents/`. `loops/` and `orchestration/` remain empty stubs.
 
 ## Subdirectories
 

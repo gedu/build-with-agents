@@ -3,7 +3,7 @@ id: theory/agents/index
 type: index
 targets: [any]
 status: draft
-verified: 2026-08-04
+verified: 2026-08-05
 sources: []
 ---
 
@@ -12,7 +12,7 @@ sources: []
 Single-agent design: tool surface shape, memory and retrieval, context isolation,
 instruction precedence, and how an agent's own scaffolding changes its behavior.
 
-**Not yet written.** No verified claim has been recorded here.
+Files are not enumerated here; the directory carries the truth and `MAP.md` carries the count.
 
 ## Belongs here
 
@@ -33,7 +33,7 @@ id: theory/agents/<slug>
 type: theory
 targets: [any]
 status: draft
-verified: 2026-08-04
+verified: 2026-08-05
 sources: []
 ---
 ```

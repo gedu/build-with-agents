@@ -3,7 +3,7 @@ id: theory/llm/index
 type: index
 targets: [any]
 status: draft
-verified: 2026-08-04
+verified: 2026-08-05
 sources: []
 ---
 
@@ -12,7 +12,7 @@ sources: []
 How language models behave as a substrate: context windows, tokenization, sampling,
 prompt sensitivity, degradation at length, and observable failure modes.
 
-**Not yet written.** No verified claim has been recorded here.
+Files are not enumerated here; the directory carries the truth and `MAP.md` carries the count.
 
 ## Belongs here
 
@@ -33,7 +33,7 @@ id: theory/llm/<slug>
 type: theory
 targets: [any]
 status: draft
-verified: 2026-08-04
+verified: 2026-08-05
 sources: []
 ---
 ```
