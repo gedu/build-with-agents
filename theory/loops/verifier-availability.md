@@ -4,7 +4,7 @@ type: theory
 targets: [any]
 status: validated
 verified: 2026-08-05
-sources: ["journal/2026-08-05-first-commit-gate-bypass.md", "journal/2026-08-05-second-gate-bypass-agent-conflict.md", "decisions/0008-review-lenses-may-use-subagents.md", "research/claude-certified-architect-exam-guide.md"]
+sources: ["journal/2026-08-05-first-commit-gate-bypass.md", "journal/2026-08-05-second-gate-bypass-agent-conflict.md", "decisions/0008-review-lenses-may-use-subagents.md", "research/claude-certified-architect-exam-guide.md", "research/gentle-orchestrator-anatomy-guide.md"]
 ---
 
 # A verifier that cannot run is not a weak gate — it is an absent gate that reports "not run"
@@ -114,6 +114,40 @@ The local evidence is consistent with this: the gate that failed closed was prog
 unavailability was *loud* — it blocked, and the bypass had to be taken deliberately and documented
 three times. A prompt-level verifier would have produced the same three unverified commits with no
 artifact at all.
+
+### Three layers, and a fourth state worse than "not run"
+
+Gentle AI's orchestrator guide refines the two-way split into three, for the same toolchain this
+repo uses (`research/gentle-orchestrator-anatomy-guide.md`):
+
+| Layer | Decides | Force |
+|---|---|---|
+| Prompt policy | What should be requested, and how to use the result | Guides the model. Nothing more |
+| Runtime permission | Whether the agent has the tool or delegation configured | The runtime enforces it |
+| Native code / CLI | Executes the operation and validates its internal invariants | Checks are the binary's, not the text's |
+
+And it states the consequence directly: although the orchestrator prompt uses words like `MANDATORY`
+and `hard gate`, **those remain prompt instructions unless another layer implements an equivalent
+check**, and must not be described as carrying the force of a runtime denial.
+
+That yields a state worse than any row in the table above — **a gate that was never a gate.** It
+reports nothing, blocks nothing, and produces no artifact, because it was only ever a sentence
+asserting its own authority. Ranked by how detectable the failure is:
+
+| State | Detectable? |
+|---|---|
+| Ran, failed | Immediately — it blocks |
+| Ran, passed | Yes — evidence exists |
+| Could not run | Only if someone notices the absence |
+| **Never was a gate** | **Not at all** — and its wording actively suggests the opposite |
+
+The last row is the dangerous one precisely because emphatic language is negatively correlated with
+enforcement: a check implemented in code does not need to shout, while a prompt instruction has
+nothing but volume available to it. **Capitalised insistence is weak evidence of enforcement, and
+mild evidence against it.**
+
+The practical test is not to read the rule but to ask which layer implements it. If the answer is
+"the instruction says so", there is no gate — there is a request with confident typography.
 
 ## Scope
 

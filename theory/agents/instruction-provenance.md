@@ -4,7 +4,7 @@ type: theory
 targets: [any]
 status: validated
 verified: 2026-08-05
-sources: ["journal/2026-08-05-second-gate-bypass-agent-conflict.md", "decisions/0008-review-lenses-may-use-subagents.md", "research/claude-certified-architect-exam-guide.md"]
+sources: ["journal/2026-08-05-second-gate-bypass-agent-conflict.md", "decisions/0008-review-lenses-may-use-subagents.md", "research/claude-certified-architect-exam-guide.md", "research/gentle-orchestrator-anatomy-guide.md"]
 ---
 
 # An instruction whose origin cannot be located cannot be reconciled — only obeyed or broken
@@ -55,6 +55,30 @@ not be traced, and four consequences followed, in order:
 Note the shape of point 4: **an unlocatable rule can only be overruled, never corrected.** Every
 such resolution adds a layer instead of removing one, so the instruction surface grows
 monotonically and each new conflict is harder to trace than the last.
+
+## Why the search failed structurally: only some stages are files
+
+Gentle AI's orchestrator guide names a distinction that explains the failure above better than
+carelessness does (`research/gentle-orchestrator-anatomy-guide.md`). It separates three stages and
+warns against collapsing them:
+
+| Stage | What it is | Searchable as a file? |
+|---|---|---|
+| Source asset | The versioned template in the repository | **Yes** |
+| Installed effective configuration | What the harness actually loads, built from assets at install or sync | **Yes** |
+| Running session | The agent, model and context of one live execution | **No** |
+
+Its explicit warning: modifying a repository asset does not demonstrate that an existing installation
+has been regenerated, and a value observed in the effective configuration does not necessarily appear
+literally in the source template.
+
+The search recorded above covered stages one and two exhaustively. **The directive lived in stage
+three**, and stage three is not a file. That reframes the finding: the problem is not that someone
+looked in the wrong places, it is that **grep is a complete search strategy for only two thirds of an
+instruction surface**, and nothing signals which third a given instruction came from.
+
+This is also why the `/memory` correction above matters but does not rescue the case. Enumeration of
+loaded memory files is enumeration of stage two.
 
 ## Why this is a design constraint, not an incident
 

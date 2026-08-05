@@ -4,7 +4,7 @@ type: decision
 targets: [any]
 status: validated
 verified: 2026-08-05
-sources: ["journal/2026-08-05-second-gate-bypass-agent-conflict.md", "journal/2026-08-05-first-commit-gate-bypass.md", "research/claude-certified-architect-exam-guide.md"]
+sources: ["journal/2026-08-05-second-gate-bypass-agent-conflict.md", "journal/2026-08-05-first-commit-gate-bypass.md", "research/claude-certified-architect-exam-guide.md", "research/gentle-orchestrator-anatomy-guide.md"]
 ---
 
 # 0008 — Review lenses may use sub-agents
@@ -45,6 +45,26 @@ materially weaker one that reports the same confidence.
 
 So "just review it inline" was never the fallback it appeared to be. The isolation *is* the
 mechanism.
+
+## What was learned after ratification
+
+Recorded here rather than silently folded in, because it changes what this ADR *did* without changing
+what it decided.
+
+Gentle AI's own orchestrator documentation lists the complete `permission.task` allowlist and states
+that it includes the review and Judgment Day agents by name — `review-risk`, `review-readability`,
+`review-reliability`, `review-resilience`, `review-refuter`, `jd-judge-a`, `jd-judge-b`,
+`jd-fix-agent` — as explicit exceptions to a default `"*": "deny"`
+(`research/gentle-orchestrator-anatomy-guide.md`).
+
+So the upstream design had **already** authorised lens delegation, in configuration, deliberately. This
+ADR did not grant a new capability; it **removed an obstruction that was never upstream's**. The
+decision stands unchanged and its justification is now stronger, since the context-isolation argument
+is independently supported by Anthropic's architect guide as well.
+
+The uncomfortable part, worth keeping: only one side of that conflict had ever stated its position in
+a file anyone could open. The side with a locatable, deliberate, documented position is the side that
+was assumed to be at fault for two days.
 
 ## Consequences
 
