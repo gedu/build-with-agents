@@ -4,7 +4,7 @@ type: theory
 targets: [any]
 status: validated
 verified: 2026-08-05
-sources: ["https://blog.bytebytego.com/p/how-chatgpt-optimizes-its-agent-loop", "journal/2026-08-05-context-measurement.md", "research/agent-loop-optimization-bytebytego.md"]
+sources: ["https://blog.bytebytego.com/p/how-chatgpt-optimizes-its-agent-loop", "journal/2026-08-05-context-measurement.md", "research/agent-loop-optimization-bytebytego.md", "research/claude-certified-architect-exam-guide.md"]
 ---
 
 # The cost of a capability is what it costs to load, not what it costs to have
@@ -71,6 +71,30 @@ narrow but real: two independent harnesses, built by different organisations, co
 deferring tool schemas. That is evidence the constraint is structural rather than an artifact of
 one implementation.
 
+## The limit of this claim — deferral does not fix everything it appears to fix
+
+Anthropic's architect guide states that giving an agent access to too many tools — *"18 instead of
+4-5"* — degrades **tool selection reliability** by increasing decision complexity, and that agents
+holding tools outside their specialization tend to misuse them
+(`research/claude-certified-architect-exam-guide.md`). First-party, though offered as illustration
+rather than as a measured threshold.
+
+Combining that with the mechanism above produces a distinction **neither source states on its own**,
+and it is the most important qualification on this file:
+
+| Problem | Fixed by deferral? |
+|---|---|
+| Schema tokens resident in the window | **Yes** — that is exactly what deferral removes |
+| Decision complexity when selecting a tool | **No** — the *names* stay resident and still enter the choice |
+
+Deferral was silently credited with solving both. It solves one. A harness can hold 90 deferred tools
+at almost no token cost and still present the model with a 90-way selection problem, because
+selection happens over the names.
+
+The two therefore need different remedies: deferral for cost, and **scoping** — giving an agent only
+the tools its role requires — for selection reliability. The guide's own recommendation is scoped tool
+access per role with narrow cross-role exceptions, which is a different lever from deferral entirely.
+
 ## What follows for design
 
 - **Count what is resident, not what is connected.** "How many MCP servers do you have" is close to
@@ -89,5 +113,10 @@ one implementation.
 ## What would sharpen it
 
 Measurements on a second harness, and a resident-vs-deferred comparison of the same tool set on the
-same task — which would turn "deferral saves tokens" into a quality claim as well as a cost one.
-Neither has been run here.
+same task. Neither has been run here.
+
+Note what the section above already settled: the quality dimension this file originally asked for
+arrived from first-party guidance, and it **did not** confirm the convenient answer. It showed that
+deferral and selection reliability are separate problems. Asking for the sharpening produced a
+narrower claim, not a broader one — which is the outcome to expect when the question is asked
+honestly.

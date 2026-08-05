@@ -4,7 +4,7 @@ type: theory
 targets: [any]
 status: validated
 verified: 2026-08-05
-sources: ["https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents", "https://arxiv.org/abs/2603.08274", "journal/2026-08-05-context-measurement.md"]
+sources: ["https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents", "https://arxiv.org/abs/2603.08274", "journal/2026-08-05-context-measurement.md", "research/claude-certified-architect-exam-guide.md"]
 ---
 
 # Context degradation with length is real and measured — and no published threshold tells you when to clear
@@ -60,6 +60,23 @@ open-weight models. It measures *fabrication in document-grounded Q&A* — one t
 This is the scope test from `skills/source-verdict` applied to a genuinely good source. The paper
 is not weak. It is being asked a question it did not measure.
 
+## A second, distinct effect: position, not just length
+
+Anthropic's architect guide names the **"lost in the middle"** effect: models process information at
+the beginning and end of long inputs reliably, but may omit findings from middle sections
+(`research/claude-certified-architect-exam-guide.md`).
+
+This is **not the length claim restated**. Length says: more tokens, less precision. Position says:
+*where* in the input something sits changes whether it is used at all. A short input can suffer the
+positional effect and a long one can be arranged to mitigate it. The guide's own mitigation is
+structural rather than reductive — put key findings at the beginning of aggregated inputs, and give
+detailed results explicit section headers.
+
+The same guide states, in an answer rationale, that **larger context windows do not solve attention
+quality problems.** That is the sharpest available first-party statement against the assumption that a
+1M window makes any of this go away, and it is why the scope limit above matters rather than being a
+technicality.
+
 ## The consequence for practice
 
 There is no defensible token threshold to automate on. What exists is:
@@ -73,6 +90,19 @@ So the trigger for resetting a session cannot be read off a counter. The signals
 available are **behavioural**: re-deriving a fact already settled, contradicting an earlier
 decision in the same session, losing the distinction between what was verified and what was
 assumed.
+
+First-party guidance names the same class of signal independently, which is the strongest support this
+approach has. It describes degradation in extended sessions as models *"giving inconsistent answers
+and referencing 'typical patterns' rather than specific classes discovered earlier"* — a behavioural
+symptom, described without reference to any token count. It also states that starting a new session
+with a structured summary is more reliable than resuming with stale tool results, and recommends
+scratchpad files for persisting key findings across context boundaries.
+
+Two conclusions follow. The behavioural trigger is not a workaround adopted because no threshold was
+available — it is what the vendor describes too. And "referencing typical patterns instead of the
+specifics discovered earlier" is a **more useful symptom than the three listed above**, because it is
+observable from the outside by anyone reading the output, not only by the agent noticing its own
+repetition.
 
 That is why `skills/context-checkpoint` triggers on finishing a unit of work rather than on a token
 count. It also records a second reason — that surfacing a remaining-context countdown to the model

@@ -4,7 +4,7 @@ type: skill
 targets: [any]
 status: draft
 verified: 2026-08-05
-sources: ["journal/2026-08-05-context-measurement.md", "https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents"]
+sources: ["journal/2026-08-05-context-measurement.md", "https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents", "research/claude-certified-architect-exam-guide.md"]
 ---
 
 # context-checkpoint
@@ -12,9 +12,20 @@ sources: ["journal/2026-08-05-context-measurement.md", "https://www.anthropic.co
 Close a work unit so the conversation can be cleared without losing anything, and so the next
 session resumes without re-deriving what this one established.
 
-`status: draft` — the mechanism below is written and its halves are individually proven, but the
-loop has not been run end-to-end enough times to promote it. Do not cite it as validated
-practice.
+`status: draft` — **still draft, deliberately.** The design choice below now has first-party support:
+Anthropic's architect guide states that starting a new session with a structured summary is more
+reliable than resuming with stale tool results, recommends scratchpad files for persisting key
+findings across context boundaries, and describes context degradation behaviourally — models
+"referencing 'typical patterns' rather than specific classes discovered earlier" — with no token
+threshold attached (`research/claude-certified-architect-exam-guide.md`).
+
+That strengthens the *rationale*. It does not satisfy this file's stated promotion criterion, which
+is that **the loop has been run end-to-end enough times to know it works.** It has not. External
+agreement about a design is not evidence that this particular procedure executes cleanly, and
+conflating the two would be the scope error `skills/source-verdict` test 3 exists to catch.
+
+Promote when there are recorded end-to-end runs, not when a better citation arrives. Do not cite as
+validated practice.
 
 ## When to invoke
 

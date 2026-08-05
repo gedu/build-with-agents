@@ -4,7 +4,7 @@ type: decision
 targets: [any]
 status: validated
 verified: 2026-08-05
-sources: ["journal/2026-08-05-second-gate-bypass-agent-conflict.md", "journal/2026-08-05-first-commit-gate-bypass.md"]
+sources: ["journal/2026-08-05-second-gate-bypass-agent-conflict.md", "journal/2026-08-05-first-commit-gate-bypass.md", "research/claude-certified-architect-exam-guide.md"]
 ---
 
 # 0008 — Review lenses may use sub-agents

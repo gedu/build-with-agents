@@ -30,10 +30,10 @@ where to look and what you are allowed to trust.
 | `setup.sh` | Generates per-tool symlinks; committed, output is not | Yes | active |
 | `skills/` | Tool-neutral skills, one dir per skill (`SKILL.md` + optional `assets/`, `references/`) | Yes, when `validated` | 2 skills (`context-checkpoint` draft, `source-verdict` validated) |
 | `theory/llm/` | How models behave: context, tokens, sampling, failure modes | Yes, when `validated` | 1 doc (`context-degradation-at-length`, validated) |
-| `theory/agents/` | Single-agent design: tools, memory, context isolation | Yes, when `validated` | 1 doc (`capability-load-cost`, validated) |
+| `theory/agents/` | Single-agent design: tools, memory, context isolation | Yes, when `validated` | 2 docs (`capability-load-cost`, `instruction-provenance`) |
 | `theory/orchestration/` | Multi-agent coordination, delegation, handoffs | Yes, when `validated` | empty |
-| `theory/loops/` | Iteration shapes: plan/act/verify, review loops, termination | Yes, when `validated` | empty |
-| `research/` | Received links, contrasted against evidence, each with a verdict | Verdict only, as evidence | 4 verdicts (2 `partially supported`, 2 `unverifiable`) |
+| `theory/loops/` | Iteration shapes: plan/act/verify, review loops, termination | Yes, when `validated` | 1 doc (`verifier-availability`, validated) |
+| `research/` | Received links, contrasted against evidence, each with a verdict | Verdict only, as evidence | 5 verdicts (1 `supported`, 2 `partially supported`, 2 `unverifiable`) |
 | `decisions/` | Numbered ADRs (`NNNN-slug.md`) — the WHY | Yes | `0001`–`0008` ratified |
 | `journal/` | Dated conversations and brainstorms | **Never as authority**; valid as provenance (ADR 0007) | 6 entries (2026-08-04, 2026-08-05 ×5) |
 | `blocks/_shared/` | Target-agnostic minimal blocks with a contract | Yes, when `validated` | empty |

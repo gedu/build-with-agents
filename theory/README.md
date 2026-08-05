@@ -13,7 +13,7 @@ Verified understanding of how models, agents and orchestration actually behave. 
 with `decisions/`, this is the only place in the repo that can be cited as truth — and
 only for files with `status: validated`.
 
-First entries landed 2026-08-05 in `llm/` and `agents/`. `loops/` and `orchestration/` remain empty stubs.
+First entries landed 2026-08-05 in `llm/`, `agents/` and `loops/`. `orchestration/` remains an empty stub.
 
 ## Subdirectories
 
