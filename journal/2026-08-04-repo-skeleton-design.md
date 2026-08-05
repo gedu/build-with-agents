@@ -21,15 +21,15 @@ reasoning, decisions and SDD cycles.
 ## 2. Rejected: a `CLAUDE.md`-rooted design
 
 The initial design put a `CLAUDE.md` at the root. Eduardo corrected it: that couples the
-repo to one AI tool. He pointed at `/Users/eduardo.graciano/Documents/mine/prowler`, which
-already does the tool-neutral thing.
+repo to one AI tool. He pointed at a private repository of his own, which already does the
+tool-neutral thing.
 
 Adopted instead: `AGENTS.md` as the single source of truth, `skills/` at the repo root
 rather than `.claude/skills/`, and tool-specific entrypoints as generated symlinks that are
 never committed — symlinks rather than copies, because copies drift. Generalized corollary:
 knowledge lives outside the executor; the executor is a thin wrapper. → ADR 0001
 
-## 3. Two failures observed in prowler
+## 3. Two failures observed in that private repository
 
 - Hand-maintained skill tables went stale. → rule: every table is generated or does not exist.
 - Its own `skill-creator` template omitted `metadata.scope` and `metadata.auto_invoke`, the
