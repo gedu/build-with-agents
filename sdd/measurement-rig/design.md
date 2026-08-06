@@ -388,3 +388,72 @@ asymmetry masquerade as the effect being measured.
   cannot break the product it measures: `python3` is stated as a rig-only prerequisite, and the
   `hooks/pre-commit` portability contract explicitly does not extend here. No change needed — recorded so
   a later reader does not re-open it.
+
+## Amendment 2 — `Bash` subsumes `Glob` and `Grep`, which was a second variable
+
+Found while verifying the Phase 0–3 apply batch, by probing rather than reading. It would have
+invalidated the experiment, and it invalidates Amendment 1's arm arithmetic.
+
+### The observation
+
+Two probes, identical except for one flag:
+
+| Invocation | Visible tools | `Bash` | `Glob` | `Grep` |
+|---|---|---|---|---|
+| no flags | **54** | present | absent | absent |
+| `--disallowedTools Bash` | **55** | absent | **present** | **present** |
+
+Disallowing one tool made the surface **larger**. `Bash` subsumes `Glob` and `Grep`: while it is
+available the surface presents `Bash` alone, and removing it exposes the two search tools as separate
+entries. Net −1 +2 = +1.
+
+### Three consequences, and the second is the one that matters
+
+**1. Surface size is not monotonic in `--disallowedTools`.** Any code computing the disallow list as
+*(broad surface) − (scoped surface)* is wrong, because `Glob` and `Grep` are not members of the broad
+surface and cannot be subtracted from it. The design's Decision on the scoped-arm disallow list said
+exactly that, and it must change.
+
+**2. The two arms differed in capability, not only in breadth.** BROAD held `Bash` and not
+`Glob`/`Grep`; SCOPED held `Glob`/`Grep` and not `Bash`. So BROAD could shell out and SCOPED could not
+— **a second variable**, of precisely the kind ADR 0010 constraint 2 forbids and the kind this repo
+refused a vendor's number over. A result from those two arms could not have been attributed to surface
+breadth, and nothing in the transcript would have said so.
+
+**3. It explains the apply batch's unreconcilable 33-tool observation**, and vindicates its refusal to
+invent `rig/surfaces/broad.txt` from a surface it could not reconcile with the recon baseline. Declining
+to write down a number it did not trust is what kept this findable.
+
+### The correction
+
+**Disallow `Bash` in both arms.** Then:
+
+| Arm | Definition | Visible |
+|---|---|---|
+| BROAD | `--disallowedTools Bash` | 55, including `Glob`, `Grep`, `Read` |
+| SCOPED | disallow everything except `Glob`, `Grep`, `Read` | 3 |
+
+SCOPED becomes a **true subset** of BROAD. The same three capabilities are reachable in both arms, and
+the only thing that differs is how many other names sit alongside them — which is the single quantity
+`theory/agents/tool-surface-design.md` claims selection happens over.
+
+`Bash` being absent from both arms is also correct on its own terms: the tasks are defect-*reporting*,
+no arm needs to execute anything, and leaving a shell in one arm would let it substitute for the search
+tools the practice check is built to observe.
+
+### What this changes downstream
+
+- `rig/surfaces/broad.txt` is captured with `--disallowedTools Bash`, not from a bare invocation.
+- The disallow list for SCOPED is computed against **that** preimage, so the subtraction is well-defined.
+- The read-back assertion still compares `init.tools` to a committed preimage, unchanged — and this
+  finding is the strongest argument yet for why it compares against a preimage rather than against the
+  flags the driver passed. The flags were consistent throughout; the surface was not what they implied.
+
+### The method note
+
+Both the exploration and Amendment 1 reasoned about surface size from flag semantics, and both were
+wrong in the same direction: they assumed disallowing tools can only shrink the surface. One two-probe
+comparison, costing under a dollar, found a confound that four reasoning passes had not. That is the
+fourth instance in three days of `theory/loops/reading-and-running-find-different-defects.md` behaving
+as written, and the second where the wrong reading would have silently invalidated an experiment rather
+than producing a visible error.
