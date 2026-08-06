@@ -1,0 +1,133 @@
+---
+id: sdd/measurement-rig/tasks
+type: journal
+targets: [any]
+status: draft
+verified: 2026-08-06
+sources: ["sdd/measurement-rig/spec.md", "sdd/measurement-rig/design.md", "decisions/0010-measurements-vary-the-harness-not-the-model.md", "sdd/testing-capabilities.md", "AGENTS.md"]
+---
+
+# Tasks: measurement-rig
+
+No test runner exists in this repo (`sdd/testing-capabilities.md`). Verification below is
+`bash -n`, `./hooks/pre-commit[--all]`, manual adversarial exercises, and derive.py's
+byte-identity re-derivation check — never "run the tests."
+
+## Review Workload Forecast
+
+| Field | Value |
+|---|---|
+| Estimated changed lines | ~1,200+ authored total (run.sh ~200, derive.py ~250, report.py ~150, 3 fixtures ~500, docs/index ~60, answer-keys/prompts ~90); `runs.jsonl` rows are generated goldens, excluded from authored count |
+| 400-line budget risk | High |
+| Chained PRs recommended | Yes |
+| Suggested split | PR1 → PR2 → PR3 → PR4 → PR5 → PR6 (see below) |
+| Delivery strategy | ask-always |
+| Chain strategy | pending — team decision needed |
+
+Decision needed before apply: Yes
+Chained PRs recommended: Yes
+Chain strategy: pending
+400-line budget risk: High
+
+### Suggested Work Units
+
+| Unit | Goal | PR | Focused check | Runtime harness | Rollback boundary |
+|---|---|---|---|---|---|
+| 1 | Scaffolding + tier-1 fixture (checker-before-prompt) + `run.sh` + runner-only shakedown | PR1 | `bash -n rig/run.sh` | Manual: dirty-tree, manifest-tamper, mid-kill exercises via `rig/run.sh --dirty-ok` | Delete `rig/` entirely |
+| 2 | `derive.py` + `report.py` + negative-control observation | PR2 | Run `derive.py` twice, diff `runs.jsonl` byte-identical | One real `claude` run via `run.sh` (negative control) | Revert `derive.py`/`report.py`; PR1 stays valid |
+| 3 | Tier-1 pilot (10 runs) + derived timeout | PR3 | `./hooks/pre-commit --all` on new rows | 10 live `claude -p` runs (5 BROAD + 5 SCOPED) | Revert timeout constant + tier-1 rows |
+| 4 | Tier-2 fixture + cell | PR4 | `bash -n`; MANIFEST before/after | Up to 15 live runs | Revert tier-2 files/rows + refreeze |
+| 5 | Tier-3 fixture + cell | PR5 | Same as PR4 | Up to 15 live runs | Revert tier-3 files/rows + refreeze |
+| 6 | Aggregation + `theory/` write | PR6 | `python3 rig/report.py` | N/A — pure aggregation, no live run | Revert `theory/agents/tool-surface-design.md` only |
+
+PR2 is at the 400-line edge (derive.py+report.py ≈ 400); split into 2a/2b if the real diff exceeds budget.
+
+## Phase 0: Scaffolding — no code (blocked: none)
+
+- [ ] 0.1 Register `rig/` in `MAP.md`'s Areas table, citable **No** (instrument/process record).
+- [ ] 0.2 Create `rig/README.md` (`type: index`): rig is an instrument, not truth; results reach `theory/` via a normal write.
+- [ ] 0.3 Add `/rig/runs/` to `.gitignore` **outside** `setup.sh`'s `BEGIN_MARK`/`END_MARK` managed block — placing it inside means `setup.sh` treats it as owned/rewritten content and a later run silently drops it.
+
+## Phase 1: Tier-1 fixture, checker before prompt (blocked: Phase 0)
+
+- [ ] 1.1 Create `rig/fixtures/tool-surface/v1/src/paginate.js` — `pageSlice()` off-by-one boundary defect + 2-3 correct helpers.
+- [ ] 1.2 Commit `answer-key/t1.json` (seeded line; expected `{Read}`, off-set `{Glob,Grep}`, forbidden = rest) in its **own commit**, before 1.3 — checker-first provable from `git log` order.
+- [ ] 1.3 In a later commit, create `prompts/t1.txt` (exact tier-1 prompt bytes).
+- [ ] 1.4 Add to `t1.json`: R-A1.7 negative control (a defect file never `Read` → must classify `improper`) and an off-set case (off-set tool called in both arms).
+- [ ] 1.5 Compute + commit `MANIFEST.sha256` over tier-1 `src/`, `prompts/`, `answer-key/`.
+
+## Phase 2: Runner `rig/run.sh` (blocked: Phase 1)
+
+- [ ] 2.1 Resolve repo root from own `BASH_SOURCE`; dirty-tree guard (`git status --porcelain`) → exit 2; MANIFEST recompute-compare → exit 2; `python3` presence check → exit 2.
+- [ ] 2.2 `--dirty-ok` flag: bypasses dirty-tree guard only, stamps `code_commit: <sha>-dirty` + `void_reason: dirty-tree`.
+- [ ] 2.3 Materialize `src/` copy only to a machine-local workspace outside `<repo>` (no `answer-key/`, no discoverable repo `AGENTS.md`).
+- [ ] 2.4 Invoke: fixed `timeout $TIMEOUT_S claude -p … --output-format stream-json --verbose ${DISALLOW:+--disallowedTools …}`, stream redirected to a file, never piped.
+- [ ] 2.5 Persist `status.json` after exit (`exit_code`, `timed_out`, `wall_ms`, `timeout_s`, `driver_version`); ≤1 unparseable trailing line tolerated only when `timed_out`.
+- [ ] 2.6 Re-hash workspace copy post-run (substrate-mutation check).
+- [ ] 2.7 Exit contract: 0 all `completed`/`void`, non-zero any `failed`, 2 could-not-start — flush `status.json`/partials **before** non-zero exit.
+- [ ] 2.8 Verify `bash -n rig/run.sh`.
+
+## Phase 3: Runner-only shakedown (blocked: Phase 2)
+
+- [ ] 3.1 Kill a run mid-flight → require `stream.jsonl` ≥1 parseable line, dir ends orphaned/absent.
+- [ ] 3.2 Stage a fixture edit → exit 2; repeat unstaged.
+- [ ] 3.3 Touch one byte in a fixture **copy** (not the frozen original) → exit 2.
+- [ ] 3.4 Run from a different cwd and a nested dir → identical `code_commit` both times.
+- [ ] 3.5 Fixture path/prompt with spaces, quotes, non-ASCII → runs unchanged, `init.tools` still matches preimage.
+
+## Phase 4: Analyser `derive.py` + `report.py` (blocked: Phase 2)
+
+- [ ] 4.1 `rig/derive.py`: parse `stream.jsonl`; read-back verification (surface/model/prompt/code/cwd/ambient-drift → void reasons).
+- [ ] 4.2 Outcome checker (regex line-set vs answer key) + practice checker (forbidden-tool scan + earlier-Read/Grep-of-file scan).
+- [ ] 4.3 Four-cell classify; total `runs.jsonl` rebuild; `schema_version` stamped; `cwd_is_expected` bool only, never raw `cwd`.
+- [ ] 4.4 Verify: run `derive.py` twice over same run dirs → `runs.jsonl` byte-identical.
+- [ ] 4.5 `rig/report.py`: per-arm four-cell table, off-set/forbidden distribution, anomaly log (X=3) — no composite score, ever.
+- [ ] 4.6 Pairing rule: aggregate only `(task_id, iteration)` completed in **both** arms; name every excluded slot + arm + void reason.
+- [ ] 4.7 Confirm wall-clock is per-row diagnostic only, never differenced by `report.py`.
+- [ ] 4.8 Verify stdlib-only imports (`json`, `hashlib`, `statistics`, `pathlib`); no `pip`/venv.
+
+## Phase 5: Negative control, observed (blocked: Phase 4)
+
+- [ ] 5.1 Run the negative control: BROAD flags declaring the SCOPED expected digest.
+- [ ] 5.2 Observe: MUST void `surface-mismatch`. If not — STOP; no `theory/` write may occur; file as its own blocked follow-up, not a silent pass.
+
+## Phase 6: Tier-1 pilot + derived timeout (blocked: Phase 3 AND Phase 5 both passing)
+
+- [ ] 6.1 Run tier-1 cell: 5 BROAD + 5 SCOPED, `TIMEOUT_S=300` (pilot bound only).
+- [ ] 6.2 If any pilot run times out: pilot invalid — raise bound, re-run before continuing.
+- [ ] 6.3 Derive `ceil(3 × slowest_successful_pilot_wall_s / 30) × 30`, floor 120s; update `run.sh` constant + WHY comment.
+- [ ] 6.4 Compute `T_task = 2 × (files_in_answer_key + 2) + 1`; record.
+- [ ] 6.5 Apply N=5→10→15 variance rule to tier-1 spread; report final N + min/max range.
+- [ ] 6.6 `./hooks/pre-commit --all` over committed rows.
+
+## Phase 7: Tier-2 fixture + cell (blocked: Phase 6, all shakedown assertions passed)
+
+- [ ] 7.1 Create `src/utils/date.js` (midnight boundary defect) + 3-4 correct distractors.
+- [ ] 7.2 Commit `answer-key/t2.json` (+ its own R-A1.7 negative control + off-set case) **before** the prompt commit.
+- [ ] 7.3 Commit `prompts/t2.txt` in a later commit.
+- [ ] 7.4 Refreeze `MANIFEST.sha256`; verify accept-before / reject-tampered-after.
+- [ ] 7.5 Run tier-2 cell (N=5→15 variance rule); report N + range.
+
+## Phase 8: Tier-3 fixture + cell (blocked: Phase 6; independent of Phase 7)
+
+- [ ] 8.1 Create `src/handlers/checkout.js`, `src/lib/pricing.js` (`>` vs `>=` defect), `src/lib/pricing.contract.md`.
+- [ ] 8.2 Commit `answer-key/t3.json` (+ negative control + off-set case) **before** the prompt commit.
+- [ ] 8.3 Commit `prompts/t3.txt` in a later commit.
+- [ ] 8.4 Refreeze `MANIFEST.sha256`; verify before/after as in 7.4.
+- [ ] 8.5 Run tier-3 cell (N=5→15 variance rule); report N + range.
+
+## Phase 9: Aggregation + theory write (blocked: Phase 7 AND Phase 8; 9.0 gates 9.4)
+
+- [ ] 9.0 **[BLOCKED — design gap, not decided here]** Design's Open Questions defers whether `rig/`'s `MAP.md` entry needs its own ADR to "whoever writes the first result." Needs an explicit ruling before 9.4, not a tasks-phase decision.
+- [ ] 9.1 Run `rig/report.py` over all committed rows: four-cell table, off-set distribution, anomaly log, all 3 tasks.
+- [ ] 9.2 Apply X=3 instrument-doubt threshold; investigate before writing `theory/` if tripped.
+- [ ] 9.3 Apply the pre-registered falsification table; determine exactly one verdict (Supports/Narrows/Contradicts).
+- [ ] 9.4 Modify `theory/agents/tool-surface-design.md`: verdict, four-cell table, off-set distribution, anomaly log, R-A1.6 honesty-contract limitations (6 items). No code.
+
+## No-code tasks
+
+0.1, 0.2, 0.3, 3.1–3.5 (verification only), 4.4, 4.8 (verification), 5.1–5.2 (run + observe), 6.2, 6.5, 6.6, 9.0–9.4.
+
+## Blocked tasks
+
+5.2 (gates all downstream work on the negative control firing), 6.1–6.6 (gated on 3.1–3.5 AND 5.1–5.2), 7.x/8.x (gated on Phase 6 passing in full), 9.x (gated on 7.x AND 8.x), 9.0 (design-level gap — needs an explicit ruling, not authored here), 9.4 (gated on 9.0–9.3).
