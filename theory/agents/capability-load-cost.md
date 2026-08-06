@@ -3,8 +3,8 @@ id: theory/agents/capability-load-cost
 type: theory
 targets: [any]
 status: validated
-verified: 2026-08-05
-sources: ["https://blog.bytebytego.com/p/how-chatgpt-optimizes-its-agent-loop", "journal/2026-08-05-context-measurement.md", "research/agent-loop-optimization-bytebytego.md", "research/claude-certified-architect-exam-guide.md"]
+verified: 2026-08-06
+sources: ["https://blog.bytebytego.com/p/how-chatgpt-optimizes-its-agent-loop", "journal/2026-08-05-context-measurement.md", "research/agent-loop-optimization-bytebytego.md", "research/claude-certified-architect-exam-guide.md", "research/llm-as-code-agentic-programming.md"]
 ---
 
 # The cost of a capability is what it costs to load, not what it costs to have
@@ -70,6 +70,30 @@ That is second-hand and labelled as such — attributed reporting, not vendor do
 narrow but real: two independent harnesses, built by different organisations, converged on
 deferring tool schemas. That is evidence the constraint is structural rather than an artifact of
 one implementation.
+
+### The same shape in a third domain: context as a function of structure
+
+An academic result argues that an agent's context need not grow with the number of steps taken. If
+control flow lives in the program, each model call's context is its **ancestor chain** in a call DAG
+with returned subtrees collapsed to summaries — so length is a function of **call depth**, not of
+accumulation: *"no call ever carries the whole task's history, only its ancestor chain"*
+(`research/llm-as-code-agentic-programming.md`, arXiv:2606.15874).
+
+That is this file's claim again, in a domain it did not anticipate. The pattern now holds three times:
+
+| Domain | Cost is a function of | Not of |
+|---|---|---|
+| Tools | Schemas **loaded** | Tools connected |
+| Artifacts across a delegation boundary | Artifacts **copied into a prompt** | Artifacts referenced |
+| Conversation in an agent loop | Ancestor-chain **depth** | Steps executed |
+
+Each was reached independently, and none of the three sources states the general form. The general
+form is: **context cost is set by what a given call must carry, and what a call must carry is a design
+choice, not a consequence of scale.** Every instance above is someone discovering that separately.
+
+Scope: the third row is one paper's architectural argument, measured on GUI automation with one model
+against leaderboard baselines — see the verdict for the seam in that comparison. The *mechanism* is
+what generalises here, exactly as with the two rows above it.
 
 ## The limit of this claim — deferral does not fix everything it appears to fix
 

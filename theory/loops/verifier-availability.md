@@ -3,8 +3,8 @@ id: theory/loops/verifier-availability
 type: theory
 targets: [any]
 status: validated
-verified: 2026-08-05
-sources: ["journal/2026-08-05-first-commit-gate-bypass.md", "journal/2026-08-05-second-gate-bypass-agent-conflict.md", "decisions/0008-review-lenses-may-use-subagents.md", "research/claude-certified-architect-exam-guide.md", "research/gentle-orchestrator-anatomy-guide.md"]
+verified: 2026-08-06
+sources: ["journal/2026-08-05-first-commit-gate-bypass.md", "journal/2026-08-05-second-gate-bypass-agent-conflict.md", "journal/2026-08-05-redaction-gate-and-2478-on-224.md", "decisions/0008-review-lenses-may-use-subagents.md", "research/claude-certified-architect-exam-guide.md", "research/gentle-orchestrator-anatomy-guide.md", "research/llm-as-code-agentic-programming.md", "research/agent-loop-termination-kinney.md"]
 ---
 
 # A verifier that cannot run is not a weak gate — it is an absent gate that reports "not run"
@@ -98,6 +98,37 @@ spent trying. A cap used as the *primary* termination condition hides the absenc
 completion test — which is the same failure this file is about, arriving from the other direction: a
 loop that stops on a counter has no verifier either, it just fails less visibly.
 
+### What the primary signal can be, when convergence is not observable
+
+The paragraph above says a cap must not be the primary termination condition and does not say what
+may be. An independent synthesis outside this vendor closes that gap with concrete detectors, and it
+reaches the same rule first: *"Max iterations alone isn't enough; you need loop fingerprinting **and**
+cost budgets **and** no-progress detection"* (`research/agent-loop-termination-kinney.md`).
+
+| Detector | Mechanism | What it actually tests |
+|---|---|---|
+| Repetition fingerprint | Hash each iteration's `(tool_name, result_preview)`; stop after N identical hashes in a row | The loop is cycling rather than progressing |
+| No-progress detection | Compare observable state between iterations, not model text | Something in the world changed |
+| Cost ceiling | Hard spend cap per run | Bounded blast radius, independent of correctness |
+| Wall-clock ceiling | Elapsed-time cap | Catches slow steps that a step count does not |
+
+Two things about this list matter more than the list.
+
+**Every entry tests state or resource consumption, and none tests the model's account of itself.**
+That is what separates them from the anti-patterns the same guidance rejects — parsing natural
+language for completion, or checking assistant text. A fingerprint over tool results is a fact about
+what the loop did; "the agent said it was done" is a fact about what it emitted.
+
+**They are conjunctive, not alternatives.** Each catches a different way a loop fails to end, so
+picking one and calling the loop bounded reproduces the original defect at a smaller scale. The
+repetition detector misses a loop that varies its calls while accomplishing nothing; no-progress
+detection misses a loop that is progressing expensively; a cost ceiling misses a cheap infinite loop.
+
+Scope, because the source does not carry it: these are **design mechanisms, not measured results.**
+Every figure on that page is second-hand and two of its most quotable numbers have no disclosed
+method — see the verdict. The detectors are worth adopting because their logic is inspectable, not
+because anyone measured them.
+
 ## Deterministic enforcement versus prompt instruction
 
 The same first-party guidance separates **programmatic enforcement** (hooks, prerequisite gates) from
@@ -148,6 +179,38 @@ mild evidence against it.**
 
 The practical test is not to read the rule but to ask which layer implements it. If the answer is
 "the instruction says so", there is no gate — there is a request with confident typography.
+
+### The same conclusion, measured, from outside any vendor
+
+Everything above is normative: two vendors' guidance plus local incidents. An academic result now
+supports the load-bearing part of it, and it is worth separating because it is the first **measured**
+evidence this file has (`research/llm-as-code-agentic-programming.md`).
+
+arXiv:2606.15874 argues that token explosion, control-flow hallucination and unreliable completion
+are **architectural consequences** of assigning the deterministic work of looping, branching and
+sequencing to a probabilistic system — not implementation bugs — and states the corollary bluntly:
+*"A better prompt or a stronger model cannot guarantee the reliability of the LLM agent."*
+
+That is the three-layer table's conclusion reached independently. The layers say emphatic prompt
+wording does not create enforcement; the paper says the class of work being delegated is the problem,
+so no improvement within the prompt layer fixes it. Normative and empirical derivations agreeing is
+much better evidence than either alone, and neither derivation knew about the other.
+
+Its measurement, on GUI automation over OSWorld: the program-controlled design reached **86.8%
+overall success in 15 steps** against leaderboard baselines running up to 100 steps, the best of which
+was 80.4%.
+
+**Scope, stated because this number will otherwise be quoted as a law.** One model, one benchmark,
+GUI/computer-use tasks. The baselines were **taken from a public leaderboard, not re-run**, so a
+single comparison mixes an author-measured figure with cited ones — disclosed by the authors, which
+removes the charge of concealment but not the confound. The authors also bound their own claim:
+the approach *"does not subsume fully exploratory tasks"* and is effective *"when a workflow has a
+known structure."*
+
+What survives every objection is the **step-count gap**, not the success rate. 15 versus up to 100 is
+too large for leaderboard noise to explain, and a step budget is bounded by construction rather than
+measured. Cite that. Do not cite this as evidence that program-controlled agents beat frameworks in
+general — that sentence is wider than the evidence, and the loop-design claim does not need it.
 
 ## Scope
 

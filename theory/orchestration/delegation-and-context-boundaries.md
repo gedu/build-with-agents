@@ -3,8 +3,8 @@ id: theory/orchestration/delegation-and-context-boundaries
 type: theory
 targets: [any]
 status: validated
-verified: 2026-08-05
-sources: ["research/gentle-orchestrator-anatomy-guide.md", "research/claude-certified-architect-exam-guide.md", "theory/agents/capability-load-cost.md"]
+verified: 2026-08-06
+sources: ["research/gentle-orchestrator-anatomy-guide.md", "research/claude-certified-architect-exam-guide.md", "research/agent-harness-explainer-cluster.md", "journal/2026-08-05-redaction-gate-and-2478-on-224.md", "theory/agents/capability-load-cost.md"]
 ---
 
 # A delegation is a context boundary, and everything the child needs must cross it explicitly
@@ -71,6 +71,44 @@ with the uncertainty of each now invisible.
 This is `theory/loops/verifier-availability.md` seen from the other side. There, the verifier was
 unavailable and the gate reported "not run". Here, the verifier is *skipped* because a report is
 mistaken for a check — and it reports success. Same missing verifier, louder failure.
+
+### The rule is not about subagents — it is about instruments, including your own
+
+Both sources above frame this as a property of *delegation*, and framing it that way leaves a gap that
+was found the hard way here.
+
+An independent statement of the same rule, from the testing direction rather than the delegation
+direction, is broader and better: *"never trust the report if the system under test did not actually
+change correctly"*, and *"Testing the story is weak. Testing the state change is the serious
+version"* (`research/agent-harness-explainer-cluster.md`). Note what that formulation does **not**
+mention: who or what produced the report. It is a rule about reports, not about subagents.
+
+**The local instance, and it is why the widening is not pedantry.** Recorded in
+`journal/2026-08-05-redaction-gate-and-2478-on-224.md` §6: a corner-case pass on a newly built gate
+reported that every fix had failed. The fixes were correct. The **test harness** was reverting the code
+under test on every reset — the artifact under test had been committed inside the fixture repository —
+so the suite was exercising the old version while its output described the new one. A verified-false
+conclusion was one step from being published, and nothing in it involved a subagent.
+
+So the correct scope is: **anything that reports on work you did not directly observe is a claim, not
+evidence.** A delegate's summary, a test suite's output, a linter's exit code, a CI badge, and your own
+one-off script are the same category. The delegation case is the most discussed, not the most dangerous
+— your own tooling is trusted more precisely because you wrote it.
+
+The operational form, which is cheap: **before believing a report, confirm what produced it was the
+thing you meant to test.** In the case above, one `rg` against the fixture copy would have shown it
+lacked the fix. That check took seconds and was not run, because the suite was the thing being trusted.
+
+**The grader ordering that follows**, from the same source: code-based checks first — *"unit tests,
+static analysis, regex, schema validation, database queries, tool-call checks"* — then model-based
+graders, which *"need calibration"*, then humans as the slow gold standard. That is the three-layer
+enforcement ordering in `theory/loops/verifier-availability.md` restated for verification: put the
+deterministic, inspectable check first, and reserve judgment-shaped checks for what genuinely requires
+judgment.
+
+Scope: the source carries **no measurement** — no study, no benchmark, no method. It is prescriptive
+guidance, and its verdict is `unverifiable` for that reason. It is cited here for the principle and its
+sharper framing. The instance that gives the principle teeth is local and first-hand.
 
 ## When not to delegate, and how much
 
