@@ -27,7 +27,7 @@ counted from the tool-call list.
 | Tool-call transcript | **Available** | `tool_use` blocks carrying `name` and verbatim `input`, paired to `tool_result` by `tool_use_id` |
 | Wall clock | **Available** | Per-event timestamps |
 | Turn count | **Available** — `num_turns` | Confirmed by a real run. See the correction below; this row said "partial" before one command settled it |
-| Controllable tool surface | **Available** | `--allowedTools` / `--disallowedTools` per invocation, and `--agents <json>` for a declared subagent tool set |
+| Controllable tool surface | **Partially — and not the way assumed** | `--allowedTools` does **not** change what the model sees. See the reconnaissance section: the surface is controllable only for its MCP half |
 
 ### Verified first-hand, not taken from the exploration's report
 
@@ -125,6 +125,78 @@ This correction is the clearest instance so far of
 `theory/loops/reading-and-running-find-different-defects.md`: reading the flag text produced a confident
 wrong conclusion about auth and a "partial" verdict on a field that exists, and a single execution fixed
 both while surfacing a cost fact no amount of reading would have produced.
+
+## Reconnaissance: the schema, and the finding that constrains the first experiment
+
+One run with a forced tool call, then four one-line variations. Nine `stream-json` events per run. Total
+cost of the whole reconnaissance under two dollars.
+
+### The event schema, confirmed
+
+| Event | Carries |
+|---|---|
+| `system` / `hook_started`, `hook_response` | Ambient hooks firing — observable, so it can be recorded rather than assumed |
+| `system` / `init` | **`tools` (the exact array)**, `mcp_servers` with per-server status, `model`, `permissionMode`, `cwd` |
+| `assistant` | `message.content[]` with `text` and `tool_use` blocks; `tool_use` gives `id`, `name`, `input`; plus `timestamp`, `request_id`, `parent_tool_use_id` |
+| `user` | `tool_use_result`, and a `tool_result` content block paired by `tool_use_id` with `is_error` |
+| `rate_limit_event` | `status`, `rateLimitType`, `overageStatus`, `isUsingOverage`, `resetsAt` |
+| `result` / `success` | `num_turns`, `stop_reason`, `total_cost_usd`, full `usage`, `modelUsage` by model id, **`permission_denials`** |
+
+Two of those were not anticipated and both are useful. **`init.tools` means the tool surface does not
+have to be asserted — it can be read back from the run itself**, which is what constraint 2 of ADR 0010
+wants a hash of. And `permission_denials` plus `is_error` on a tool result give a second, independent
+angle on wrong-tool counting beyond comparing names against an allowed set.
+
+Calibration: one tool call produced `num_turns: 2`, so turns run about one more than tool calls.
+
+### The finding: `--allowedTools` does not scope the visible surface
+
+Four runs, same trivial prompt, one flag changed at a time:
+
+| Configuration | Visible tools | MCP servers | Cost |
+|---|---|---|---|
+| Baseline, no flags | 54 | 25 | $0.2208 |
+| `--allowedTools "Read"` | **54** | 25 | **$0.2208** |
+| `--strict-mcp-config` | **30** | 0 | $0.1967 |
+| Both | 30 | 0 | $0.1967 |
+
+`--allowedTools` changed nothing — identical tool count and identical cost to the cent. It is a
+**permission** filter, not a visibility control. The model still sees every name.
+
+**That breaks the first experiment as designed.** `theory/agents/tool-surface-design.md`'s claim is that
+selection happens over resident *names*, so an arm that keeps all 54 names resident and merely forbids
+calling them does not reduce selection complexity at all. It would have measured nothing, and it would
+have looked like it worked.
+
+`--strict-mcp-config` does work: 54 → 30 tools, 25 → 0 servers. **But the remaining 30 are built-in and
+no flag tested removes them.** The scoped arm therefore has a floor of 30, so the intended contrast of
+roughly 5 versus 90 is not reachable this way.
+
+### What the first experiment can actually be
+
+Three options, none of them the original:
+
+| Option | Contrast available | Status |
+|---|---|---|
+| Vary the MCP half via `--strict-mcp-config` / `--mcp-config` | 30 versus 54 resident names, precisely controlled at the server level | **Available now.** A 1.8× surface difference, not 18× |
+| Run the task inside a declared agent via `--agents <json>`, whose `tools:` frontmatter does scope visibility | Potentially very narrow — a sub-agent in this session was observed with only 7 tools | **Unverified for `-p` main-agent runs.** The next thing to test |
+| Drive the Anthropic API directly | Fully ours, any surface | Measures a harness nobody uses — the fork already recorded above |
+
+Option one is a legitimate, weaker version of the experiment and it is executable today. Whether option
+two works in print mode is the single highest-value remaining unknown, because it is the difference
+between a 1.8× and an order-of-magnitude contrast.
+
+### An incidental data point for the cost axis
+
+Removing 24 MCP tool definitions saved **$0.024 per run, about 11%**. That is
+`theory/agents/capability-load-cost.md`'s claim beginning to acquire a number in this harness. Recorded
+as **one observation, not a measurement** — no repeats, no variance, and the two runs that shared a
+configuration came back byte-identical in cost, which suggests caching is doing work the single delta
+does not separate out.
+
+Also observed: `permissionMode` came back as `bypassPermissions` without anyone asking for it, inherited
+from ambient settings. Another instance of the configuration this machine supplies silently, and now
+recorded per run because `init` reports it.
 
 ## Negative result, recorded because it kills an option cheaply
 
