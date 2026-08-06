@@ -27,7 +27,7 @@ counted from the tool-call list.
 | Tool-call transcript | **Available** | `tool_use` blocks carrying `name` and verbatim `input`, paired to `tool_result` by `tool_use_id` |
 | Wall clock | **Available** | Per-event timestamps |
 | Turn count | **Available** — `num_turns` | Confirmed by a real run. See the correction below; this row said "partial" before one command settled it |
-| Controllable tool surface | **Partially — and not the way assumed** | `--allowedTools` does **not** change what the model sees. See the reconnaissance section: the surface is controllable only for its MCP half |
+| Controllable tool surface | **Available — via `--disallowedTools`, not `--allowedTools`** | Floor is 3 tools (`Glob`, `Grep`, `Read`). `--allowedTools` has no visibility effect at all. See the reconnaissance section |
 
 ### Verified first-hand, not taken from the exploration's report
 
@@ -172,27 +172,45 @@ have looked like it worked.
 no flag tested removes them.** The scoped arm therefore has a floor of 30, so the intended contrast of
 roughly 5 versus 90 is not reachable this way.
 
-### What the first experiment can actually be
+### The mechanism, found by continuing to probe: `--disallowedTools`
 
-Three options, none of them the original:
+Three more runs settled it, and the answer is an asymmetry between two flags that read like a pair:
 
-| Option | Contrast available | Status |
-|---|---|---|
-| Vary the MCP half via `--strict-mcp-config` / `--mcp-config` | 30 versus 54 resident names, precisely controlled at the server level | **Available now.** A 1.8× surface difference, not 18× |
-| Run the task inside a declared agent via `--agents <json>`, whose `tools:` frontmatter does scope visibility | Potentially very narrow — a sub-agent in this session was observed with only 7 tools | **Unverified for `-p` main-agent runs.** The next thing to test |
-| Drive the Anthropic API directly | Fully ours, any surface | Measures a harness nobody uses — the fork already recorded above |
+| Flag | Effect on the visible surface |
+|---|---|
+| `--allowedTools` | **None.** 54 → 54. A permission allowlist only |
+| `--disallowedTools` | **Removes names from visibility.** Every tool named disappears from `init.tools` |
+| `--agents <json>` | **None** on a `-p` main-agent run. 30 → 30. It declares agents available to invoke, not the caller's own surface |
+| `--strict-mcp-config` | Drops all MCP tools. 54 → 30 |
 
-Option one is a legitimate, weaker version of the experiment and it is executable today. Whether option
-two works in print mode is the single highest-value remaining unknown, because it is the difference
-between a 1.8× and an order-of-magnitude contrast.
+Naming eleven tools took the surface from 30 to 21. Naming the full built-in set took it to **three:
+`Glob`, `Grep`, `Read`.**
 
-### An incidental data point for the cost axis
+**So the first experiment is executable at full contrast after all: 54 versus 3, a factor of 18.** That
+is the shape ADR 0010 wanted, and it happens to sit at the same order as the *"18 instead of 4-5"*
+illustration in `research/claude-certified-architect-exam-guide.md` that
+`theory/agents/tool-surface-design.md` is built on. The design was never wrong — the flag was.
 
-Removing 24 MCP tool definitions saved **$0.024 per run, about 11%**. That is
-`theory/agents/capability-load-cost.md`'s claim beginning to acquire a number in this harness. Recorded
-as **one observation, not a measurement** — no repeats, no variance, and the two runs that shared a
-configuration came back byte-identical in cost, which suggests caching is doing work the single delta
-does not separate out.
+### The cost axis, and why it makes the experiment cleaner than expected
+
+| Surface | Cost of a trivial run |
+|---|---|
+| 54 tools, 25 MCP servers | $0.2208 |
+| 30 tools, 0 MCP servers | $0.1967 |
+| 3 tools | $0.2012 |
+
+Going from 54 names to 3 changed cost by about **$0.02, roughly 9%**, and the ambient context in every
+one of those runs was ~26k tokens. So **the names are nearly free and the ambient context dominates** —
+which is `theory/agents/capability-load-cost.md`'s claim showing up in a third harness.
+
+That is not a footnote, it is what makes the experiment clean: **because 51 extra tool names cost almost
+nothing, any difference between the two arms in wrong-tool calls or task success cannot be attributed to
+cost.** The confound that would have muddied the result is small enough to set aside, which isolates
+exactly the quantity the experiment exists to measure — selection reliability.
+
+Recorded as **observations, not measurements**: single runs, no repeats, no variance, and two runs
+sharing a configuration returned byte-identical costs, so caching is doing work these deltas do not
+separate out. ADR 0010's constraint 3 exists for precisely this reason.
 
 Also observed: `permissionMode` came back as `bypassPermissions` without anyone asking for it, inherited
 from ambient settings. Another instance of the configuration this machine supplies silently, and now
