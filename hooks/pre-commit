@@ -43,6 +43,14 @@
 
 set -euo pipefail
 
+# Byte semantics, not locale semantics, for every tool below. A repository can contain
+# bytes that are not valid in the ambient encoding, and under a UTF-8 locale both BSD tr
+# and awk abort on them ("Illegal byte sequence", "multibyte conversion failure"). This
+# script reports that as exit 2, so the failure is loud rather than a silent pass — but a
+# check that cannot run is still not a check. C locale also makes [A-Za-z] mean exactly
+# ASCII, which is what every pattern below intends.
+export LC_ALL=C
+
 # Print the header block by scanning for it rather than by line number, so editing the
 # header cannot silently start printing executable lines.
 show_help() {
@@ -79,8 +87,33 @@ PATTERNS=(
 # replacing a tracked symlink with a regular file is an added-content change that ACMR
 # alone would skip entirely. Deletions carry no added lines and are excluded.
 staged_added_lines() {
-  git diff --cached -U0 --no-color --diff-filter=ACMRT | awk '
-    /^\+\+\+ b\// { file = substr($0, 7); next }
+  # --text forces a content diff for binary files. Without it git emits only
+  # "Binary files a/x and b/y differ", with no added lines at all, so a secret staged
+  # inside a blob passes the gate silently. Cost is a larger diff; correctness in a
+  # security gate outranks it.
+  #
+  # tr is not optional and --text is useless without it: awk truncates a record at the
+  # first NUL byte, so a blob's added line arrives as an empty string and scans clean.
+  # NUL is replaced rather than deleted so two tokens either side of it cannot fuse.
+  # The script-wide LC_ALL=C is what keeps tr and awk from aborting on a blob's
+  # invalid multibyte bytes; see the note beside it.
+  git diff --cached -U0 --no-color --text --diff-filter=ACMRT \
+    | tr '\000' ' ' \
+    | awk '
+    # Header paths need three normalisations, each of which silently misattributed a
+    # finding before it was handled: git appends a TAB when the path contains a space,
+    # wraps the whole path in QUOTES when it contains non-ASCII or control characters,
+    # and writes /dev/null for a side that does not exist. A header that fails to match
+    # does not clear `file`, so an unhandled form reports the PREVIOUS file name.
+    /^\+\+\+ / {
+      p = substr($0, 5)
+      sub(/\t.*$/, "", p)
+      if (substr(p, 1, 1) == "\"") { p = substr(p, 2, length(p) - 2) }
+      if (p == "/dev/null") { file = ""; next }
+      sub(/^b\//, "", p)
+      file = p
+      next
+    }
     /^@@ / {
       match($0, /\+[0-9]+/)
       line = substr($0, RSTART + 1, RLENGTH - 1) + 0
@@ -94,7 +127,10 @@ staged_added_lines() {
 all_tracked_lines() {
   git ls-files -z | while IFS= read -r -d '' f; do
     [ -f "$f" ] || continue
-    grep -nH '' -- "$f" 2>/dev/null || :
+    # -a forces binary files to be read as text. Without it grep prints
+    # "Binary file X matches" instead of the content, and a secret embedded in a blob
+    # is invisible while the run still reports "clean across N tracked files".
+    grep -a -nH '' -- "$f" 2>/dev/null || :
   done
 }
 

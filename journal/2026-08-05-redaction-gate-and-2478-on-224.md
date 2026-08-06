@@ -117,7 +117,57 @@ upstream report.
   against the current workspace snapshot identity. Those differ **even when the candidate tree is
   byte-identical**, which makes the mismatch invisible to a `git diff` check.
 
-## 6. Open, deliberately
+## 6. Post-review double check — four more misses, same family as the two CRITICALs
+
+Run after the review, before pushing, on the reasoning that a gate deserves an adversarial pass
+against inputs nobody chose for it. Four defects, none of which any lens found, and all of them the
+**same failure the review had already named twice: the tool reporting coverage it did not have.**
+Third and fourth instance in one day.
+
+| Input | What happened |
+|---|---|
+| Filename containing a space | Git appends a TAB to the `+++` header. The location printed as `my notes.md⇥:1` |
+| Filename containing non-ASCII | Git **quotes** the whole path (`+++ "b/caf\303\251.md"`). The header regex required `+++ b/`, did not match, and left `file` at its previous value — so the finding was attributed to **the wrong file**, or to none |
+| Binary file, `--all` | `grep` printed "Binary file X matches" instead of content. A secret inside a blob was invisible while the run reported *"clean across N tracked files"* |
+| Binary file, staged | `git diff` emits only "Binary files differ" with no added lines, so the commit gate could not see inside a blob at all |
+
+The second one is the worst of the four. Detection still fired, so nothing would have leaked — but a
+security tool that names the wrong file sends you to the wrong place, and the failure is invisible
+because a finding *was* reported.
+
+Fixed: the header parser now strips the trailing tab, unwraps git's quoting, and handles
+`/dev/null`; `--all` scans with `grep -a`; the staged diff uses `--text`.
+
+**Two fixes that only exist because the code was actually run.** Both looked correct and were not:
+
+- `--text` alone changed nothing. Git produced the added line, and **awk truncated the record at the
+  first NUL byte**, so it arrived as an empty string and scanned clean. Needs `tr` on the NULs.
+- Then `tr`, and then `awk`, aborted outright on a blob's invalid multibyte bytes under a UTF-8
+  locale. Fixed with a script-wide `LC_ALL=C`, which also makes `[A-Za-z]` mean exactly ASCII, which
+  is what every pattern already intended.
+
+Both of those aborts surfaced as **exit 2, "COULD NOT RUN"** rather than as a silent pass — the
+CRITICAL 2 fix doing precisely its job on a failure mode nobody predicted, hours after being written.
+That is the strongest evidence in this repo for the fail/not-run distinction, and it arrived by
+accident.
+
+**A methodology note worth more than any of the fixes.** The first corner-case run reported that all
+the fixes had failed. They had not: the throwaway test repo had the hook committed inside itself, so
+every `git reset --hard` silently reverted it to the pre-fix version. The tests were exercising the
+old code while appearing to exercise the new. Verified conclusions were nearly published from a
+harness that was lying — **check what the harness is actually running before believing what it
+reports.**
+
+Verified after the fixes, in a clean fixture per case: multi-file multi-hunk attribution, a filename
+with a space, a filename with non-ASCII, a staged binary, `--all` over a committed binary, all four
+approved placeholder forms passing untouched, `--help` printing no code, an unknown argument exiting
+2, and `setup.sh --claude` / `--all` still reaching the gitignore sync.
+
+This fix commit is **post-review and therefore unreviewed**. It could not be folded into the bounded
+correction, which was already spent, and a second review could not produce a receipt anyway while
+#2478 stands.
+
+## 7. Open, deliberately
 
 - **Lineage `review-bcfce2ce488fc844` is left in `correction_required`.** It is the second abandoned
   lineage in this repo. Benign on the same reasoning as the first, but **do not treat it as a blocker
