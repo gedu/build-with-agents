@@ -30,6 +30,13 @@ coverage/
 # Local agent state (not the tool-neutral sources)
 .codegraph/
 
+# Measurement-rig raw captures (rig/README.md; decisions/0011): every `init`
+# event carries an absolute home path, so these never get committed. Kept
+# OUTSIDE the managed block below on purpose — that block is rewritten
+# wholesale by ./setup.sh, and an entry placed inside it would be silently
+# dropped the next time anyone reruns the script.
+/rig/runs/
+
 # >>> generated AI tool assets (managed by setup.sh) >>>
 # Do not edit inside this block by hand; `./setup.sh` owns it.
 # <<< generated AI tool assets (managed by setup.sh) <<<
