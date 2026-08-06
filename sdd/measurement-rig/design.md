@@ -457,3 +457,79 @@ comparison, costing under a dollar, found a confound that four reasoning passes 
 fourth instance in three days of `theory/loops/reading-and-running-find-different-defects.md` behaving
 as written, and the second where the wrong reading would have silently invalidated an experiment rather
 than producing a visible error.
+
+## Amendment 3 — the surface is nondeterministic, so `--strict-mcp-config` becomes required in both arms
+
+Found immediately after Amendment 2, while capturing `rig/surfaces/broad.txt` and — on the discipline
+this repo keeps re-learning — capturing it **twice** to check it was stable. It was not.
+
+### The observation
+
+Two identical invocations of `--disallowedTools Bash`, seconds apart:
+
+| Capture | Visible tools |
+|---|---|
+| 1 | **55** |
+| 2 | **82** |
+
+The 27 extra entries were all tools of one remote MCP server. The earlier reconnaissance had recorded
+that server with `status: "pending"`; it finished connecting between the two captures and its tools
+joined the surface.
+
+**The visible tool surface therefore depends on MCP connection race timing.** Two runs in the same arm,
+minutes apart, can differ by 27 names. This is worse than Amendment 2's finding: that one produced a
+wrong-but-stable comparison, this one produces no stable comparison at all. The read-back assertion
+would have voided a large and unpredictable share of runs with `surface-mismatch` — correctly — and the
+experiment would simply never have accumulated its N.
+
+### The correction, which reverses an earlier prohibition of this design's own
+
+`--strict-mcp-config` was **forbidden** by the exploration and by Amendment 1, on the grounds that it
+takes MCP servers from 25 to 0 and is therefore a second variable.
+
+That reasoning was right about the mechanism and wrong about the conclusion, in exactly the way
+Amendment 2 was: **a reducer applied to one arm is a variable; applied to both arms it is a constant.**
+`--strict-mcp-config` is now **required in both arms**, and required rather than merely permitted,
+because without it the surface is not reproducible.
+
+Verified — three consecutive captures of `--strict-mcp-config --disallowedTools Bash`:
+
+| Capture | Tools | MCP servers |
+|---|---|---|
+| 1 | 31 | 0 |
+| 2 | 31 | 0 |
+| 3 | 31 | 0 |
+
+Byte-identical across all three. The surface contains `Glob`, `Grep` and `Read`, so SCOPED remains a
+**true subset** of BROAD, which is what Amendment 2 was for.
+
+| Arm | Flags | Visible |
+|---|---|---|
+| BROAD | `--strict-mcp-config --disallowedTools Bash` | **31** |
+| SCOPED | the same, plus the other 28 names disallowed | **3** |
+
+### What it costs, stated rather than buried
+
+The contrast drops from 54-versus-3 to **31-versus-3** — roughly an order of magnitude instead of
+eighteen-fold. That is a smaller effect to detect and it raises the chance of a null result.
+
+Accepted, because the alternative is not a bigger contrast, it is **no measurement**: a nonreproducible
+BROAD surface cannot support a comparison at any contrast ratio. A smaller reproducible difference beats
+a larger imaginary one.
+
+It also narrows what the result can claim. The finding will be about **built-in tool surface breadth
+with MCP excluded**, and must not be stated as a claim about surfaces including remote MCP servers. That
+belongs in the honesty contract.
+
+### The pattern, now visible three times
+
+Amendments 2 and 3 are the same move, and naming it is worth more than either finding:
+
+> **A reducer applied to one arm is a confound. Applied to both arms it is a constant.**
+
+`Bash` in Amendment 2, MCP servers here. Both looked like things to remove from the scoped arm; both
+were things to remove from **every** arm. The general form: when a knob changes more than the quantity
+under study, do not avoid the knob — set it identically everywhere and record it as a fixed input.
+
+Both were found by running two probes and comparing, and neither by reading a flag description. That is
+the fourth and fifth instance in this change alone.
