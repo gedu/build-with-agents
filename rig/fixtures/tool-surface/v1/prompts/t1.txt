@@ -1,0 +1,1 @@
+Read `paginate.js` and report every defect that causes `pageSlice` to return the wrong items. Report each defect as one line in the exact format `<relative-path>:<line-number>`, one per defect, and output nothing else in your final message.
