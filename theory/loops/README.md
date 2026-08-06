@@ -12,7 +12,7 @@ sources: []
 Iteration shapes: plan/act/verify cycles, review and correction loops, budgets,
 convergence, and termination conditions that prevent infinite or wasteful loops.
 
-**Not yet written.** No verified claim has been recorded here.
+Files are not enumerated here; the directory carries the truth and `MAP.md` carries the count.
 
 ## Belongs here
 

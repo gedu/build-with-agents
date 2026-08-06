@@ -34,7 +34,7 @@ where to look and what you are allowed to trust.
 | `theory/agents/` | Single-agent design: tools, memory, context isolation | Yes, when `validated` | 3 docs (`capability-load-cost`, `instruction-provenance`, `tool-surface-design`) |
 | `theory/orchestration/` | Multi-agent coordination, delegation, handoffs | Yes, when `validated` | 1 doc (`delegation-and-context-boundaries`, validated) |
 | `theory/loops/` | Iteration shapes: plan/act/verify, review loops, termination | Yes, when `validated` | 1 doc (`verifier-availability`, validated) |
-| `research/` | Received links, contrasted against evidence, each with a verdict | Verdict only, as evidence | 6 verdicts (2 `supported`, 2 `partially supported`, 2 `unverifiable`) |
+| `research/` | Received links, contrasted against evidence, each with a verdict | Verdict only, as evidence | 10 verdicts (3 `supported`, 4 `partially supported`, 3 `unverifiable`) |
 | `decisions/` | Numbered ADRs (`NNNN-slug.md`) — the WHY | Yes | `0001`–`0009` ratified |
 | `journal/` | Dated conversations and brainstorms | **Never as authority**; valid as provenance (ADR 0007) | 8 entries (2026-08-04, 2026-08-05 ×7) |
 | `blocks/_shared/` | Target-agnostic minimal blocks with a contract | Yes, when `validated` | empty |
