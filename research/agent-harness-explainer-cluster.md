@@ -4,10 +4,10 @@ type: research
 targets: [any]
 status: validated
 verified: 2026-08-06
-sources: ["https://www.langchain.com/blog/how-to-build-a-custom-agent-harness", "https://dev.to/naimulkarim/what-is-an-ai-agent-harness-370m", "https://www.techademy.com/how-ai-agents-work", "https://www.dhirajdas.dev/blog/how-to-test-ai-agents-harness-guide", "https://blogs.oracle.com/developers/what-is-the-ai-agent-loop-the-core-architecture-behind-autonomous-ai-systems", "theory/orchestration/delegation-and-context-boundaries.md"]
+sources: ["https://www.langchain.com/blog/how-to-build-a-custom-agent-harness", "https://dev.to/naimulkarim/what-is-an-ai-agent-harness-370m", "https://www.techademy.com/how-ai-agents-work", "https://www.dhirajdas.dev/blog/how-to-test-ai-agents-harness-guide", "theory/orchestration/delegation-and-context-boundaries.md"]
 ---
 
-# Five agent-loop / harness explainers, adjudicated together
+# Four agent-harness explainers, adjudicated together
 
 ## Claim
 
@@ -28,10 +28,11 @@ All accessed 2026-08-06.
 | Naimul Karim, dev.to, *What is an AI Agent Harness?* | Independent explainer. *"the software infrastructure that surrounds a Large Language Model… and enables it to interact with the outside world"* | None |
 | Techademy, *How AI agents work* | Marketing content for a training platform, ending in a mentor-session CTA | None. Its "50 tools", "30 model calls", "10–20 active tools" are illustrative, not measured |
 | Dhiraj Das, *How to test AI agents: harness guide* | Independent prescriptive guide on testing agents | None. No study, benchmark or disclosed method |
-| Oracle, *What is the AI agent loop* | **Not retrievable** — HTTP 403 on access | Cannot be assessed |
 
-The Oracle link is recorded as **unreachable, not as empty.** Nothing about its content is being
-judged here; it returned 403 and was never read. If it matters, it needs to be supplied as text.
+**Oracle's agent-loop article was originally clustered here as unreachable (HTTP 403) and has since
+moved to its own entry**, `research/agent-loop-oracle.md`, adjudicated on 2026-08-06 from text supplied
+by the operator. It does not belong in this group: it carries falsifiable claims, cited numbers, and a
+`partially supported` verdict. Four sources remain here.
 
 ## Contrast
 
@@ -47,7 +48,7 @@ and teardown."* That is a description of where deterministic checks can attach, 
 question `theory/loops/verifier-availability.md` asks as "which layer implements it". Usable as a map
 of insertion points. Still first-party to one framework and uncited.
 
-**One of the five is materially more useful than the other four, and it converges with a local
+**One of the four is materially more useful than the other three, and it converges with a local
 first-hand finding.** Dhiraj Das's testing guide has no numbers, but it articulates, from outside this
 repo, exactly the rule this week produced twice:
 
@@ -81,14 +82,17 @@ decision in this repo.
 
 ## Verdict
 
-**`unverifiable`**, for all five, and for two distinct reasons that should not be blurred.
+**`unverifiable`**, for all four.
 
-- **Four contain no falsifiable claim.** They are definitions, taxonomies and prescriptions. Per
-  `research/README.md` and the `source-verdict` skill this is the expected verdict for explainers, and
-  it is **not** a synonym for false. Their value is vocabulary, a map of harness responsibilities, and
-  LangChain's list of loop insertion points.
-- **One was never read.** The Oracle post returned 403. It has no verdict because it has no assessed
-  content.
+**None contains a falsifiable claim.** They are definitions, taxonomies and prescriptions. Per
+`research/README.md` and the `source-verdict` skill this is the expected verdict for explainers, and it
+is **not** a synonym for false. Their value is vocabulary, a map of harness responsibilities, and
+LangChain's list of loop insertion points.
+
+Worth keeping distinct from an unreachable source: these four were **read and found to carry no
+falsifiable claim**, which is a judgement. A source that cannot be fetched has no verdict at all, which
+is an absence. Oracle's article began in this entry as the second case and left it as the first — see
+`research/agent-loop-oracle.md`.
 
 Recorded uses, so this entry is not merely dismissive: "harness" is now safe shared vocabulary;
 LangChain's middleware hook points are a usable map; Das's grader tiers and his grade-the-state rule
@@ -103,5 +107,3 @@ verification instrument's report, including your own*. That extension is support
 evidence, not by Das — cite him for the principle and this repo's journal for the instance.
 
 Nothing else in this group is promotable. No numbers, no method, no measurement.
-
-If the Oracle piece matters, supply its text and it gets its own entry.

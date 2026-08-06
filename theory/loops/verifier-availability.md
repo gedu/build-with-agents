@@ -4,7 +4,7 @@ type: theory
 targets: [any]
 status: validated
 verified: 2026-08-06
-sources: ["journal/2026-08-05-first-commit-gate-bypass.md", "journal/2026-08-05-second-gate-bypass-agent-conflict.md", "journal/2026-08-05-redaction-gate-and-2478-on-224.md", "decisions/0008-review-lenses-may-use-subagents.md", "research/claude-certified-architect-exam-guide.md", "research/gentle-orchestrator-anatomy-guide.md", "research/llm-as-code-agentic-programming.md", "research/agent-loop-termination-kinney.md"]
+sources: ["journal/2026-08-05-first-commit-gate-bypass.md", "journal/2026-08-05-second-gate-bypass-agent-conflict.md", "journal/2026-08-05-redaction-gate-and-2478-on-224.md", "decisions/0008-review-lenses-may-use-subagents.md", "research/claude-certified-architect-exam-guide.md", "research/gentle-orchestrator-anatomy-guide.md", "research/llm-as-code-agentic-programming.md", "research/agent-loop-termination-kinney.md", "research/agent-loop-oracle.md"]
 ---
 
 # A verifier that cannot run is not a weak gate — it is an absent gate that reports "not run"
@@ -101,14 +101,28 @@ loop that stops on a counter has no verifier either, it just fails less visibly.
 ### What the primary signal can be, when convergence is not observable
 
 The paragraph above says a cap must not be the primary termination condition and does not say what
-may be. An independent synthesis outside this vendor closes that gap with concrete detectors, and it
-reaches the same rule first: *"Max iterations alone isn't enough; you need loop fingerprinting **and**
-cost budgets **and** no-progress detection"* (`research/agent-loop-termination-kinney.md`).
+may be. **Two sources outside this vendor close that gap with concrete detectors, and they converge
+without citing each other** — an independent practitioner synthesis
+(`research/agent-loop-termination-kinney.md`): *"Max iterations alone isn't enough; you need loop
+fingerprinting **and** cost budgets **and** no-progress detection"*; and a vendor engineering article
+(`research/agent-loop-oracle.md`) naming *"maximum iteration limits, no-progress detection (exiting
+when repeated iterations produce no new information), and token/cost budgets as hard guardrails"*, plus
+goal-achievement checks.
+
+That convergence is worth more than either source, and for a specific reason: it is agreement on
+**design guidance**, not a shared citation. The same two documents also repeat two identical unsourced
+token figures traceable to one origin — see either verdict — so their agreement on *numbers* is worth
+nothing while their agreement here is worth something. Same pair of sources, opposite conclusions about
+what their overlap proves.
+
+Oracle's phrasing of the second detector is the sharper one and is adopted here: **no new information**,
+rather than an identical repeat. A loop that varies its calls while learning nothing passes a
+fingerprint check and fails this one.
 
 | Detector | Mechanism | What it actually tests |
 |---|---|---|
-| Repetition fingerprint | Hash each iteration's `(tool_name, result_preview)`; stop after N identical hashes in a row | The loop is cycling rather than progressing |
-| No-progress detection | Compare observable state between iterations, not model text | Something in the world changed |
+| Repetition fingerprint | Hash each iteration's `(tool_name, result_preview)`; stop after N identical hashes in a row | The loop is cycling on identical work |
+| No-progress detection | Exit when iterations produce **no new information**, judged on observable state rather than model text | Something was actually learned or changed |
 | Cost ceiling | Hard spend cap per run | Bounded blast radius, independent of correctness |
 | Wall-clock ceiling | Elapsed-time cap | Catches slow steps that a step count does not |
 

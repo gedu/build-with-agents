@@ -4,7 +4,7 @@ type: research
 targets: [any]
 status: validated
 verified: 2026-08-06
-sources: ["https://stevekinney.com/writing/agent-loops", "theory/loops/verifier-availability.md", "research/claude-certified-architect-exam-guide.md"]
+sources: ["https://stevekinney.com/writing/agent-loops", "theory/loops/verifier-availability.md", "research/claude-certified-architect-exam-guide.md", "research/agent-loop-oracle.md"]
 ---
 
 # Agent Loops (Steve Kinney)
@@ -62,6 +62,19 @@ Nothing here is measured by the author. That is not dishonest — the piece is a
 its sources — but it means the correct citation for any of these is the original, not this page. The
 90.2% in particular is a bare percentage with no disclosed denominator, and this repo should not
 repeat it.
+
+**Added 2026-08-06, and it strengthens that prohibition.** Both the 1x/4x/15x token multipliers and the
+90.2% multi-agent figure also appear in Oracle's agent-loop article, attributed to the same third party
+with the same absence of method (`research/agent-loop-oracle.md`). Two authors, three months apart, no
+other overlap — which reads exactly like independent confirmation and **is not**. Two documents quoting
+one unsourced figure is one unsourced figure appearing twice.
+
+Read the two entries together or neither. The rule that falls out: before counting agreement between
+sources, resolve their attributions to an origin. If they resolve to the same one, N is 1.
+
+The 34% ALFWorld figure appears in both as well, and that case is **fine** — both cite the same named
+public paper, and a shared citation to a checkable origin is legitimate because the origin can be
+attacked. The distinction is whether the shared root is reachable, not whether it is shared.
 
 **The 67.6% figure is interesting for a different reason**: it says tool *responses*, not tool
 *schemas*, dominate context. `theory/agents/capability-load-cost.md` measured schemas and conversation
