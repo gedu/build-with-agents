@@ -89,23 +89,48 @@ die_cannot_run() {
 # dependency (e.g. GNU coreutils' gdate) for one timestamp.
 now_ms() { python3 -c 'import time; print(int(time.time() * 1000))'; }
 
-# hash_tree <dir> — one sha256 over the recursive content of <dir>, order-
-# independent by construction (sorted relative paths). Used for the
-# substrate-mutation check: pre- and post-run hashes of the materialized
-# workspace copy must match, because neither arm has a write tool.
-hash_tree() {
+# hash_fixture_files <dir> — one sha256 over exactly the files that were
+# materialized from the fixture's src/ (a manifest computed once, right
+# after materialization, and reused for the post-run re-hash) — never
+# "whatever is in <dir> now".
+#
+# EXECUTED, not reasoned: this shakedown found that `claude` itself writes
+# an ambient `.atl/skill-registry*` cache into its own cwd on every
+# invocation, regardless of which tools the agent used — this repo's own
+# .gitignore already names `.atl/` as "local agent state, not the
+# tool-neutral sources". Neither arm has a WRITE tool, so the agent cannot
+# create that file itself, and hashing "the whole directory" produced a
+# false substrate_mutated=true on every single run, including one where
+# the fixture file was verified byte-identical by hand. The question this
+# check must answer is "did the agent's read-only substrate change", not
+# "did any file appear in the directory" — those are different questions,
+# and only the first one is a finding.
+hash_fixture_files() {
+  # $1 = workspace root; the explicit path list comes in on stdin, one
+  # relative path per line — NEVER a fresh directory listing, so a file
+  # that appears later (ambient tooling) cannot enter the comparison, and
+  # a file that disappears is still caught (hashed as "<missing>").
   python3 - "$1" <<'PY'
 import hashlib, pathlib, sys
 
 root = pathlib.Path(sys.argv[1])
 lines = []
-for p in sorted(root.rglob("*")):
-    if p.is_file():
-        rel = p.relative_to(root).as_posix()
-        lines.append(f"{hashlib.sha256(p.read_bytes()).hexdigest()}  {rel}")
-lines.sort()
+for rel in sorted(l.strip() for l in sys.stdin if l.strip()):
+    p = root / rel
+    try:
+        content = p.read_bytes()
+    except FileNotFoundError:
+        content = b"<missing>"
+    lines.append(f"{hashlib.sha256(content).hexdigest()}  {rel}")
 print(hashlib.sha256("\n".join(lines).encode()).hexdigest())
 PY
+}
+
+# list_fixture_files <dir> — the relative-path manifest captured once,
+# right after materialization, and reused unchanged for both the pre- and
+# post-run hash so the comparison's scope cannot silently drift.
+list_fixture_files() {
+  ( cd "$1" && find . -type f | sed 's#^\./##' | sort )
 }
 
 # compute_manifest <fixture-root> — sorted "sha256  relpath" over
@@ -285,7 +310,8 @@ fi
 # subdirectory) so a reported relative path is just e.g. "paginate.js".
 WORKSPACE_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/rig-workspace.XXXXXX")"
 cp -R "$FIXTURE_ROOT/src/." "$WORKSPACE_ROOT/"
-PRE_HASH="$(hash_tree "$WORKSPACE_ROOT")"
+FIXTURE_FILE_LIST="$(list_fixture_files "$WORKSPACE_ROOT")"
+PRE_HASH="$(printf '%s\n' "$FIXTURE_FILE_LIST" | hash_fixture_files "$WORKSPACE_ROOT")"
 
 # ---- claim the run directory (Decision 6: mkdir is the lock) ------------
 
@@ -351,9 +377,13 @@ TIMED_OUT=0
 
 # ---- substrate-mutation check --------------------------------------------
 #
-# Neither arm has a write tool, so any change to the read-only workspace
-# copy is a finding, not a tolerance (design.md Decision 4).
-POST_HASH="$(hash_tree "$WORKSPACE_ROOT")"
+# Neither arm has a write tool, so a change to one of the ORIGINAL fixture
+# files is a finding, not a tolerance (design.md Decision 4). Scoped to the
+# exact file list captured at materialization time (see hash_fixture_files'
+# own comment for why: ambient tooling writes into the workspace cwd
+# regardless of the agent's own tool use, and that is not this check's
+# concern).
+POST_HASH="$(printf '%s\n' "$FIXTURE_FILE_LIST" | hash_fixture_files "$WORKSPACE_ROOT")"
 SUBSTRATE_MUTATED=0
 [ "$PRE_HASH" != "$POST_HASH" ] && SUBSTRATE_MUTATED=1
 
