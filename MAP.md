@@ -3,8 +3,8 @@ id: map
 type: index
 targets: [any]
 status: validated
-verified: 2026-08-05
-sources: ["decisions/0001-agents-md-as-single-source-of-truth.md", "decisions/0004-mandatory-frontmatter-as-query-interface.md", "journal/2026-08-04-repo-skeleton-design.md"]
+verified: 2026-08-06
+sources: ["decisions/0001-agents-md-as-single-source-of-truth.md", "decisions/0004-mandatory-frontmatter-as-query-interface.md", "decisions/0009-redaction-is-a-repo-wide-rule.md", "decisions/0010-measurements-vary-the-harness-not-the-model.md", "journal/2026-08-04-repo-skeleton-design.md"]
 ---
 
 # MAP.md — start here
