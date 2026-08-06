@@ -180,3 +180,97 @@ anomaly count MUST be published alongside the result.
 | `--bare` + API key | Real goal, not v1's |
 | A test runner | None exists in this repo |
 | Cost as a headline finding | ~9% delta; caching confounds it |
+
+## Amendment 1 — adopted from `gentle-ai/bench`, 2026-08-06
+
+Six requirements added after reviewing the `bench/` harness in the public `gentle-ai` repository, which
+solves several of these problems in production with a real incident behind each rule. Recorded as an
+amendment rather than folded in, so the provenance of each rule stays visible.
+
+**Not adopted, because it was already handled:** the answer-key leak. A first reading of the bench rule
+*"the agent must not read the source… the run comes out clean for the wrong reason"* looked like a hole
+here. It is not — the design already materializes the run's workspace as a copy of `src/` only, outside
+the repository, with `answer-key/` never inside cwd. Recorded because the near-miss is instructive: a
+rule imported from another harness was almost written up as a local defect without checking the local
+artifact first.
+
+### R-A1.1 Three run states, and an exit contract that distinguishes them
+
+A run is `completed`, `void`, or `failed`, and the runner's exit code must separate them:
+
+| State | Meaning | Exit |
+|---|---|---|
+| `completed` | Produced numbers. May be a pass or a fail — both are results | 0 |
+| `void` | Could not produce numbers for an environmental reason (timeout, rate limit, non-`end_turn` stop, missing transcript). Excluded and replaced | 0 — a void is a designed outcome |
+| `failed` | The harness itself could not build or prove its fixture, or an assertion fired | **non-zero** |
+
+The rationale is not symmetry, it is a filed bug: `gentle-ai` issue #1883 found a benchmark run that
+reported failed journeys and still exited 0, so a CI gate reading the exit saw success in a run that
+measured nothing. **The results file must be written before the non-zero exit**, so the evidence survives
+the failure.
+
+This mirrors `hooks/pre-commit`'s own 0/1/2 contract, which is house style here for the same reason.
+
+### R-A1.2 Aggregate only over the comparable subset
+
+Totals are computed over **iteration slots that completed in both arms**. A slot void in BROAD and
+completed in SCOPED contributes to neither.
+
+Excluded slots must be **named in the output**, never silently dropped. Summing unequal Ns produces a
+delta that reads as an effect when it is only a difference in how many runs survived — and since voids
+are not expected to distribute evenly between a 54-tool arm and a 3-tool arm, this is a live risk here
+rather than a theoretical one.
+
+### R-A1.3 No composite score, ever
+
+The four cells, the off-set distribution and the token/cost figures are reported **separately**. No
+weighted sum, no single "quality" number, no ratio that collapses them.
+
+The reason, which `gentle-ai/bench` states from experience: a weighted sum can improve while the worst
+component gets worse, so collapsing the dimensions hides exactly the regression that matters most. Here
+the specific hazard is that `improper-success` could rise while the composite improves.
+
+### R-A1.4 Every detector must be proven able to fire
+
+A check that cannot fail makes the passing case a tautology. So for each detector the rig relies on,
+the suite must contain a case that **makes it fire**:
+
+- The negative control (BROAD flags declaring the SCOPED digest) must void `surface-mismatch`. **It is
+  not enough that it is specified — it must be run and observed to void.** If it does not fire, nothing
+  may be written to `theory/`.
+- The practice check must have a case where a reported defect's file was never read, and that case must
+  be classified `improper`.
+- The off-set detector must have a case where an off-set tool is called, in **both** arms.
+
+This is the zero-by-construction trap the proposal caught, generalised into a standing requirement.
+
+### R-A1.5 Wall clock is a bound, never a comparative dimension
+
+The timeout exists to void runaway runs. Elapsed time must **not** be reported as a measured difference
+between arms, because it is dominated by provider-side variance and is not comparable between two runs
+of the same configuration, let alone two configurations. `gentle-ai/bench` excludes it outright for this
+reason; here it is retained solely as a voiding mechanism and is barred from the comparison.
+
+### R-A1.6 Honesty contract — the known gaps ship with the result
+
+The result must be published with a numbered list of its own limitations, on the principle that a
+benchmark which quietly invents a metric is worse than one that admits a gap. At minimum:
+
+1. **Ambient context is a constant, not eliminated.** ~26k tokens per run of `CLAUDE.md` discovery,
+   hooks, plugins and auto-memory are present in both arms. Identical across arms, so a difference is
+   still attributable — but the absolute numbers are not portable to another machine.
+2. **One machine, one model, subscription auth.** Not reproducible elsewhere without `--bare` and an
+   API key.
+3. **Synthetic fixtures.** Per the RDD rule that synthetic proxy coverage never proves another runtime,
+   this result may **not** be extrapolated to real repositories without saying so.
+4. **Small N.** The variance rule sets the floor; the spread ships with every figure and no figure ships
+   without it.
+5. **`num_turns` is a proxy for effort**, not a measurement of work done.
+6. Any anomaly class observed during the run, with its count, per the pre-registered X = 3 rule.
+
+### R-A1.7 Negative controls are inventoried per flow
+
+Adopted from the RDD defect workflow, which requires inventorying every flow with *"entry, mode,
+environment, expectation, and negative controls"*. One rig-wide negative control is not sufficient:
+**each task declares its own**, so a task whose detector never fires is visible per task rather than
+hidden behind a suite that passed overall.

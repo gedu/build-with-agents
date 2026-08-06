@@ -343,3 +343,48 @@ exists, so rollback before that point is deleting `rig/`.
 - [ ] Does a new top-level `rig/` warrant an ADR, given it joins the `MAP.md` citability table? The
       proposal's affected-areas table already flags `decisions/` as possibly-new; deferring the answer
       to whoever writes the first result, because the citability question only bites once a number exists.
+
+## Amendment 1 — runner and aggregator changes from `gentle-ai/bench`, 2026-08-06
+
+Two design changes required by spec amendment R-A1.1 and R-A1.2. Everything else in that amendment is a
+spec-level requirement this design already satisfies.
+
+### Runner exit contract, and the ordering that makes it useful
+
+| Situation | Runner exit |
+|---|---|
+| All requested runs reached `completed` or `void` | 0 |
+| Any run reached `failed` — fixture unprovable, digest mismatch, assertion fired | **non-zero** |
+| The runner itself could not start — dirty tree, missing manifest, bad arguments | 2, per the existing house contract |
+
+**The ordering is the load-bearing half**: `status.json` and every partial capture are flushed **before**
+the non-zero exit. A harness that exits non-zero and takes its evidence with it turns a diagnosable
+failure into a mystery. This is the same reason `hooks/pre-commit` reports exit 2 with its findings
+printed rather than aborting silently.
+
+`void` deliberately does not affect the exit. It is a designed outcome, and making it non-zero would
+train whoever runs this to ignore the exit code — which is precisely how `gentle-ai` issue #1883 became
+possible.
+
+### Aggregator: pair by iteration slot, refuse to sum unequal arms
+
+The aggregator already refuses to merge rows sharing a `fixture_version` with differing `fixture_digest`.
+Two rules are added:
+
+- **Pair by `(task_id, iteration)`.** A slot contributes to the comparison only when **both** arms reached
+  `completed` for that slot. This is a change from summing each arm independently.
+- **Name every excluded slot in the output**, with its arm and void reason. Never a silent drop, and never
+  a count without the list.
+
+Rationale specific to this experiment: voids are not expected to distribute evenly between a 54-tool arm
+and a 3-tool arm — the broad arm has more ways to run long. Summing arms independently would let that
+asymmetry masquerade as the effect being measured.
+
+### Two things confirmed rather than changed
+
+- **Wall clock stays a bound and never enters the comparison** (R-A1.5). The row may carry elapsed time
+  for diagnosis; the aggregator must not difference it.
+- **The rig's own boundary** already matches the `gentle-ai/bench` discipline of a separate module that
+  cannot break the product it measures: `python3` is stated as a rig-only prerequisite, and the
+  `hooks/pre-commit` portability contract explicitly does not extend here. No change needed — recorded so
+  a later reader does not re-open it.
