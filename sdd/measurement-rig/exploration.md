@@ -43,6 +43,11 @@ The sub-agent's findings were re-checked directly, because a sub-agent's report 
 
 ### A correction to the exploration's recommendation, found by reading the full flag text
 
+> **Both subsections below were themselves superseded by an actual run — see *Correction, from one run
+> that cost two seconds*.** They are kept because the sequence is the point: reading the flag text fixed
+> one error and introduced another, and only executing settled it. Do not act on the two subsections
+> immediately following without reading that correction first.
+
 The exploration proposed `--bare` alongside `--agents`, and a truncated reading of `--bare` suggested
 those conflict. They do not — the opposite is true. `--bare`'s full description ends:
 
