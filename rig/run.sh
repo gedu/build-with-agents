@@ -320,16 +320,29 @@ PROMPT_TEXT="$(cat "$PROMPT_FILE")"
 #
 # Redirected straight to a file, never piped into a parser (design.md
 # Decision 2): a parser crash in the pipe would destroy the transcript.
+#
+# Backgrounded, with an explicit trap, rather than run in the foreground
+# inside a plain subshell. EXECUTED, not reasoned: an earlier version of
+# this script ran the invocation in the foreground, and killing run.sh's
+# own PID (as opposed to Ctrl-C, which signals the whole terminal process
+# group) left `timeout`/`claude` running as an orphan — still billing,
+# still writing to stream.jsonl, with nothing left tracking it. Forwarding
+# the signal to the child explicitly is what makes the mid-flight-kill
+# shakedown (Phase 3, 3.1) actually test what it claims to.
 START_MS="$(now_ms)"
 set +e
 (
   cd "$WORKSPACE_ROOT"
-  timeout "$TIMEOUT_S" claude -p "$PROMPT_TEXT" \
+  exec timeout "$TIMEOUT_S" claude -p "$PROMPT_TEXT" \
     --output-format stream-json --verbose \
     ${DISALLOW:+--disallowedTools "$DISALLOW"} \
     >>"$RUN_DIR/stream.jsonl" 2>>"$RUN_DIR/stderr.log"
-)
+) &
+CHILD_PID=$!
+trap 'kill -TERM "$CHILD_PID" 2>/dev/null' TERM INT
+wait "$CHILD_PID"
 EXIT_CODE=$?
+trap - TERM INT
 set -e
 END_MS="$(now_ms)"
 WALL_MS=$((END_MS - START_MS))
