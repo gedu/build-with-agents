@@ -292,14 +292,31 @@ PROMPT_FILE="$FIXTURE_ROOT/prompts/${TASK_ID}.txt"
 # apply report) — a value guessed here would be exactly the kind of
 # invented knowledge AGENTS.md forbids, and a wrong one would silently
 # break every future void-classification.
-DISALLOW=""
+# Bash is disallowed in BOTH arms, and that is not a preference (design.md
+# Amendment 2). Bash SUBSUMES Glob and Grep: while it is available the surface
+# presents Bash alone and hides them; removing it exposes both. Leaving Bash in
+# the broad arm would therefore mean the arms differ in CAPABILITY — broad could
+# shell out, scoped could not — instead of only in breadth, which is a second
+# variable and the one thing ADR 0010 constraint 2 forbids.
+#
+# It is also correct on its own terms: these tasks only REPORT defects, so no arm
+# needs to execute anything, and a shell in one arm could substitute for the very
+# search tools the practice check exists to observe.
+BASELINE_DISALLOW="Bash"
+
+DISALLOW="$BASELINE_DISALLOW"
 if [ "$ARM" = scoped ]; then
   BROAD_SURFACE="$SURFACES_ROOT/broad.txt"
   SCOPED_SURFACE="$SURFACES_ROOT/scoped.txt"
-  [ -f "$BROAD_SURFACE" ] || die_cannot_run "missing $BROAD_SURFACE. The scoped arm's --disallowedTools list is (broad surface) minus (scoped surface); broad.txt must be captured from a real claude session first. See rig/README.md."
+  [ -f "$BROAD_SURFACE" ] || die_cannot_run "missing $BROAD_SURFACE. The scoped arm's list is Bash plus (broad surface minus scoped surface); broad.txt must be captured with --strict-mcp-config --disallowedTools Bash. See rig/README.md."
   [ -f "$SCOPED_SURFACE" ] || die_cannot_run "missing $SCOPED_SURFACE"
-  DISALLOW="$(comm -23 <(sort -u "$BROAD_SURFACE") <(sort -u "$SCOPED_SURFACE") | paste -sd, -)"
-  [ -n "$DISALLOW" ] || die_cannot_run "computed --disallowedTools list is empty; broad.txt and scoped.txt are identical, or broad.txt is stale"
+  # broad.txt was itself captured with Bash already disallowed, so Bash is NOT a
+  # member of it and `comm` can never emit it. Prepending BASELINE_DISALLOW is
+  # therefore load-bearing, not belt-and-braces: without it the scoped arm would
+  # keep Bash, which would hide Glob and Grep and invert the comparison.
+  EXTRA="$(comm -23 <(sort -u "$BROAD_SURFACE") <(sort -u "$SCOPED_SURFACE") | paste -sd, -)"
+  [ -n "$EXTRA" ] || die_cannot_run "computed --disallowedTools list is empty; broad.txt and scoped.txt are identical, or broad.txt is stale"
+  DISALLOW="$BASELINE_DISALLOW,$EXTRA"
 fi
 
 # ---- materialize the workspace ------------------------------------------
@@ -359,8 +376,20 @@ START_MS="$(now_ms)"
 set +e
 (
   cd "$WORKSPACE_ROOT"
+  # --strict-mcp-config is REQUIRED in both arms, and it reverses an earlier
+  # prohibition in this file's own design (Amendment 3). Without it the visible
+  # surface is NOT REPRODUCIBLE: two identical invocations seconds apart returned
+  # 55 and 82 tools, because a remote MCP server recorded as "pending" finished
+  # connecting between them and contributed 27 names. Runs in the same arm would
+  # differ by 27 tools, the read-back would correctly void an unpredictable share
+  # of them as surface-mismatch, and the experiment would never accumulate its N.
+  #
+  # It was forbidden before because it moves MCP server count from 25 to 0 and is
+  # therefore a second variable. True of one arm. Applied to BOTH arms it is a
+  # constant — the same correction Amendment 2 made for Bash.
   exec timeout "$TIMEOUT_S" claude -p "$PROMPT_TEXT" \
     --output-format stream-json --verbose \
+    --strict-mcp-config \
     ${DISALLOW:+--disallowedTools "$DISALLOW"} \
     >>"$RUN_DIR/stream.jsonl" 2>>"$RUN_DIR/stderr.log"
 ) &
