@@ -4,7 +4,7 @@ type: index
 targets: [any]
 status: validated
 verified: 2026-08-06
-sources: ["decisions/0001-agents-md-as-single-source-of-truth.md", "decisions/0004-mandatory-frontmatter-as-query-interface.md", "decisions/0009-redaction-is-a-repo-wide-rule.md", "decisions/0010-measurements-vary-the-harness-not-the-model.md", "journal/2026-08-04-repo-skeleton-design.md"]
+sources: ["decisions/0001-agents-md-as-single-source-of-truth.md", "decisions/0004-mandatory-frontmatter-as-query-interface.md", "decisions/0009-redaction-is-a-repo-wide-rule.md", "decisions/0010-measurements-vary-the-harness-not-the-model.md", "decisions/0011-rig-produces-evidence-not-truth.md", "journal/2026-08-04-repo-skeleton-design.md"]
 ---
 
 # MAP.md — start here
@@ -35,13 +35,14 @@ where to look and what you are allowed to trust.
 | `theory/orchestration/` | Multi-agent coordination, delegation, handoffs | Yes, when `validated` | 1 doc (`delegation-and-context-boundaries`, validated) |
 | `theory/loops/` | Iteration shapes: plan/act/verify, review loops, termination | Yes, when `validated` | 2 docs (`verifier-availability`, `reading-and-running-find-different-defects`) |
 | `research/` | Received links, contrasted against evidence, each with a verdict | Verdict only, as evidence | 11 verdicts (3 `supported`, 5 `partially supported`, 3 `unverifiable`) |
-| `decisions/` | Numbered ADRs (`NNNN-slug.md`) — the WHY | Yes | `0001`–`0010` ratified |
+| `decisions/` | Numbered ADRs (`NNNN-slug.md`) — the WHY | Yes | `0001`–`0011` ratified |
 | `journal/` | Dated conversations and brainstorms | **Never as authority**; valid as provenance (ADR 0007) | 8 entries (2026-08-04, 2026-08-05 ×7) |
 | `blocks/_shared/` | Target-agnostic minimal blocks with a contract | Yes, when `validated` | empty |
 | `blocks/react/` | React-specific blocks | Yes, when `validated` | empty |
 | `blocks/react-native/` | React Native-specific blocks | Yes, when `validated` | empty |
 | `templates/` | Compositions of blocks, ready to copy | Yes, when `validated` | empty |
-| `sdd/` | SDD cycles: proposal, spec, design, tasks, verification | No — process record | empty |
+| `sdd/` | SDD cycles: proposal, spec, design, tasks, verification | No — process record | 1 change (`measurement-rig`) |
+| `rig/` | Measurement harness: fixtures, runner, analyser. Raw captures are gitignored | Code yes; **output is evidence only**, citable once promoted to `theory/` with scope and spread (ADR 0011) | 1 experiment (`tool-surface`), in progress |
 | `upstream/` | Experiments against `gentle-ai` / `engram` / `gga`, staged bug reports | No — experiments | 4 reports (`gentle-ai`); `0001` filed as [#2478](https://github.com/Gentleman-Programming/gentle-ai/issues/2478), `0002`–`0004` staged |
 
 ## Target coverage

@@ -131,3 +131,39 @@ PR2 is at the 400-line edge (derive.py+report.py ≈ 400); split into 2a/2b if t
 ## Blocked tasks
 
 5.2 (gates all downstream work on the negative control firing), 6.1–6.6 (gated on 3.1–3.5 AND 5.1–5.2), 7.x/8.x (gated on Phase 6 passing in full), 9.x (gated on 7.x AND 8.x), 9.0 (design-level gap — needs an explicit ruling, not authored here), 9.4 (gated on 9.0–9.3).
+
+## Amendment 1 — scope and delivery decided, 2026-08-06
+
+Ratified by the operator after reading the Review Workload Forecast above.
+
+**Scope: tier 2 is deferred. v1 is tier 1 as pilot plus tier 3 as the measurement.**
+
+Tier 1 calibrates the rig and derives the timeout; tier 3 carries the measurement. The reasoning is a
+reversal worth recording, because the obvious cut was the wrong one: **tier 1 alone is the version most
+likely to return null.** One file and one action gives a run almost no opportunity to wander, so a broad
+surface would look identical to a scoped one and the experiment would answer nothing. Tier 3 —
+reproduce, locate, verify — is where BROAD has the most decision points and where signal should appear if
+the claim in `theory/agents/tool-surface-design.md` holds at all.
+
+Phase 7 (tier 2) is **deferred, not cancelled**. Its tasks stay in this file, unstarted. Phase 8 (tier 3)
+is renumbered in effect to run immediately after Phase 6, and Phase 9's blocking condition becomes
+Phase 6 AND Phase 8.
+
+Estimated effect on the forecast: roughly 1,200 authored lines down to roughly 800, still above the
+400-line budget, which the delivery decision below addresses rather than hides.
+
+**Delivery: sequential commits to `main`. No PRs, no chain.**
+
+This repo has no pull request in its history — every commit went straight to `main`. The 400-line budget
+exists to bound review burden, and the review it bounds is the `gentle-ai` bounded review, which cannot
+reach a receipt while upstream #2478 stands. A PR chain here would be ceremony bought with real
+complexity.
+
+What is kept from the chained plan is the part that carries the value: **the work-unit slicing.** Each
+unit lands as its own commit, reviewable on its own, in the order the phases require. What is dropped is
+only the branch and PR machinery around them.
+
+**Task 9.0 is unblocked** by `decisions/0011-rig-produces-evidence-not-truth.md`, which rules that `rig/`
+code is citable, its output is evidence only, and a figure becomes citable solely by promotion into
+`theory/` carrying its scope, its spread and the honesty contract. That makes 9.4 a promotion with
+preconditions rather than a write.
