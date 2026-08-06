@@ -3,8 +3,8 @@ id: skills/source-verdict
 type: skill
 targets: [any]
 status: validated
-verified: 2026-08-05
-sources: ["research/README.md", "AGENTS.md", "https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents", "https://arxiv.org/abs/2603.08274"]
+verified: 2026-08-06
+sources: ["research/README.md", "AGENTS.md", "https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents", "https://arxiv.org/abs/2603.08274", "research/agent-loop-oracle.md", "research/agent-loop-termination-kinney.md"]
 ---
 
 # source-verdict
@@ -55,6 +55,38 @@ Is there a number, and where did it come from? Three tiers, and the gap between 
 | Measured by the author, method disclosed | Strongest. You can attack the method |
 | Cited to a named source | Checkable. Go check it — the citation is often weaker than the claim it is used for |
 | No number, or a number with no method | Decoration. Not evidence |
+
+#### Repetition is not provenance
+
+**Before counting agreement between sources, resolve their attributions to an origin. If they resolve
+to the same one, N is 1.**
+
+A figure with no disclosed method does not improve by appearing in more places. Two documents quoting
+one unsourced number is *one unsourced number appearing twice* — and it reads exactly like independent
+confirmation, which is what makes this worth a rule rather than a remark.
+
+The distinction that keeps this from becoming blanket suspicion of any repeated figure:
+
+| Shared root | Verdict on the repetition |
+|---|---|
+| A named, reachable source — a paper, a public benchmark, a dated dataset | **Legitimate.** Both cite something that can be attacked. Go attack it |
+| An undisclosed internal measurement, a vendor's "internal data", an unattributed anecdote | **Adds nothing.** Count it once, and once is not enough |
+
+The test is whether the shared root is **reachable**, not whether it is shared.
+
+Worked example, from this repo: two agent-loop articles — an independent practitioner synthesis and a
+vendor engineering post, three months apart, no other overlap — both report ~4x/15x token multipliers
+and a 90.2% multi-agent result, both attributed to the same vendor's internal data, neither with a
+method. Read alone, either looks like a source. Read together, they look like consensus. They are one
+unsourced figure. See `research/agent-loop-termination-kinney.md` and `research/agent-loop-oracle.md`.
+
+The same two pieces also agree on layered loop-termination guidance without citing each other, and
+**that** agreement does carry weight, because it is convergence on design reasoning rather than a relayed
+number. Same pair of sources, opposite conclusions about what their overlap proves. Ask which kind of
+overlap you have before you count it.
+
+Corollary for a corpus rather than a pair: a set assembled from what circulates is **selected for
+circulation**, so the most-repeated figure in it is the one to distrust first, not the one to trust.
 
 ### 3. Scope
 
