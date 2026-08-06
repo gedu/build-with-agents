@@ -186,10 +186,33 @@ Three more runs settled it, and the answer is an asymmetry between two flags tha
 | `--allowedTools` | **None.** 54 → 54. A permission allowlist only |
 | `--disallowedTools` | **Removes names from visibility.** Every tool named disappears from `init.tools` |
 | `--agents <json>` | **None** on a `-p` main-agent run. 30 → 30. It declares agents available to invoke, not the caller's own surface |
-| `--strict-mcp-config` | Drops all MCP tools. 54 → 30 |
+| `--strict-mcp-config` | Drops all MCP tools **and disconnects the servers**. 54 → 30, servers 25 → 0 |
 
 Naming eleven tools took the surface from 30 to 21. Naming the full built-in set took it to **three:
 `Glob`, `Grep`, `Read`.**
+
+### `--disallowedTools` accepts MCP tool names, which removes a confound
+
+Added after the proposal phase flagged it, and it matters more than it looks. The route above reached 3
+tools using `--strict-mcp-config` **plus** `--disallowedTools` — but `--strict-mcp-config` also takes the
+MCP server count from 25 to 0. That is a **second variable**, and an experiment with two variables cannot
+attribute its result to either.
+
+Tested directly by naming two MCP tools and nothing else:
+
+| | Result |
+|---|---|
+| Visible tools | 54 → **52** — exactly the two named disappeared |
+| `mcp_servers` | **25, unchanged.** Servers stay connected |
+| An MCP tool *not* named | Still visible |
+
+So the scoped arm can reach 3 tools through **one mechanism only**, with every MCP server still
+connected. `--strict-mcp-config` is not needed and should not be used, because it changes connection
+state as well as surface.
+
+That is the difference between a single-variable comparison and a confounded one. Both arms pay identical
+MCP connection overhead; **only the tool names differ**, which is exactly the quantity
+`theory/agents/tool-surface-design.md` claims selection happens over.
 
 **So the first experiment is executable at full contrast after all: 54 versus 3, a factor of 18.** That
 is the shape ADR 0010 wanted, and it happens to sit at the same order as the *"18 instead of 4-5"*
