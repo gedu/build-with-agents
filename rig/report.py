@@ -104,16 +104,30 @@ def anomaly_log(rows):
     is very often also a member of that same row's anomaly_classes (derive.py
     populates both from the same detection), and summing both would count
     one anomalous run twice under the same class name."""
-    counts = {}
+    counts, control_counts = {}, {}
     for r in rows:
         classes = set(r.get("anomaly_classes", []))
         if r["state"] == "void" and r["void_reason"]:
             classes.add(r["void_reason"])
         if r["state"] == "failed":
             classes.add("failed")
+        if r.get("is_control"):
+            # A control that voided did its job. Its anomaly is deliberate and is
+            # kept out of the instrument-doubt count — otherwise running controls
+            # trips the threshold that blocks the theory/ write.
+            #
+            # A control that did NOT void is the real alarm: the detector it exists
+            # to exercise is dead, and every run that passed that check is worthless.
+            # That one counts, and counts loudly.
+            if r["state"] == "void":
+                for cls in classes:
+                    control_counts[cls] = control_counts.get(cls, 0) + 1
+            else:
+                counts["control-did-not-fire"] = counts.get("control-did-not-fire", 0) + 1
+            continue
         for cls in classes:
             counts[cls] = counts.get(cls, 0) + 1
-    return counts
+    return counts, control_counts
 
 
 def print_table(title, rows):
@@ -164,8 +178,11 @@ def main():
     for r in paired:
         print(f"  {r['run_id']}: wall_ms={r['wall_ms']}")
 
-    anomalies = anomaly_log(rows)
-    print_table("Anomaly log:", [f"{k}: {v}" for k, v in sorted(anomalies.items())] or ["none"])
+    anomalies, control_anomalies = anomaly_log(rows)
+    print_table("Anomaly log (spontaneous — counts toward instrument doubt):",
+                [f"{k}: {v}" for k, v in sorted(anomalies.items())] or ["none"])
+    print_table("Controls that fired as designed (deliberate — never counted):",
+                [f"{k}: {v}" for k, v in sorted(control_anomalies.items())] or ["none"])
     tripped = {k: v for k, v in anomalies.items() if v >= INSTRUMENT_DOUBT_THRESHOLD}
     if tripped:
         print(f"\n  !! INSTRUMENT-DOUBT THRESHOLD TRIPPED (X={INSTRUMENT_DOUBT_THRESHOLD}): {tripped}")

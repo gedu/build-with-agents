@@ -322,3 +322,45 @@ no evidence in either direction, which is R-A1.4's rule applied to a partition r
 hypothesis carries zero citability; pointing at one to say *what is being tested* is permitted, and
 pointing at one to say *why something is true* is not. Nothing in this spec rests on it being correct —
 the requirements above hold whichever way it resolves.
+
+## Amendment 3 — control runs, and why they must not count
+
+Added 2026-08-07 after running the negative control R-A1.4 requires, which worked and simultaneously
+disabled the experiment.
+
+### What happened
+
+The control is a run whose surface does not match the arm it declares. Constructed in both directions —
+a BROAD-surface run declared `scoped`, and a SCOPED-surface run declared `broad` — **both voided
+`surface-mismatch`.** The detector fires, observed rather than specified.
+
+Then the anomaly log read `surface-mismatch: 4` — the two deliberate controls plus two genuine ones from
+before Amendments 2 and 3 — which **tripped the pre-registered X=3 instrument-doubt threshold and blocked
+any `theory/` write.**
+
+**Running your own controls disabled your own experiment.** The threshold could not tell an anomaly you
+caused on purpose from one that happened to you.
+
+### R-A3.1 Control runs are marked, reported separately, and never counted toward instrument doubt
+
+A control occupies iteration slot `0c<n>`. Its anomalies are deliberate: they are reported in their own
+section and excluded from the instrument-doubt count.
+
+### R-A3.2 A control that does NOT void is the alarm, and it counts loudly
+
+The inversion is the load-bearing half. A control exists to make a detector fire; a control that
+completes means **the detector it exercises is dead**, and every run that passed that check is
+worthless.
+
+That case raises `control-did-not-fire`, which **does** count toward instrument doubt.
+
+**And that detector was itself proven able to fire**, per R-A1.4 applied recursively: a control
+constructed so it could not void raised `control-did-not-fire: 1`, and removing it cleared the count.
+A detector added to check other detectors is not exempt from the rule it enforces.
+
+### Why this is not bookkeeping
+
+An experiment whose safety mechanism is disabled by exercising its safety mechanism has no safety
+mechanism. The failure is silent in the worst way: it presents as the threshold *working* — a blocked
+`theory/` write looks like caution, and the reason it blocked would have been investigated as an
+instrument fault that did not exist.

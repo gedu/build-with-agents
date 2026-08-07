@@ -42,6 +42,21 @@ SURFACES_ROOT = REPO_ROOT / "rig/surfaces"
 RUNS_ROOT = REPO_ROOT / "rig/runs" / EXPERIMENT
 RESULTS_DIR = REPO_ROOT / "rig/results" / EXPERIMENT
 RUN_ID_RE = re.compile(r"^(t[123])-(broad|scoped)-([0-9][A-Za-z0-9]*)$")
+
+# A control slot: iteration `0c<n>`. Still a digit-initial iteration, so the run_id
+# grammar is unchanged.
+#
+# Controls exist to make a detector FIRE (spec R-A1.4), so their anomalies are
+# deliberate. Counting them toward the X=3 instrument-doubt threshold means running
+# your own controls disables your experiment — observed, not theorised: two
+# deliberate surface-mismatch controls plus two genuine ones reached 4 and tripped
+# the threshold that blocks any theory/ write.
+#
+# So a control's anomalies are reported in their own bucket and never in the
+# instrument-doubt count. The inversion that matters: a control which does NOT void
+# is itself the alarm, because a detector that cannot fire makes every passing run
+# meaningless.
+CONTROL_ITERATION_RE = re.compile(r"^0c[0-9]+$")
 # mktemp -d "$TMPDIR/rig-workspace.XXXXXX" (run.sh) — exactly 6 template
 # chars. This is a SHAPE check, not an exact-path check: run.sh does not
 # persist the workspace path it generated, so derive.py cannot compare
@@ -346,6 +361,7 @@ def build_row(run_dir: Path, surfaces, digests, answer_keys):
         "task_id": task_id,
         "arm": arm,
         "iteration": iteration,
+        "is_control": bool(CONTROL_ITERATION_RE.match(iteration)),
         "model": model,
         "harness_version": status.get("driver_version"),
         "python": status.get("python_version"),
