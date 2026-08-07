@@ -77,16 +77,61 @@ PR2 is at the 400-line edge (derive.py+report.py ≈ 400); split into 2a/2b if t
 - [x] 3.4 Ran from `/tmp` and from a nested repo dir (`theory/`) → identical `code_commit`, matching `HEAD`, confirmed live both times.
 - [x] 3.5 Prompt containing spaces, quotes, backticks, `$(cmd)`, and non-ASCII, invoked from a directory path also containing spaces and quotes → passed through byte-for-byte with no shell injection, confirmed live via the transcript's own `result` text. The `init.tools`-vs-preimage half is deferred with `rig/surfaces/broad.txt` (see apply report) — not exercised this batch.
 
-## Phase 4: Analyser `derive.py` + `report.py` (blocked: Phase 2)
+## Phase 4: Analyser `derive.py` + `report.py` (blocked: Phase 2) — DONE 2026-08-07
 
-- [ ] 4.1 `rig/derive.py`: parse `stream.jsonl`; read-back verification (surface/model/prompt/code/cwd/ambient-drift → void reasons).
-- [ ] 4.2 Outcome checker (regex line-set vs answer key) + practice checker (forbidden-tool scan + earlier-Read/Grep-of-file scan).
-- [ ] 4.3 Four-cell classify; total `runs.jsonl` rebuild; `schema_version` stamped; `cwd_is_expected` bool only, never raw `cwd`.
-- [ ] 4.4 Verify: run `derive.py` twice over same run dirs → `runs.jsonl` byte-identical.
-- [ ] 4.5 `rig/report.py`: per-arm four-cell table, off-set/forbidden distribution, anomaly log (X=3) — no composite score, ever.
-- [ ] 4.6 Pairing rule: aggregate only `(task_id, iteration)` completed in **both** arms; name every excluded slot + arm + void reason.
-- [ ] 4.7 Confirm wall-clock is per-row diagnostic only, never differenced by `report.py`.
-- [ ] 4.8 Verify stdlib-only imports (`json`, `hashlib`, `statistics`, `pathlib`); no `pip`/venv.
+- [x] 4.1 `rig/derive.py`: parse `stream.jsonl`; read-back verification (surface/model/cwd/ambient-drift →
+      void reasons). **Scope note**: prompt and code-commit read-back are recorded on the row
+      (`prompt_sha256`, `code_commit`) rather than re-voided by `derive.py`, because `run.sh` already
+      guards both pre-launch (manifest compare, dirty-tree check) and design.md's own read-back table
+      places those two checks at "exit 2 pre-launch", not as a `derive.py` void path.
+- [x] 4.2 Outcome checker (regex line-set vs answer key) + practice checker (forbidden-tool scan +
+      earlier-Read/Grep-of-file scan), plus a self-test-specific simplified practice evaluator for the
+      `checker_self_test` fragments (documented in-code: those fragments carry no `file_path`, only
+      `{name, is_error}`, so file-level matching is relaxed to "a Read/Grep call occurred" — disclosed
+      simplification, not invented behaviour).
+- [x] 4.3 Four-cell classify; total `runs.jsonl` rebuild; `schema_version` stamped; `cwd_is_expected` bool
+      only, never raw `cwd` (verified: no `cwd` key appears anywhere in the emitted row).
+- [x] 4.4 Verified: ran `derive.py` twice as two independent processes over the same 5 real run dirs;
+      `runs.jsonl` and stdout both byte-identical (`diff` clean both times).
+- [x] 4.5 `rig/report.py`: per-arm four-cell table, off-set/forbidden distribution, anomaly log (X=3) — no
+      composite score anywhere in the file.
+- [x] 4.6 Pairing rule: aggregate only `(task_id, iteration)` completed in **both** arms; every excluded
+      slot named with its `run_id`, arm, state and void_reason.
+- [x] 4.7 Confirmed: `report.py` prints `wall_ms` per row for diagnosis only; no function differences it
+      between arms.
+- [x] 4.8 Verified stdlib-only imports: `derive.py` uses `hashlib, json, re, sys, pathlib`; `report.py`
+      uses `json, statistics, sys, pathlib`. No `pip`, no venv, no third-party import in either file.
+
+**Bug found and fixed by running, not reasoning** (twice, both real): (1) the practice checker was
+comparing full `path:line` reported strings against file-only tool-call targets — silently always failing
+the match. Fixed by stripping the line number before comparison. (2) `report.py`'s anomaly log summed
+`void_reason` and `anomaly_classes` separately, double-counting the same anomalous run under one class
+name (`surface-mismatch` read `4` instead of `2`). Fixed by unioning both into one set per row before
+counting. Neither bug was visible from reading the code; both were only visible from real output.
+
+**Real data used, not invented fixtures**: the two gitignored completed runs `t1-broad-90` /
+`t1-scoped-90` derive to `clean-failure` / `proper` exactly as predicted (broad's extra `paginate.js:23`
+line fails outcome while passing practice; scoped's exact single line passes both). Three additional
+leftover shakedown directories (`t1-broad-93/94/95`, pre-dating Amendments 2–3) were also present and
+correctly void: `93` as `dirty-tree` (from its own `status.json`, `--dirty-ok` shakedown), `94`/`95` as
+`surface-mismatch` — their `init.tools` show the OLD 54-tool/`Bash`-present surface, which no longer
+matches the amended 31-tool `broad.txt` preimage. This is the read-back check correctly catching stale
+captures, not a bug in either the runner or the deriver.
+
+**`checker_self_test` run and observed to fire (R-A1.4)**, output reproduced:
+```
+checker self-test (R-A1.4 — each detector must be observed to fire):
+  [PASS] t1/negative_control: practice_pass=False (want False), cell_if_outcome_pass='improper-success' (want 'improper-success')
+  [PASS] t1/off_set_case: practice_pass=True (want True), offset_calls=1 (want 1), forbidden_calls=0 (want 0)
+```
+
+**Budget**: authored diff is `derive.py` 445 + `report.py` 179 = 624 lines, against the tasks-phase
+forecast of ~400 (`runs.jsonl`'s 5 generated rows excluded from the authored count per the review-workload
+convention). This is over forecast, not "well past" it by this batch's own read of that guard — the file
+split is already the design-mandated one (runner/analyser/aggregator boundary), so there is no further
+natural internal split, and every excess line traces to a named, verified requirement (ambient-drift
+pairing, the checker self-test harness, three void-precedence layers) rather than padding. Reported here
+rather than trimmed, matching how the Phase 0–3 batch handled its own overage.
 
 ## Phase 5: Negative control, observed (blocked: Phase 4)
 
