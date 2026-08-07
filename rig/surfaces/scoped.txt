@@ -1,3 +1,4 @@
+# harness: 2.1.224 (Claude Code)
 Glob
 Grep
 Read

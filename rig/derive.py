@@ -78,7 +78,23 @@ def surface_digest(names) -> str:
 
 
 def load_surface(arm: str):
-    return sorted(l.strip() for l in (SURFACES_ROOT / f"{arm}.txt").read_text().splitlines() if l.strip())
+    """Tool names only. `# harness: <version>` header is metadata, not a tool."""
+    lines = (SURFACES_ROOT / f"{arm}.txt").read_text().splitlines()
+    return sorted(l.strip() for l in lines if l.strip() and not l.startswith("#"))
+
+
+def surface_harness(arm: str):
+    """The CLI version this preimage was captured under, or None.
+
+    The visible tool surface is NOT stable across CLI versions — observed:
+    2.1.224 shipped `ListAgents` and every run against a 31-tool preimage voided
+    surface-mismatch. That reason is diagnostically wrong: the runs were fine and
+    the preimage was stale, which is a different problem with a different fix.
+    """
+    for l in (SURFACES_ROOT / f"{arm}.txt").read_text().splitlines():
+        if l.startswith("# harness:"):
+            return l.split(":", 1)[1].strip()
+    return None
 
 
 def load_answer_keys():
@@ -315,6 +331,12 @@ def build_row(run_dir: Path, surfaces, digests, answer_keys):
     if state == "complete":
         if not init_event or not result_event:
             state, void_reason = "void", "missing-result"
+        elif (sh := surface_harness(arm)) is not None and status.get("driver_version") and sh != status["driver_version"]:
+            # The preimage predates this CLI. Distinct from surface-mismatch: the
+            # run is not at fault and re-running will not help — the preimage needs
+            # recapturing under this version.
+            state, void_reason = "void", "surface-preimage-stale"
+            anomaly_classes.add("surface-preimage-stale")
         elif tool_surface_sha256 != surface_digest(surfaces[arm]):
             state, void_reason = "void", "surface-mismatch"
             anomaly_classes.add("surface-mismatch")
