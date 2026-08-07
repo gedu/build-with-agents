@@ -109,6 +109,7 @@ operator knows which applies.
 | `theory/` | **Yes**, when `status: validated` | Verified practice backed by `sources`. |
 | `blocks/`, `templates/` | Yes, when `status: validated` | Executable artifacts with a contract. |
 | `research/` | Only as **evidence**, never as conclusion | A link plus a contrast plus a verdict. Cite the verdict, not the link. |
+| `hypotheses/` | **No. Zero citability**, not even as evidence | A declared test with no result. Citing one would let pre-registration manufacture weight. See ADR 0012. |
 | `journal/` | **Never as authority**, always valid as **provenance** | Raw material. See the split below. |
 | `sdd/`, `upstream/` | No | Process records and experiments. |
 

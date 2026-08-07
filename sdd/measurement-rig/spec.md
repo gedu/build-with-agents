@@ -274,3 +274,51 @@ Adopted from the RDD defect workflow, which requires inventorying every flow wit
 environment, expectation, and negative controls"*. One rig-wide negative control is not sufficient:
 **each task declares its own**, so a task whose detector never fires is visible per task rather than
 hidden behind a suite that passed overall.
+
+## Amendment 2 — the second outcome channel, pre-registered
+
+Added 2026-08-07, **before any tier-3 run exists**, and that timing is the entire point.
+
+The first real tier-1 pair produced identical tool-call multisets in both arms and different answers.
+So the effect the spec is built to measure appeared through a channel the spec does not currently
+record as an outcome: **answer precision, with selection provably unchanged.**
+
+If tier 3 runs first and the reporting channel is chosen afterwards, the choice is made with the data
+visible. That is the fault this repo refused a vendor's figure over, and it does not become acceptable
+when we are the ones doing it.
+
+### R-A2.1 Record the tool-call multiset per run, and partition on it
+
+Every completed row already carries its tool-call list. The aggregate must additionally **partition
+completed pairs by whether the two arms' tool-call multisets were identical**, and report the four-cell
+table **within each partition** as well as overall.
+
+That partition is the discriminator. An outcome gap inside the identical-calls partition is an effect
+that selection cannot explain; an outcome gap only in the differing-calls partition is one that
+selection can.
+
+### R-A2.2 Both channels are primary, and both were declared before the run
+
+Neither may be demoted to a secondary metric after the result is known. The report presents:
+
+- the `proper` rate per arm, overall
+- the `proper` rate per arm **within the identical-calls partition**
+- the `proper` rate per arm **within the differing-calls partition**
+- the off-set distribution, unchanged
+
+Still no composite score, per R-A1.3. Three tables, not one number.
+
+### R-A2.3 An empty partition is "not tested", never a verdict
+
+If the identical-calls partition is empty — every pair differed in tool calls — the second channel was
+**not tested** by that run. It is not thereby refuted. A detector with no opportunity to fire produces
+no evidence in either direction, which is R-A1.4's rule applied to a partition rather than to a check.
+
+### Where the alternative reading lives
+
+`hypotheses/0001-broad-surface-degrades-output-not-selection.md`, registered with its full test table.
+
+**That file is named here as the object under test, not as support for anything.** Per ADR 0012 a
+hypothesis carries zero citability; pointing at one to say *what is being tested* is permitted, and
+pointing at one to say *why something is true* is not. Nothing in this spec rests on it being correct —
+the requirements above hold whichever way it resolves.
