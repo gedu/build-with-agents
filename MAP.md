@@ -26,7 +26,8 @@ where to look and what you are allowed to trust.
 | Area | What belongs there | Citable as truth | Status |
 |------|--------------------|------------------|--------|
 | `AGENTS.md` | Root instructions, rules, frontmatter schema | Yes | active |
-| `MAP.md` | This index | Yes | active |
+| `MAP.md` | This index — where knowledge lives | Yes | active |
+| `OPERATIONS.md` | What to run and when — gates, rig, review lifecycle. Points at `--help` rather than duplicating flags | Yes | active |
 | `setup.sh` | Generates per-tool symlinks and installs git hooks; committed, output is not | Yes | active |
 | `hooks/` | Committed git hooks. `pre-commit` is the ADR 0009 redaction gate | Yes | 1 hook (`pre-commit`) |
 | `skills/` | Tool-neutral skills, one dir per skill (`SKILL.md` + optional `assets/`, `references/`) | Yes, when `validated` | 2 skills (`context-checkpoint` draft, `source-verdict` validated) |
@@ -70,6 +71,7 @@ Do not create a target directory before there is validated content to put in it.
 | "Is this claim backed?" | the artifact's `sources` field; empty means not verified |
 | "What was discussed about X?" | `journal/` — context and provenance only, never authority |
 | "Which tool entrypoints exist?" | `setup.sh --help`; nothing generated is committed |
+| "What do I run, and when?" | `OPERATIONS.md` |
 
 Every table in this repo is either generated or does not exist. This file is the one
 hand-maintained index, and it holds only pointers and status — never data that already

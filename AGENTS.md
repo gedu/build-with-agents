@@ -3,8 +3,8 @@ id: agents/root
 type: index
 targets: [any]
 status: validated
-verified: 2026-08-05
-sources: ["decisions/0001-agents-md-as-single-source-of-truth.md", "decisions/0004-mandatory-frontmatter-as-query-interface.md", "decisions/0009-redaction-is-a-repo-wide-rule.md", "journal/2026-08-04-repo-skeleton-design.md"]
+verified: 2026-08-07
+sources: ["decisions/0001-agents-md-as-single-source-of-truth.md", "decisions/0004-mandatory-frontmatter-as-query-interface.md", "decisions/0009-redaction-is-a-repo-wide-rule.md", "decisions/0011-rig-produces-evidence-not-truth.md", "OPERATIONS.md", "journal/2026-08-04-repo-skeleton-design.md"]
 ---
 
 # AGENTS.md — root instructions
@@ -40,6 +40,7 @@ Scope today: **React** and **React Native** only. See `MAP.md` for planned targe
 | No invented knowledge | Do not write a practice you have not verified. Unverified content stays `status: draft` with sources empty and an explicit "Not yet written" note. |
 | Tables are generated or absent | Never hand-maintain a table that duplicates data already living in frontmatter. Stale hand-written indexes are worse than no index. |
 | Schema = doc | If a schema is documented, the doc and the schema are one artifact. Changing the fields tooling reads means changing this file in the same commit. |
+| Operations | `OPERATIONS.md` says what to run and when — gates, the measurement rig, the review lifecycle. Read it before changing, verifying or measuring anything; it is deliberately not resident here. |
 | Redaction | This repo is **public**. No committed file may contain a home-directory path, a private project or client name, a token, or a hostname — in prose, in frontmatter, or in a commit message. See below. |
 
 ## Redaction
