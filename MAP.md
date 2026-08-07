@@ -30,7 +30,7 @@ where to look and what you are allowed to trust.
 | `OPERATIONS.md` | What to run and when — gates, rig, review lifecycle. Points at `--help` rather than duplicating flags | Yes | active |
 | `setup.sh` | Generates per-tool symlinks and installs git hooks; committed, output is not | Yes | active |
 | `hooks/` | Committed git hooks. `pre-commit` is the ADR 0009 redaction gate | Yes | 1 hook (`pre-commit`) |
-| `skills/` | Tool-neutral skills, one dir per skill (`SKILL.md` + optional `assets/`, `references/`) | Yes, when `validated` | 2 skills (`context-checkpoint` draft, `source-verdict` validated) |
+| `skills/` | Tool-neutral skills, one dir per skill (`SKILL.md` + optional `assets/`, `references/`) | Yes, when `validated` | 3 skills (`context-checkpoint` draft, `hypothesis-cycle` draft, `source-verdict` validated) |
 | `theory/llm/` | How models behave: context, tokens, sampling, failure modes | Yes, when `validated` | 1 doc (`context-degradation-at-length`, validated) |
 | `theory/agents/` | Single-agent design: tools, memory, context isolation | Yes, when `validated` | 3 docs (`capability-load-cost`, `instruction-provenance`, `tool-surface-design`) |
 | `theory/orchestration/` | Multi-agent coordination, delegation, handoffs | Yes, when `validated` | 1 doc (`delegation-and-context-boundaries`, validated) |
