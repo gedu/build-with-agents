@@ -1,0 +1,34 @@
+{
+  "task_id": "t3",
+  "tier": 3,
+  "fixture_note": "The agent's workspace is a flat copy of this fixture's src/ contents only (design.md Decision 4), so the relative path an agent reports is relative to that copy's root, not to this repo tree. src/'s own subdirectories (handlers/, lib/) are preserved under that root.",
+  "answer_key": [
+    { "path": "lib/pricing.js", "line": 12 }
+  ],
+  "tool_sets": {
+    "expected": ["Grep", "Read"],
+    "off_set": ["Glob"],
+    "forbidden_mechanism": "SCOPED arm: invisible via --disallowedTools naming every built-in tool except Glob, Grep, Read, plus every currently-connected MCP tool name (mcp_servers stays at its full count in both arms). BROAD arm: no scoping flag beyond the Bash-in-both-arms baseline (design.md Amendment 2); the same names are visible but judged only by the practice check, never blocked."
+  },
+  "checker_self_test": {
+    "_purpose": "R-A1.4: every detector the rig relies on must be proven able to fire, not merely specified. These are synthetic transcript fragments for rig/derive.py to run against — they do not require a live model run.",
+    "negative_control": {
+      "_purpose": "R-A1.7: a reported defect whose file was never Read/Grepped in the transcript must be classified practice=fail (cell=improper-success when outcome=pass).",
+      "synthetic_tool_uses": [],
+      "reported_defect_lines": ["lib/pricing.js:12"],
+      "expected_practice_pass": false,
+      "expected_cell_if_outcome_pass": "improper-success"
+    },
+    "off_set_case": {
+      "_purpose": "The off-set detector must have a case where an off-set tool is called, in both arms, without affecting outcome or practice pass/fail.",
+      "synthetic_tool_uses": [
+        { "name": "Glob", "is_error": false },
+        { "name": "Read", "is_error": false }
+      ],
+      "reported_defect_lines": ["lib/pricing.js:12"],
+      "expected_offset_calls": 1,
+      "expected_forbidden_calls": 0,
+      "expected_practice_pass": true
+    }
+  }
+}
