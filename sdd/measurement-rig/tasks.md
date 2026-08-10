@@ -3,7 +3,7 @@ id: sdd/measurement-rig/tasks
 type: journal
 targets: [any]
 status: draft
-verified: 2026-08-07
+verified: 2026-08-10
 sources: ["sdd/measurement-rig/spec.md", "sdd/measurement-rig/design.md", "decisions/0010-measurements-vary-the-harness-not-the-model.md", "sdd/testing-capabilities.md", "AGENTS.md"]
 ---
 
@@ -260,6 +260,65 @@ process timing/cost/content is real):
    `lib/pricing.js:12` — the exact answer-key line, exact required format, no extra text, no near-miss
    line number, in both arms and in the bonus run. No formatting or ambiguity failure occurred; the
    fixture's prompt was unambiguous to every run that completed.
+
+**Catching this file up on two commits that landed after the note above and were never recorded here**
+(`bc550b4`, `3de1bfc`, both 2026-08-07): the "surface-mismatch" verdict on the six voided runs above was
+diagnostically wrong. The CLI moved 2.1.223 → 2.1.224 mid-experiment and shipped a new built-in
+(`ListAgents`); the runs had the surface they asked for, the committed preimage predated it. `derive.py`
+now distinguishes `surface-preimage-stale` (re-run pointless, recapture the preimage) from a real
+`surface-mismatch` (re-run pointless for a different reason); preimages carry a `# harness: <version>`
+header. Re-deriving with the recaptured 2.1.224 preimages (32 broad / 3 scoped) turned one voided row
+(`t3-scoped-04`) into a real `complete`/`proper` result, giving n=4 completed tier-3-v1 runs: 3 broad + 1
+scoped, all `proper`. **That is the actual headline finding this pilot produced, and it is the reason v2
+exists**: a fixture where every completed run passes has no gap to measure, and spending N on it buys a
+null that says nothing about the claim.
+
+## Phase 8b: Tier-3-v2 fixture — the fixture rebuilt to discriminate, and it still doesn't (2026-08-10)
+
+Not a new phase number in the blocking graph (Phase 8b depends on nothing Phase 8 didn't already clear);
+named `8b` rather than folded into Phase 8's checklist so the two fixture generations stay visually
+distinct in this file, matching how `v1`/`v2` stay distinct on disk (design.md Decision 4).
+
+- [x] 8b.1 Diagnosed why v1's tier-3 pilot returned 4-of-4 `proper`: the prompt named both the
+      defective file (`lib/pricing.js`) and the contract file (`lib/pricing.contract.md`), asked for
+      "the actual defect" singular, and the contract bolded the operative word ("inclusive") plus added
+      a steering sentence — nothing was left to over- or under-report.
+- [x] 8b.2 Built `rig/fixtures/tool-surface/v2/` — 8 files (`handlers/checkout.js` entry point,
+      `lib/pricing.js`, `lib/rush.js`, `lib/loyalty.js`, `lib/shipping.js`, `lib/fees.js`, `lib/tax.js`,
+      `lib/pricing.contract.md`). Three real defects (`>` where the contract's "or more"/"at least"
+      language needs `>=`): `lib/pricing.js:15`, `lib/rush.js:14`, `lib/loyalty.js:12`. Two deliberate
+      near-misses — correct code shaped like the same bug — at `lib/pricing.js:12` (contract says "over
+      $250," strict, so `>` is right) and `lib/fees.js:14` (contract says "under $20," strict, so `<` is
+      right). Contract states all seven rules as plain numbers, no bolding, no steering sentence.
+      Committed `0781e3a` (source + answer key, before the prompt).
+- [x] 8b.3 Prompt (`prompts/t3v2.txt`) names only `handlers/checkout.js` and a generic symptom; never
+      names any of the six pricing modules or `pricing.contract.md`. Asks for **every** defect, one
+      `<relative-path>:<line-number>` per line — recall and precision are both observable, not just a
+      single pass/fail bit. Committed `282f45e` together with the MANIFEST refreeze.
+- [x] 8b.4 `run.sh`/`derive.py` generalized to resolve `FIXTURE_ROOT` per `task_id` instead of a single
+      hardcoded `v1` path (`t3v2` → `v2`, everything else → `v1`), so `v1/` needed no edit. `derive.py`
+      also gained `defects_found`/`defects_missed`/`defects_extra` on every row — three separate counts
+      (spec R-A1.3: never summed) that a single-defect task could never have exposed. Schema bumped to
+      2. Committed `87ccd93`, before the fixture itself, and verified non-breaking: the 15 pre-existing
+      rows re-derive to the same state/classification as before, `derive.py` run twice stays
+      byte-identical, and the checker self-test still fires `PASS` for `t1`, `t3`, and now `t3v2`.
+- [x] 8b.5 MANIFEST accept-before / reject-tampered-after verified live for `v2/`: `t3v2-broad-00`
+      (sacrificial, not one of the 3 pilot pairs) proceeded past the guard; an unstaged byte tamper of
+      `lib/pricing.js` after the freeze produced exit 2 with the MANIFEST-mismatch message; reverted,
+      tree clean before the pilot.
+- [x] 8b.6 Ran the tier-3-v2 pilot (3 pairs): `t3v2-broad-{01,02,03}` and `t3v2-scoped-{01,02,03}`, live,
+      sequential. **Finding: v2 still does not discriminate.** All six completed runs classified
+      `proper` — `defects_found=3, defects_missed=0, defects_extra=0` on every one, in both arms. Neither
+      near-miss was ever reported by any run. Tool-call multisets: identical for 2 of 3 pairs, one
+      incidental extra `Glob` in the scoped arm for the third — the same shape v1's pilot showed, now
+      confirmed on a fixture with three real defects instead of one. `t3v2-broad-00` (the sacrificial
+      shakedown run, excluded from the 3-pair count) voided `surface-mismatch` on its own — a single
+      cold-start flake (`tool_count=31` against the 32-tool preimage, immediately before three
+      consecutive matching runs), recorded rather than dismissed. No conclusion about `hypotheses/0001`
+      is drawn — three pairs is below its own pre-registered power table. Committed `7975eb8`.
+      **Per this batch's own instruction: this is another hardening-pass finding, not a spend-N signal.**
+      Neither v1 nor v2 has yet produced a fixture where a completed run can fail cleanly; Phase 6/7/9
+      remain blocked on that being true of at least one tier before any live cell is worth funding.
 
 ## Phase 9: Aggregation + theory write (blocked: Phase 7 AND Phase 8; 9.0 gates 9.4)
 
