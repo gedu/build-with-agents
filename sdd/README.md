@@ -2,16 +2,24 @@
 id: sdd/index
 type: index
 targets: [any]
-status: draft
-verified: 2026-08-04
-sources: []
+status: validated
+verified: 2026-08-10
+sources: ["sdd/measurement-rig/verify.md", "decisions/0011-rig-produces-evidence-not-truth.md"]
 ---
 
 # sdd/
 
 Spec-Driven Development cycles run in or from this repo. Process records, not truth.
 
-No cycle recorded yet.
+## Recorded cycles
+
+| Cycle | Phases present | Verdict |
+|---|---|---|
+| `measurement-rig/` | exploration → proposal → spec → design → tasks → verify | **PARTIAL** — verified cost instrument, unverified quality instrument. See `measurement-rig/verify.md`. |
+
+A cycle is recorded here once it has a `verify.md`. A partial verdict is a recorded outcome, not an
+unfinished cycle: the verification ran, and it concluded that one channel of the instrument has
+never been shown to work. Closing a cycle means stating what it established *and* what it did not.
 
 ## Layout
 

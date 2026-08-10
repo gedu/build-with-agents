@@ -38,12 +38,12 @@ where to look and what you are allowed to trust.
 | `research/` | Received links, contrasted against evidence, each with a verdict | Verdict only, as evidence | 11 verdicts (3 `supported`, 5 `partially supported`, 3 `unverifiable`) |
 | `decisions/` | Numbered ADRs (`NNNN-slug.md`) — the WHY | Yes | `0001`–`0012` ratified |
 | `hypotheses/` | Falsifiable claims with a declared test, registered before the run that could settle them | **No — zero citability** (ADR 0012). Not even as evidence | 1 open |
-| `journal/` | Dated conversations and brainstorms | **Never as authority**; valid as provenance (ADR 0007) | 9 entries (2026-08-04, 2026-08-05 ×7, 2026-08-10) |
+| `journal/` | Dated conversations and brainstorms | **Never as authority**; valid as provenance (ADR 0007) | 10 entries (2026-08-04, 2026-08-05 ×7, 2026-08-10 ×2) |
 | `blocks/_shared/` | Target-agnostic minimal blocks with a contract | Yes, when `validated` | empty |
 | `blocks/react/` | React-specific blocks | Yes, when `validated` | empty |
 | `blocks/react-native/` | React Native-specific blocks | Yes, when `validated` | empty |
 | `templates/` | Compositions of blocks, ready to copy | Yes, when `validated` | empty |
-| `sdd/` | SDD cycles: proposal, spec, design, tasks, verification | No — process record | 1 change (`measurement-rig`) |
+| `sdd/` | SDD cycles: proposal, spec, design, tasks, verification | No — process record | 1 cycle (`measurement-rig`), verified **PARTIAL** — verified cost instrument, unverified quality instrument |
 | `rig/` | Measurement harness: fixtures, runner, analyser. Raw captures are gitignored | Code yes; **output is evidence only**, citable once promoted to `theory/` with scope and spread (ADR 0011) | 1 experiment (`tool-surface`), in progress |
 | `upstream/` | Experiments against `gentle-ai` / `engram` / `gga` / `claude-code`, staged bug reports | No — experiments | `gentle-ai`: `0001` filed as [#2478](https://github.com/Gentleman-Programming/gentle-ai/issues/2478), `0002` and `0004` staged, `0003` **rejected** (resolved on 2.3.0 before filing). `claude-code`: `0001` staged |
 
