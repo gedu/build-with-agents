@@ -33,6 +33,14 @@
 #   Added lines in the staged diff only, so an unrelated commit is never blocked by a
 #   pre-existing finding. `--all` scans every tracked file instead, for an audit.
 #
+# SELF-TEST
+#   `--self-test` builds a throwaway repository and runs this script against it, asserting
+#   one exit code per case: a clean tree containing an empty file and a placeholder path,
+#   a real home-path finding, and an unreadable tracked file. Exit 0 every case passed,
+#   1 a case failed, 2 the test could not run. Run it whenever this file changes.
+#   ADR 0013 — a committed executable carries its own test, so it needs no runner and no
+#   framework, both of which the portability rule below forbids anyway.
+#
 # PORTABILITY
 #   POSIX `grep -E`, not `rg`. A committed hook must run on a machine that has not
 #   installed anything.
@@ -62,11 +70,85 @@ die_cannot_run() {
   exit 2
 }
 
+# Builds a throwaway repository and re-invokes this script against it, asserting one exit
+# code per case. It is not run from the commit path: putting mktemp, git init and chmod
+# into every commit would make the gate slower and more failure-prone in exchange for
+# testing something that only changes when someone edits this file (ADR 0013).
+self_test() {
+  SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+  [ -x "$SELF" ] || die_cannot_run "could not locate this script in order to re-invoke it"
+
+  TMP="$(mktemp -d)" || die_cannot_run "could not create a temporary directory"
+  # Restore permissions before removing: case 3 leaves a file at mode 000.
+  trap 'chmod -R u+rwX "$TMP" 2>/dev/null || :; rm -rf "$TMP"' EXIT
+
+  ( cd "$TMP" && git init -q . \
+      && git config user.email selftest@example.invalid \
+      && git config user.name selftest ) >/dev/null 2>&1 \
+    || die_cannot_run "could not create the temporary repository"
+
+  FAILED=0
+
+  # expect <wanted-exit-code> <label>
+  expect() {
+    set +e
+    ( cd "$TMP" && "$SELF" --all ) >/dev/null 2>&1
+    _got=$?
+    set -e
+    if [ "$_got" -eq "$1" ]; then
+      printf '  ok    %s\n' "$2"
+    else
+      printf '  FAIL  %s — expected exit %s, got %s\n' "$2" "$1" "$_got" >&2
+      FAILED=1
+    fi
+  }
+
+  _commit() {
+    ( cd "$TMP" && git add -A && git commit -qm "$1" ) >/dev/null 2>&1 \
+      || die_cannot_run "could not stage the '$1' fixture"
+  }
+
+  # Case 1 — clean, including the two shapes that must NOT escalate. An empty tracked file
+  # makes grep exit 1, which means "no lines", not "could not read"; and every home-path
+  # pattern requires a real path segment, so the documented angle-bracketed placeholders
+  # must not match. Both were regressions waiting to happen in the exit-code handling.
+  printf 'nothing to see here\n'                    > "$TMP/plain.txt"
+  : >                                                 "$TMP/empty.txt"
+  printf 'see <home>/.config and <repo>/hooks\n'    > "$TMP/placeholder.txt"
+  _commit clean
+  expect 0 "clean tree, with an empty file and placeholder paths"
+
+  # Case 2 — a real finding. The forbidden string is assembled at runtime from two
+  # fragments that match nothing on their own, because a literal home path written here
+  # would make this gate correctly block its own commit. That constraint doubles as a test
+  # that the fragments really are inert.
+  printf '%s/%s/project\n' '/Users' 'someone'       > "$TMP/leak.txt"
+  _commit leak
+  expect 1 "an absolute home path is reported"
+  rm -f "$TMP/leak.txt"
+  _commit unleak
+
+  # Case 3 — the regression this whole test exists for. Before the fix, an unreadable
+  # tracked file was skipped in silence and --all printed "clean across N tracked files"
+  # and exited 0: a gate reporting a pass on content it never read.
+  chmod 000 "$TMP/plain.txt"
+  expect 2 "an unreadable tracked file escalates instead of being skipped"
+  chmod 644 "$TMP/plain.txt"
+
+  [ "$FAILED" -eq 0 ] || {
+    printf '\n  SELF-TEST FAILED — this gate is not behaving as specified.\n' >&2
+    exit 1
+  }
+  printf '  self-test: all cases passed\n'
+  exit 0
+}
+
 case "${1:-}" in
-  "")       MODE="staged" ;;
-  --all)    MODE="all" ;;
-  --help)   show_help; exit 0 ;;
-  *)        die_cannot_run "unknown argument '${1}'. Use no argument, --all, or --help." ;;
+  "")           MODE="staged" ;;
+  --all)        MODE="all" ;;
+  --self-test)  self_test ;;
+  --help)       show_help; exit 0 ;;
+  *)            die_cannot_run "unknown argument '${1}'. Use no argument, --all, --self-test, or --help." ;;
 esac
 
 # Each entry: <label>|<extended regex>
