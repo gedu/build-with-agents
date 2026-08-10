@@ -178,6 +178,14 @@ def main():
     for r in paired:
         print(f"  {r['run_id']}: wall_ms={r['wall_ms']}")
 
+    print("\nDefect recall/precision — three counts per run, reported separately and never")
+    print("summed into a score (spec R-A1.3). Meaningful for multi-defect tasks (a single-")
+    print("defect task degenerates to found in {0,1}, missed in {0,1}, extra in {0,...}):")
+    for r in paired:
+        if r.get("defects_found") is not None:
+            print(f"  {r['run_id']}: defects_found={r['defects_found']} "
+                  f"defects_missed={r['defects_missed']} defects_extra={r['defects_extra']}")
+
     anomalies, control_anomalies = anomaly_log(rows)
     print_table("Anomaly log (spontaneous — counts toward instrument doubt):",
                 [f"{k}: {v}" for k, v in sorted(anomalies.items())] or ["none"])

@@ -34,14 +34,26 @@ import re
 import sys
 from pathlib import Path
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2  # v2: added defects_found/defects_missed/defects_extra (design.md
+# Decision 8 — no migrations, a schema_version bump is a rebuild, not a
+# patch to rows already on disk). Re-deriving rewrites every existing row
+# with this version and the three new fields; nothing here reads the old
+# value of schema_version to special-case anything.
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXPERIMENT = "tool-surface-v1"
-FIXTURE_ROOT = REPO_ROOT / "rig/fixtures/tool-surface/v1"
+# Fixture location is additively versioned per task_id (design.md Decision 4:
+# a fixture change is a new vN/ directory, never an edit to an existing one).
+# t3v2 is tier 3's discriminating rebuild; t1/t2/t3 stay on v1 — the version a
+# task_id names is fixed at the moment that task_id is introduced.
+FIXTURE_VERSIONS = {"t1": "v1", "t2": "v1", "t3": "v1", "t3v2": "v2"}
+FIXTURE_ROOTS = {
+    v: REPO_ROOT / "rig/fixtures/tool-surface" / v
+    for v in sorted(set(FIXTURE_VERSIONS.values()))
+}
 SURFACES_ROOT = REPO_ROOT / "rig/surfaces"
 RUNS_ROOT = REPO_ROOT / "rig/runs" / EXPERIMENT
 RESULTS_DIR = REPO_ROOT / "rig/results" / EXPERIMENT
-RUN_ID_RE = re.compile(r"^(t[123])-(broad|scoped)-([0-9][A-Za-z0-9]*)$")
+RUN_ID_RE = re.compile(r"^(t[123]|t3v2)-(broad|scoped)-([0-9][A-Za-z0-9]*)$")
 
 # A control slot: iteration `0c<n>`. Still a digit-initial iteration, so the run_id
 # grammar is unchanged.
@@ -98,17 +110,23 @@ def surface_harness(arm: str):
 
 
 def load_answer_keys():
+    """Reads every fixture version's own answer-key/ dir. Task ids are
+    disjoint across versions (t1/t2/t3 in v1, t3v2 in v2), so merging into
+    one dict keyed by task_id is safe — this is not the aggregation that
+    design.md's fixture_digest-mismatch guard forbids, because no two
+    versions ever share a task_id."""
     keys = {}
-    ak_dir = FIXTURE_ROOT / "answer-key"
-    if ak_dir.is_dir():
-        for f in sorted(ak_dir.glob("*.json")):
-            data = json.loads(f.read_text())
-            keys[data["task_id"]] = data
+    for root in FIXTURE_ROOTS.values():
+        ak_dir = root / "answer-key"
+        if ak_dir.is_dir():
+            for f in sorted(ak_dir.glob("*.json")):
+                data = json.loads(f.read_text())
+                keys[data["task_id"]] = data
     return keys
 
 
-def fixture_digest() -> str:
-    manifest = FIXTURE_ROOT / "MANIFEST.sha256"
+def fixture_digest(version: str) -> str:
+    manifest = FIXTURE_ROOTS[version] / "MANIFEST.sha256"
     return sha256_hex(manifest.read_bytes()) if manifest.is_file() else None
 
 
@@ -205,12 +223,26 @@ def resolve_target(tool_use, tool_result_block, init_event):
 DEFECT_LINE_RE = re.compile(r"^[\w/.\-]+:\d+$")
 
 
-def check_outcome(final_text: str, answer_key: list) -> bool:
+def check_outcome(final_text: str, answer_key: list):
+    """Returns (outcome_pass, defects_found, defects_missed, defects_extra).
+
+    outcome_pass keeps its original all-or-nothing meaning (exact line set,
+    no missing line, no extra line, no duplicate). The three counts are a
+    SEPARATE recall/precision signal, spelled out per spec R-A1.3: never
+    summed or weighted into a score here or by any caller — a task with
+    several seeded defects needs found/missed/extra to be distinguishable
+    from a single pass/fail bit, which is exactly what a fixture with only
+    one defect could never expose."""
     if final_text is None:
-        return False
+        return False, None, None, None
     reported = [l for l in final_text.splitlines() if DEFECT_LINE_RE.match(l)]
-    expected = {f"{d['path']}:{d['line']}" for d in answer_key}
-    return set(reported) == expected and len(reported) == len(expected)
+    reported_set = set(reported)
+    expected_set = {f"{d['path']}:{d['line']}" for d in answer_key}
+    outcome_pass = reported_set == expected_set and len(reported) == len(expected_set)
+    defects_found = len(expected_set & reported_set)
+    defects_missed = len(expected_set - reported_set)
+    defects_extra = len(reported_set - expected_set)
+    return outcome_pass, defects_found, defects_missed, defects_extra
 
 
 def check_practice(tool_calls, reported_paths, expected, off_set):
@@ -357,10 +389,11 @@ def build_row(run_dir: Path, surfaces, digests, answer_keys):
 
     outcome_pass = practice_pass = classification = over_ceiling = None
     offset_calls = forbidden_calls = None
+    defects_found = defects_missed = defects_extra = None
     ak = answer_keys.get(task_id)
     if state == "complete" and ak:
         final_text = result_event.get("result")
-        outcome_pass = check_outcome(final_text, ak["answer_key"])
+        outcome_pass, defects_found, defects_missed, defects_extra = check_outcome(final_text, ak["answer_key"])
         reported_lines = [l for l in (final_text or "").splitlines() if DEFECT_LINE_RE.match(l)]
         # rsplit on the LAST ':' — a defect line is "<path>:<line-number>"
         # and the practice check needs the path alone to compare against a
@@ -376,6 +409,8 @@ def build_row(run_dir: Path, surfaces, digests, answer_keys):
     if result_event:
         num_turns = result_event.get("num_turns")
 
+    fixture_version = FIXTURE_VERSIONS.get(task_id, "v1")
+
     row = {
         "schema_version": SCHEMA_VERSION,
         "run_id": run_dir.name,
@@ -390,8 +425,8 @@ def build_row(run_dir: Path, surfaces, digests, answer_keys):
         "prompt_sha256": prompt_sha256,
         "tool_surface_sha256": tool_surface_sha256,
         "tool_count": tool_count,
-        "fixture_version": "v1",
-        "fixture_digest": digests["fixture"],
+        "fixture_version": fixture_version,
+        "fixture_digest": digests["fixture"].get(fixture_version),
         "checker_digest": digests["checker"],
         "code_commit": status.get("code_commit"),
         "cwd_is_expected": cwd_is_expected,
@@ -414,6 +449,13 @@ def build_row(run_dir: Path, surfaces, digests, answer_keys):
         "offset_calls": offset_calls,
         "forbidden_calls": forbidden_calls,
         "outcome_pass": outcome_pass,
+        # Recall/precision as three separate counts (spec R-A1.3: never
+        # summed or weighted into one score, here or by any caller). A task
+        # with several seeded defects needs these to be distinguishable from
+        # the single outcome_pass bit above.
+        "defects_found": defects_found,
+        "defects_missed": defects_missed,
+        "defects_extra": defects_extra,
         "practice_pass": practice_pass,
         "classification": classification,
         "anomaly_classes": sorted(anomaly_classes),
@@ -443,6 +485,7 @@ def apply_ambient_drift_pairing(built):
                 r["void_reason"] = "ambient-drift"
                 r["outcome_pass"] = r["practice_pass"] = r["classification"] = None
                 r["over_ceiling"] = None
+                r["defects_found"] = r["defects_missed"] = r["defects_extra"] = None
 
 
 def main():
@@ -452,7 +495,10 @@ def main():
         return 1
 
     surfaces = {"broad": load_surface("broad"), "scoped": load_surface("scoped")}
-    digests = {"fixture": fixture_digest(), "checker": CHECKER_DIGEST}
+    digests = {
+        "fixture": {v: fixture_digest(v) for v in FIXTURE_ROOTS},
+        "checker": CHECKER_DIGEST,
+    }
 
     run_dirs = sorted(p for p in RUNS_ROOT.glob("*") if p.is_dir()) if RUNS_ROOT.is_dir() else []
     built = []

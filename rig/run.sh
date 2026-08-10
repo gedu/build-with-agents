@@ -44,7 +44,9 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 EXPERIMENT="tool-surface-v1"
-FIXTURE_ROOT="$REPO_ROOT/rig/fixtures/tool-surface/v1"
+# FIXTURE_ROOT is task-dependent (design.md Decision 4: additive versioning —
+# a change is a new vN/ directory, v1/ is never edited) and is resolved below,
+# once TASK_ID is known, not here.
 RUNS_ROOT="$REPO_ROOT/rig/runs/$EXPERIMENT"
 SURFACES_ROOT="$REPO_ROOT/rig/surfaces"
 
@@ -57,7 +59,7 @@ usage() {
   cat <<'USAGE'
 Usage: rig/run.sh <task_id> <arm> <iteration> [--dirty-ok]
 
-  task_id     t1 | t2 | t3
+  task_id     t1 | t2 | t3 | t3v2
   arm         broad | scoped
   iteration   an iteration slot, e.g. 03, or a void re-run suffix, e.g. 03r1
               (design.md Decision 6: run_id = <task_id>-<arm>-<iteration>)
@@ -134,9 +136,9 @@ list_fixture_files() {
 }
 
 # compute_manifest <fixture-root> — sorted "sha256  relpath" over
-# src/, prompts/, answer-key/. Matches the format MANIFEST.sha256 was
-# generated with (rig/fixtures/tool-surface/v1/MANIFEST.sha256), so the
-# comparison in verify_manifest() is byte-for-byte.
+# src/, prompts/, answer-key/. Matches the format each fixture version's own
+# MANIFEST.sha256 was generated with (e.g. rig/fixtures/tool-surface/v1/
+# MANIFEST.sha256), so the comparison in verify_manifest() is byte-for-byte.
 compute_manifest() {
   python3 - "$1" <<'PY'
 import hashlib, pathlib, sys
@@ -225,8 +227,19 @@ TASK_ID="${POSITIONAL[0]}"
 ARM="${POSITIONAL[1]}"
 ITERATION="${POSITIONAL[2]}"
 
-case "$TASK_ID" in t1|t2|t3) ;; *) die_bad_args "task_id must be t1, t2 or t3 — got '$TASK_ID'" ;; esac
+case "$TASK_ID" in t1|t2|t3|t3v2) ;; *) die_bad_args "task_id must be t1, t2, t3 or t3v2 — got '$TASK_ID'" ;; esac
 case "$ARM" in broad|scoped) ;; *) die_bad_args "arm must be broad or scoped — got '$ARM'" ;; esac
+
+# FIXTURE_ROOT is additively versioned per task_id (design.md Decision 4: a
+# fixture change is a new vN/ directory, never an edit to an existing one).
+# t3v2 is tier 3's discriminating rebuild; t1/t2/t3 stay on v1 — the version
+# a task_id names is fixed at the moment that task_id is introduced, never
+# reinterpreted later.
+case "$TASK_ID" in
+  t3v2) FIXTURE_VERSION="v2" ;;
+  *) FIXTURE_VERSION="v1" ;;
+esac
+FIXTURE_ROOT="$REPO_ROOT/rig/fixtures/tool-surface/$FIXTURE_VERSION"
 case "$ITERATION" in
   [0-9]*) ;;
   *) die_bad_args "iteration must start with a digit (e.g. 03, or 03r1 for a void re-run) — got '$ITERATION'" ;;
@@ -275,7 +288,7 @@ MANIFEST_FILE="$FIXTURE_ROOT/MANIFEST.sha256"
 COMPUTED_MANIFEST="$(compute_manifest "$FIXTURE_ROOT")"
 COMMITTED_MANIFEST="$(cat "$MANIFEST_FILE")"
 if [ "$COMPUTED_MANIFEST" != "$COMMITTED_MANIFEST" ]; then
-  die_cannot_run "MANIFEST.sha256 mismatch — the fixture on disk does not match what was frozen. Refusing to run against a tampered or edited fixture (design.md Decision 4). A change belongs in a new v2/ directory, not an edit to v1/."
+  die_cannot_run "MANIFEST.sha256 mismatch — the fixture on disk does not match what was frozen. Refusing to run against a tampered or edited fixture (design.md Decision 4). A change belongs in a new v(N+1)/ directory, not an edit to $FIXTURE_VERSION/."
 fi
 
 PROMPT_FILE="$FIXTURE_ROOT/prompts/${TASK_ID}.txt"
