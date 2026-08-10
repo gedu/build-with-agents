@@ -12,8 +12,16 @@ sources: []
 Space to exercise `gentle-ai`, `engram` and `gga`, and to stage bug reports before they are
 filed upstream. Experiments, not truth.
 
-`gentle-ai/` — 1 staged report, none filed yet. See `gentle-ai/README.md` for the reporting
-protocol and the manual/automatic split.
+`gentle-ai/` — 4 staged reports, 1 filed ([#2478](https://github.com/Gentleman-Programming/gentle-ai/issues/2478)).
+See `gentle-ai/README.md` for the reporting protocol and the manual/automatic split.
+
+`claude-code/` — 1 staged report, none filed yet. Different upstream, different issue template,
+different rules; its numbering restarts at `0001`. See `claude-code/README.md`, which also carries
+the audit that killed four of five staged findings against the documentation.
+
+**Each tool directory has its own protocol.** `gentle-ai` requires an approved issue before any PR;
+`anthropics/claude-code` requires a preflight attestation that each report covers exactly one bug.
+Read the tool's own README before staging anything for it.
 
 ## Layout
 
