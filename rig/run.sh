@@ -38,7 +38,13 @@
 # a mystery either way.
 #
 # NEVER --allowedTools (no visibility effect — verified in exploration.md).
-# NEVER --strict-mcp-config (drops mcp_servers 25 -> 0, a second variable).
+# ALWAYS --strict-mcp-config. This REVERSES an earlier rule of this file's own,
+# and the reversal is design.md Amendment 3: forbidding it was right about the
+# mechanism (it moves mcp_servers 25 -> 0) and wrong about the conclusion. A
+# reducer applied to ONE arm is a confound; applied to BOTH it is a constant.
+# It is required rather than merely allowed because without it the surface is
+# not reproducible — two identical invocations seconds apart returned 55 and 82
+# tools when a "pending" MCP server finished connecting between them.
 
 set -euo pipefail
 
