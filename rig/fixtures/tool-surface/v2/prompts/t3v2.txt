@@ -1,0 +1,1 @@
+A customer reports that some checkout totals are wrong. Starting from `handlers/checkout.js`, find every defect in the pricing logic it depends on that causes an incorrect total. Report each defect as one line in the exact format `<relative-path>:<line-number>`, one per line, and output nothing else in your final message.
