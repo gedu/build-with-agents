@@ -147,23 +147,24 @@ rather than trimmed, matching how the Phase 0–3 batch handled its own overage.
       which is why `report.py`'s anomaly log now separates "controls that fired as designed" from the
       genuine count.
 
-## Phase 6: Tier-1 pilot + derived timeout (blocked: Phase 3 AND Phase 5 both passing) — NOT STARTED,
-superseded this batch by a tier-3 pilot instead; see the note below Phase 8.
+## Phase 6: Tier-1 pilot + derived timeout — **CANCELLED** (see Amendment 2). Superseded by the
+tier-3 pilot, which produced every calibration number this phase existed to produce.
 
-- [ ] 6.1 Run tier-1 cell: 5 BROAD + 5 SCOPED, `TIMEOUT_S=300` (pilot bound only).
-- [ ] 6.2 If any pilot run times out: pilot invalid — raise bound, re-run before continuing.
-- [ ] 6.3 Derive `ceil(3 × slowest_successful_pilot_wall_s / 30) × 30`, floor 120s; update `run.sh` constant + WHY comment.
-- [ ] 6.4 Compute `T_task = 2 × (files_in_answer_key + 2) + 1`; record.
-- [ ] 6.5 Apply N=5→10→15 variance rule to tier-1 spread; report final N + min/max range.
-- [ ] 6.6 `./hooks/pre-commit --all` over committed rows.
+- [-] 6.1 **Cancelled.** The tier-3 pilot ran instead; see "Tier-3 pilot" below.
+- [-] 6.2 **Cancelled with 6.1.** No pilot run has ever timed out — observed walls are 11–52s.
+- [~] 6.3 **Derived, not applied.** `ceil(3 × 14.586 / 30) × 30 = 60`, floored to **120s**.
+      `run.sh:62` still reads `TIMEOUT_S=300`, the provisional pilot bound. This is the one
+      genuinely open item this phase leaves behind.
+- [-] 6.4 **Cancelled.** `T_task` gated a per-tier turn budget that no cell ever enforced.
+- [-] 6.5 **Cancelled with 6.1** — the variance rule was applied to tier 3 instead (n=12 pairs).
+- [x] 6.6 `./hooks/pre-commit --all` run over committed rows; clean across 107 tracked files.
 
-## Phase 7: Tier-2 fixture + cell (blocked: Phase 6, all shakedown assertions passed)
+## Phase 7: Tier-2 fixture + cell — **CANCELLED** (see Amendment 2), not deferred.
 
-- [ ] 7.1 Create `src/utils/date.js` (midnight boundary defect) + 3-4 correct distractors.
-- [ ] 7.2 Commit `answer-key/t2.json` (+ its own R-A1.7 negative control + off-set case) **before** the prompt commit.
-- [ ] 7.3 Commit `prompts/t2.txt` in a later commit.
-- [ ] 7.4 Refreeze `MANIFEST.sha256`; verify accept-before / reject-tampered-after.
-- [ ] 7.5 Run tier-2 cell (N=5→15 variance rule); report N + range.
+Amendment 1 deferred tier 2. Amendment 2 cancels it: the null is established for this task class at
+12 pairs with zero separation, and more tiers add breadth to a null.
+
+- [-] 7.1 – 7.5 **Cancelled.** Superseded by the decision recorded in Amendment 2.
 
 ## Phase 8: Tier-3 fixture + cell (blocked: Phase 6; independent of Phase 7) — fixture DONE 2026-08-07,
 pilot run and reported, full cell (8.5) BLOCKED on a surface-preimage recapture
@@ -185,9 +186,11 @@ pilot run and reported, full cell (8.5) BLOCKED on a surface-preimage recapture
       accept-before passed (a run proceeded past the manifest check); an unstaged tamper of
       `lib/pricing.js` after refreeze produced exit 2 with the MANIFEST-mismatch message, confirmed
       live, then reverted (`git checkout --`, tree clean again before any pilot run).
-- [ ] 8.5 Run tier-3 cell (N=5→15 variance rule); report N + range. **NOT started.** Blocked by the
-      pilot's own finding below — the committed surface preimages are stale, so no run against them
-      would be countable.
+- [x] 8.5 Run tier-3 cell (N=5→15 variance rule); report N + range. **DONE on the v2 fixture, not
+      v1** (see Phase 8b and Amendment 2). The blocker named here — stale surface preimages — was
+      cleared by the 2.1.224 recapture (`bc550b4`, `3de1bfc`). Final cell: `t3v2`, n=12 comparable
+      pairs, 25 `complete` rows committed. v1's own cell was never run and is cancelled with it:
+      v1 cannot discriminate (4-of-4 `proper`), which is the whole reason v2 exists.
 
 ### Tier-3 pilot — 3 pairs, run 2026-08-07, explicit substitute for Phase 6
 
@@ -320,21 +323,35 @@ distinct in this file, matching how `v1`/`v2` stay distinct on disk (design.md D
       Neither v1 nor v2 has yet produced a fixture where a completed run can fail cleanly; Phase 6/7/9
       remain blocked on that being true of at least one tier before any live cell is worth funding.
 
-## Phase 9: Aggregation + theory write (blocked: Phase 7 AND Phase 8; 9.0 gates 9.4)
+## Phase 9: Aggregation + theory write — DONE 2026-08-10, commit `4feac42`
 
-- [ ] 9.0 **[BLOCKED — design gap, not decided here]** Design's Open Questions defers whether `rig/`'s `MAP.md` entry needs its own ADR to "whoever writes the first result." Needs an explicit ruling before 9.4, not a tasks-phase decision.
-- [ ] 9.1 Run `rig/report.py` over all committed rows: four-cell table, off-set distribution, anomaly log, all 3 tasks.
-- [ ] 9.2 Apply X=3 instrument-doubt threshold; investigate before writing `theory/` if tripped.
-- [ ] 9.3 Apply the pre-registered falsification table; determine exactly one verdict (Supports/Narrows/Contradicts).
-- [ ] 9.4 Modify `theory/agents/tool-surface-design.md`: verdict, four-cell table, off-set distribution, anomaly log, R-A1.6 honesty-contract limitations (6 items). No code.
+- [x] 9.0 **Resolved, not by this file.** `decisions/0011-rig-produces-evidence-not-truth.md` rules
+      that `rig/` code is citable, its output is evidence only, and a figure becomes citable solely
+      by promotion into `theory/` carrying scope, spread and the honesty contract. No separate ADR
+      for the `MAP.md` entry is needed. Already recorded in Amendment 1; the checkbox lagged.
+- [x] 9.1 `rig/report.py` run over all committed rows — four-cell table, off-set distribution and
+      anomaly log, across `t1`, `t3` and `t3v2`.
+- [x] 9.2 X=3 instrument-doubt threshold applied. It tripped, was investigated, and the
+      deliberate-versus-spontaneous split (`0c<n>` control slots, R-A3.1/R-A3.2) is what cleared it.
+- [x] 9.3 Falsification table applied. Exactly one verdict: **not supported** for defect-reporting
+      tasks — 12/12 `proper` in both arms, zero defects missed, zero invented, neither planted
+      near-miss ever reported. Deliberately **not** `rejected`; a null on one task class does not
+      refute the general claim (`hypotheses/0001`).
+- [x] 9.4 `theory/agents/tool-surface-design.md` modified, plus `capability-load-cost.md` and
+      `broad-surface-degrades-output-not-selection.md`. Promoted figure: **≈224 tokens per resident
+      tool entry** (12 pairs, 32 vs 3 tools, median 6,489 extra cache-creation tokens for 29 extra
+      names; positive 12/12, sign test p=0.000244, Mann-Whitney on the 9 same-order pairs
+      p=0.000021), carrying its scope and the honesty contract. Committed `4feac42`.
 
 ## No-code tasks
 
-0.1, 0.2, 0.3, 3.1–3.5 (verification only), 4.4, 4.8 (verification), 5.1–5.2 (run + observe), 6.2, 6.5, 6.6, 9.0–9.4.
+0.1, 0.2, 0.3, 3.1–3.5 (verification only), 4.4, 4.8 (verification), 5.1–5.2 (run + observe), 6.6,
+9.0–9.4.
 
 ## Blocked tasks
 
-5.2 (gates all downstream work on the negative control firing), 6.1–6.6 (gated on 3.1–3.5 AND 5.1–5.2), 7.x/8.x (gated on Phase 6 passing in full), 9.x (gated on 7.x AND 8.x), 9.0 (design-level gap — needs an explicit ruling, not authored here), 9.4 (gated on 9.0–9.3).
+**None.** Every blocking edge in this file has been cleared, cancelled or superseded — see
+Amendment 2 for the reconciliation and for the single item that remains genuinely open (6.3).
 
 ## Amendment 1 — scope and delivery decided, 2026-08-06
 
@@ -385,3 +402,67 @@ stream-json --verbose`, no flags, read the `init.tools` array, sort, commit) on 
 runs Phase 5's negative control and Phase 6's pilot. `rig/run.sh` already refuses to run the `scoped` arm
 with a clear exit-2 message until that file exists; the `broad` arm needs no change and was fully
 exercised in Phase 3's shakedown.
+
+**Closed 2026-08-10 — and the premise behind it was wrong.** See Amendment 2. The 33-name sub-agent
+set was never a `claude -p` surface at all, so it could not have contaminated a preimage; and the
+committed preimage has now been reproduced byte-identically from an environment with every Claude Code
+variable stripped. The concern this note records was reasonable and is now answered by probe.
+
+## Amendment 2 — reconciliation and the nesting probe, 2026-08-10
+
+This file had drifted badly: it showed **17 open items** while the experiment had already produced,
+promoted and committed its first result (`4feac42`). Reconciled above against the repository rather
+than against the file's own memory. Of the 17: 9 done, 7 cancelled, **1 genuinely open**.
+
+**The one open item is 6.3** — `run.sh:62` still reads `TIMEOUT_S=300`, the provisional pilot bound,
+where the derived value is 120s. Harmless (observed walls are 11–52s) and deliberately left, since a
+timeout constant belongs with the run it calibrates and no further cell is funded.
+
+### The nesting question, settled by probe
+
+The handoff journal flagged as unverified whether a probe run from a plain terminal yields the same
+surface as one run inside a Claude Code session — a sub-agent had once reported 33 names where the
+main session reported 54. Eight paired probes plus four single-condition probes, all on CLI
+**2.1.224**, `claude -p` with `--output-format stream-json --verbose`:
+
+| Channel | Test | Result |
+|---|---|---|
+| Environment inheritance | 4 nested vs 4 `env -u`-scrubbed runs, alternating order | **Not a channel.** Scrubbed 32/32/32/32; nested 31/32/32/32 |
+| Controlling terminal | scrubbed + real pty via `script -q /dev/null` | **Not a channel.** 32 names, byte-identical to `rig/surfaces/broad.txt` |
+| Process ancestry | a shell with no Claude Code ancestor, run by the operator | **Not a channel.** Byte-identical to `rig/surfaces/broad.txt` |
+
+**All four channels are closed. The surface is invariant to nesting**, and the committed preimage is
+reproducible from a plain terminal, from a pty, and from inside a session with every Claude Code
+environment variable stripped or present. `rig/surfaces/broad.txt` is therefore a valid preimage
+regardless of where a run is launched from, which is what the Phase 4/5 note above was worried about.
+
+**The 33-name figure was a category error on our side, not a harness behaviour.** It was a
+sub-agent's own tool set as reported inside its own context — a different object from the `init.tools`
+array of a `claude -p` invocation. Sub-agent types carry deliberately restricted tool sets, and the
+missing `Glob`/`Grep` is simply the documented `Bash`-subsumption effect (Amendment 2's table below),
+not evidence of a nesting-dependent surface. The two numbers were never comparable, and no conclusion
+should ever have rested on their difference.
+
+### Surface behaviours re-measured on 2.1.224, scrubbed environment
+
+Recorded here because the earlier figures were captured on 2.1.222, **before** the `ListAgents`
+built-in shipped, so every count in them is one lower than the same measurement today. The *shape*
+of each behaviour reproduced exactly; only the absolute counts moved.
+
+| Invocation | Names | Versus baseline |
+|---|---|---|
+| no flags (baseline) | **55** | — (was 54 on 2.1.222) |
+| `--allowedTools Read` | **55** | Identical name set. A permission filter, not a visibility filter |
+| `--disallowedTools Bash` | **56** | −`Bash`, +`Glob`, +`Grep`. Non-monotonic: forbidding one name **raises** the count |
+| `--strict-mcp-config --disallowedTools Bash` | **32** | Matches the committed preimage exactly |
+
+`--allowedTools Read` cost \$0.22244 against `--disallowedTools Bash`'s \$0.22262 — a \$0.00018
+separation across a one-name difference in resident text. The earlier "identical cost to the cent"
+wording described a paired capture and should not be restated as a general claim.
+
+**`ListAgents` intermittency: a fourth observation, still no mechanism.** One of eight
+`--strict-mcp-config` probes returned 31 names instead of 32, `ListAgents` absent. It was the first
+invocation of the sequence; the seven that followed all returned 32. The earlier `t3v2-broad-00`
+flake was likewise a first-of-sequence run. That is a **correlation across two sessions, and it is
+recorded as an observation only** — no mechanism is claimed, and none should be written into any
+report until one is demonstrated.
