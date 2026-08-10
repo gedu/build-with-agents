@@ -132,9 +132,47 @@ confident wrong answer.
 In every branch the honesty contract from the spec ships with the result, and per ADR 0011 the number
 is citable only once promoted into `theory/` with its scope and spread.
 
+## Result — 2026-08-10
+
+**Not supported on the task class tested. The outcome channel is flat.**
+
+Twelve comparable pairs, tier-3 v2 fixture, 32 visible tools versus 3:
+
+| | broad | scoped |
+|---|---|---|
+| `proper` | **12 / 12** | **12 / 12** |
+| defects found | 3 of 3, every run | 3 of 3, every run |
+| defects missed | 0 | 0 |
+| defects reported that were not defects | 0 | 0 |
+
+Neither planted near-miss was reported once, by either arm, in any run. The gap is not small — it is
+**exactly zero**, in both the identical-calls and differing-calls partitions.
+
+**What that does and does not license.** The pre-registered power table says this design resolves gaps
+of roughly 40 points at this n. So the claim that survives is: **no effect of the magnitude this design
+could detect.** A smaller effect is not excluded, and no run count reachable here would exclude one.
+
+**And the same runs refuted the reading that motivated the test.** The single observation that prompted
+this hypothesis was a tier-1 pair where the broad arm added a false positive with identical tool calls.
+Twelve harder pairs produced nothing of the kind. The pattern runs opposite to the design assumption:
+the only over-report ever observed came from the *simplest* task, and harder tasks produced more
+agreement, not less. A task with a clearly correct answer appears to invite care in both arms.
+
+**What the same runs did find**, in a channel this hypothesis was not about: cost separates completely,
+about 224 tokens per resident tool entry, positive in 12 of 12 pairs. That is promoted to
+`theory/agents/capability-load-cost.md` on its own evidence — this file is cited for nothing, per
+ADR 0012.
+
 ## Status
 
-**open** — registered 2026-08-07, before any tier-3 run exists.
+**Registered 2026-08-07**, before any tier-3 run existed. Amended the same day by the first run of
+`skills/hypothesis-cycle`, which found the logical form undeclared and the planned N under-powered.
+
+**Closed for this task class on 2026-08-10: not supported.** Deliberately **not** marked `rejected` —
+a null on well-specified defect-reporting tasks is not a refutation of the general claim, and saying
+otherwise would be exactly the over-reach this file was written to prevent. It remains open for task
+classes with no single correct answer, which is where the mechanism it proposes would have room to
+show itself. Testing that is a different fixture and a different change.
 
 Amended the same day by the first application of `skills/hypothesis-cycle`, which found the logical form
 undeclared and the planned N under-powered. Both were fixed before any tier-3 run, which is the only

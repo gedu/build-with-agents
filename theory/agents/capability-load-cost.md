@@ -3,8 +3,8 @@ id: theory/agents/capability-load-cost
 type: theory
 targets: [any]
 status: validated
-verified: 2026-08-06
-sources: ["https://blog.bytebytego.com/p/how-chatgpt-optimizes-its-agent-loop", "journal/2026-08-05-context-measurement.md", "research/agent-loop-optimization-bytebytego.md", "research/claude-certified-architect-exam-guide.md", "research/llm-as-code-agentic-programming.md"]
+verified: 2026-08-10
+sources: ["https://blog.bytebytego.com/p/how-chatgpt-optimizes-its-agent-loop", "journal/2026-08-05-context-measurement.md", "research/agent-loop-optimization-bytebytego.md", "research/claude-certified-architect-exam-guide.md", "research/llm-as-code-agentic-programming.md", "rig/results/tool-surface-v1/runs.jsonl", "sdd/measurement-rig/spec.md"]
 ---
 
 # The cost of a capability is what it costs to load, not what it costs to have
@@ -133,6 +133,57 @@ access per role with narrow cross-role exceptions, which is a different lever fr
   reader must reconcile two wordings, not because it costs tokens.
 - The same shape applies to instructions, not just tools: a large procedure that only some sessions
   need belongs behind a read-on-demand pointer rather than in an always-on file.
+
+## Measured here: what one resident tool entry costs
+
+The file above rests on one `/context` reading and on the deferral mechanism observed directly. Neither
+gave a **per-tool** number. This repo's measurement rig now has one.
+
+**Design.** Same task, same model, same CLI version, same prompt bytes, twelve paired runs. One variable:
+the visible tool surface, **32 names versus 3**, set with `--disallowedTools` and read back from each
+run's own `init` event rather than asserted from the flags.
+
+**Result.**
+
+| Quantity | Value |
+|---|---|
+| Comparable pairs | 12 |
+| Extra visible tools in the broad arm | 29 |
+| Extra `cache_creation_input_tokens`, median | **6,489** (min 4,964, max 6,585) |
+| **Per resident tool entry** | **≈ 224 tokens** |
+| Cost delta, median | $0.088 per run |
+| Pairs where broad cost more | **12 of 12** |
+
+Two independent tests on that: a sign test at 12 of 12 gives p = 0.000244, and Mann-Whitney on the
+nine same-order pairs gives an exact one-sided p = 0.000021.
+
+**A confound of ours, found and ruled out.** Every pair initially ran the broad arm first, so a
+within-pair cache-warming effect would have produced exactly the flat delta observed and been
+indistinguishable from a structural one. Three pairs run in the reverse order settle it: scoped-first
+gives a median cache delta of 6,511 against broad-first's 6,467, and every pair in both orders is
+positive. The difference does not depend on who goes first.
+
+**What this refines.** The earlier measurement showed deferral removing 65.1k of schema from the window.
+This shows what remains **after** deferral: a tool that is merely *listed* still costs about 224 tokens
+per run, because a name arrives with a description. So "declare a capability by name and it is nearly
+free" is true relative to loading a schema and **false in absolute terms** — 90 deferred tools would
+carry roughly 20k tokens of resident entries by this figure, which is not nothing and is not what the
+sentence implies.
+
+### Scope, and it is narrow
+
+One machine, one model (`claude-opus-5[1m]`), one CLI version (2.1.224), one synthetic task, subscription
+auth where the reported cost is notional rather than billed. Ambient context of roughly 26k tokens is
+present and identical in both arms, so it cancels in the delta and inflates neither number.
+
+Two anomaly classes occurred and both have diagnosed causes rather than open ones: four runs voided on
+CLI version drift, and six on `ListAgents` being intermittently absent under 2.1.224 — structurally a
+broad-arm-only fault, since the scoped arm disallows that tool either way. Two broad runs were excluded
+by that mechanism; their exclusion rests on a surface check unrelated to cost.
+
+**224 tokens per entry is this harness's number, not a law.** It is a function of how long the tool
+descriptions happen to be, and a harness with terser or richer descriptions would land elsewhere. The
+*mechanism* — a resident entry costs its name plus its description, every turn — is what generalises.
 
 ## What would sharpen it
 

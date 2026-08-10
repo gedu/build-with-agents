@@ -3,8 +3,8 @@ id: theory/agents/tool-surface-design
 type: theory
 targets: [any]
 status: validated
-verified: 2026-08-05
-sources: ["research/claude-certified-architect-exam-guide.md", "theory/agents/capability-load-cost.md"]
+verified: 2026-08-10
+sources: ["research/claude-certified-architect-exam-guide.md", "theory/agents/capability-load-cost.md", "rig/results/tool-surface-v1/runs.jsonl"]
 ---
 
 # A tool surface is a prompt, so its reliability is edited in the names and descriptions
@@ -149,6 +149,37 @@ authority. The source PDF is not in this repo and they could not be re-checked.
 They are plausible and probably true. They are not verified, and this file is `validated`. Recovering
 them needs a re-read of the source, after which structured errors belong in `theory/orchestration/`
 rather than here — it is a claim about what crosses a boundary, not about how a tool is chosen.
+
+## Measured: the selection-reliability claim, tested and not observed
+
+The experiment this file asked for has now been run, and it did not find the effect.
+
+**Design.** Same task, same model, same prompt, twelve paired runs, one variable: **32 visible tools
+versus 3**. Surface set with `--disallowedTools` and read back from each run's own `init` event rather
+than asserted. Full record in `sdd/measurement-rig/` and `rig/results/tool-surface-v1/runs.jsonl`.
+
+**Result: no difference.** Twelve of twelve runs classified `proper` in **both** arms — every defect
+found, none missed, none invented, neither planted near-miss ever reported. The gap is exactly zero,
+not merely small.
+
+**What that licenses, and it is less than it looks.** At this n the design resolves gaps of roughly 40
+percentage points. So: **no effect of the magnitude this design could detect.** A smaller effect is not
+excluded. Reporting this as "surface breadth does not matter" would be wider than the evidence, in the
+direction this file already warns about.
+
+**The scope is narrow and it matters.** One task class — defect reporting against a fixture with a
+single correct answer and a checkable answer key. That may be exactly the wrong place to look: a task
+with an unambiguous right answer appears to invite care in both arms. The only over-report ever
+observed in this rig came from the *simplest* task, and harder tasks produced more agreement rather
+than less, which runs opposite to the assumption the experiment was designed on.
+
+**What the same runs did establish** belongs to the other axis: a resident tool entry costs about 224
+tokens per run, measured, positive in 12 of 12 pairs — see `theory/agents/capability-load-cost.md`.
+
+So the two-lever distinction this file draws survives intact and its evidence base is now uneven:
+**the cost lever is measured; the selection lever remains a first-party recommendation with no
+measurement supporting it, and one attempt that failed to find it.** That asymmetry is the honest state
+and it should be stated wherever this file is cited.
 
 ## What would sharpen it
 
