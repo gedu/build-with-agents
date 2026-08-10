@@ -152,9 +152,11 @@ tier-3 pilot, which produced every calibration number this phase existed to prod
 
 - [-] 6.1 **Cancelled.** The tier-3 pilot ran instead; see "Tier-3 pilot" below.
 - [-] 6.2 **Cancelled with 6.1.** No pilot run has ever timed out — observed walls are 11–52s.
-- [~] 6.3 **Derived, not applied.** `ceil(3 × 14.586 / 30) × 30 = 60`, floored to **120s**.
-      `run.sh:62` still reads `TIMEOUT_S=300`, the provisional pilot bound. This is the one
-      genuinely open item this phase leaves behind.
+- [x] 6.3 **Derived and applied.** `ceil(3 × 14.586 / 30) × 30 = 60`, floored to **120s**.
+      Applied to `run.sh` on 2026-08-10, replacing the provisional `TIMEOUT_S=300` pilot bound;
+      the derivation and its floor now live in the comment above the assignment. The fixture
+      MANIFEST covers `src/`, `prompts/` and `answer-key/` only, so changing the runner does not
+      invalidate any frozen fixture or any committed row.
 - [-] 6.4 **Cancelled.** `T_task` gated a per-tier turn budget that no cell ever enforced.
 - [-] 6.5 **Cancelled with 6.1** — the variance rule was applied to tier 3 instead (n=12 pairs).
 - [x] 6.6 `./hooks/pre-commit --all` run over committed rows; clean across 107 tracked files.

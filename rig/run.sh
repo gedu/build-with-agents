@@ -56,10 +56,16 @@ EXPERIMENT="tool-surface-v1"
 RUNS_ROOT="$REPO_ROOT/rig/runs/$EXPERIMENT"
 SURFACES_ROOT="$REPO_ROOT/rig/surfaces"
 
-# Pilot bound only (design.md Decision 5). Its job is to be replaced once
-# the tier-1 pilot (Phase 6, not yet run) derives the real bound from
-# 3x the slowest successful pilot run, floor 120s.
-TIMEOUT_S=300
+# Derived bound (design.md Decision 5), replacing the provisional 300s pilot
+# bound. Rule: ceil(3 x slowest_successful_pilot_wall_s / 30) x 30, floor 120s.
+# The tier-3 pilot that produced it (six deliberate runs, sdd/measurement-rig/
+# tasks.md Phase 6) had a slowest wall of 14.586s in t3-scoped-03:
+# ceil(3 x 14.586 / 30) x 30 = 60, raised to the 120s floor.
+#
+# Observed walls across the pilot were 11-52s and nothing has ever timed out,
+# so this bound is a runaway guard, not a budget. Re-derive it, do not nudge
+# it, if a future tier's walls approach it.
+TIMEOUT_S=120
 
 usage() {
   cat <<'USAGE'
