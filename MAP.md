@@ -38,7 +38,7 @@ where to look and what you are allowed to trust.
 | `research/` | Received links, contrasted against evidence, each with a verdict | Verdict only, as evidence | 11 verdicts (3 `supported`, 5 `partially supported`, 3 `unverifiable`) |
 | `decisions/` | Numbered ADRs (`NNNN-slug.md`) — the WHY | Yes | `0001`–`0012` ratified |
 | `hypotheses/` | Falsifiable claims with a declared test, registered before the run that could settle them | **No — zero citability** (ADR 0012). Not even as evidence | 1 open |
-| `journal/` | Dated conversations and brainstorms | **Never as authority**; valid as provenance (ADR 0007) | 8 entries (2026-08-04, 2026-08-05 ×7) |
+| `journal/` | Dated conversations and brainstorms | **Never as authority**; valid as provenance (ADR 0007) | 9 entries (2026-08-04, 2026-08-05 ×7, 2026-08-10) |
 | `blocks/_shared/` | Target-agnostic minimal blocks with a contract | Yes, when `validated` | empty |
 | `blocks/react/` | React-specific blocks | Yes, when `validated` | empty |
 | `blocks/react-native/` | React Native-specific blocks | Yes, when `validated` | empty |
