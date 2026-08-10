@@ -3,8 +3,8 @@ id: skills/context-checkpoint
 type: skill
 targets: [any]
 status: draft
-verified: 2026-08-05
-sources: ["journal/2026-08-05-context-measurement.md", "https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents", "research/claude-certified-architect-exam-guide.md"]
+verified: 2026-08-10
+sources: ["journal/2026-08-05-context-measurement.md", "https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents", "research/claude-certified-architect-exam-guide.md", "journal/2026-08-05-knowledge-base-handoff.md", "journal/2026-08-10-measurement-rig-handoff.md", "journal/2026-08-10-upstream-audit-handoff.md"]
 ---
 
 # context-checkpoint
@@ -26,6 +26,38 @@ conflating the two would be the scope error `skills/source-verdict` test 3 exist
 
 Promote when there are recorded end-to-end runs, not when a better citation arrives. Do not cite as
 validated practice.
+
+## Recorded runs
+
+The promotion criterion is *recorded* runs. This table is the record; a handoff file that asks a
+future session to record its result is not one.
+
+| # | Handoff written | Resume outcome |
+|---|---|---|
+| 1 | `journal/2026-08-05-knowledge-base-handoff.md` | **Never recorded.** |
+| 2 | `journal/2026-08-10-measurement-rig-handoff.md` | **Never recorded.** |
+| 3 | `journal/2026-08-10-upstream-audit-handoff.md` | **Worked**, 2026-08-10. See below. |
+
+Run 3, the only one with a witness: a session opened cold on the handoff alone, with none of the
+originating conversation. It recovered the next action, the tool versions and the lineage
+identifiers without re-deriving any of them, and began executing inside one exchange. Two specific
+saves, both attributable to a named section rather than to the file existing:
+
+- **§3 "verified versus assumed" prevented an inherited error from being acted on.** It marked the
+  contract-version claim as verified, so the claim was re-checked rather than trusted — and it was
+  false. A flat summary would have handed the next session that claim in the same confident past
+  tense as everything else.
+- **§2 "versions and identifiers" was consumed directly.** Versions, issue number and commit SHA
+  were used as given; none was re-derived.
+
+One recorded run is evidence that the procedure executes. It is not "enough times to know it
+works", so this stays `draft`. What changed is the reason: no longer "no runs recorded", now
+"one run recorded, need more".
+
+**Why runs 1 and 2 have no outcome, and the fix.** Each handoff asked the *next* session to record
+whether the resume worked. That request lives in the file the next run supersedes, so it is read
+once, acted on never, and discarded on the next checkpoint. The request was being filed in the
+place designed to be thrown away. Step 0 below moves it into this file, which nothing supersedes.
 
 ## When to invoke
 
@@ -61,6 +93,21 @@ observed capability, not something this skill needs to build. The only manual st
 itself, and that is correct: discarding a conversation is not a decision to automate.
 
 ## Procedure
+
+### 0. Record the previous run's outcome
+
+Before writing anything new, add a row to **Recorded runs** above for the handoff this session
+resumed from, and state whether the resume worked — naming which section carried the weight, or
+which one was missing when it was needed. If this session did not resume from a handoff, say so
+and move on.
+
+This step is first because it is the one that kept being skipped. Runs 1 and 2 produced exactly
+the evidence this skill needs for promotion, and both were lost: the request to record them lived
+in a handoff file, and the next checkpoint superseded it. Do not put the request in the artifact
+that gets superseded. Put the answer in this file.
+
+An honest "the resume failed, and here is where" is worth more than a promotion. A skill that
+only ever records its successes has no promotion criterion, just a habit.
 
 ### 1. Write the handoff file first
 
