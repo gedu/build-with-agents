@@ -22,7 +22,7 @@ These are Claude Code CLI behaviours and do not belong in the `gentle-ai` tracke
 
 | Report | Subject | Filed |
 |--------|---------|-------|
-| `0001-bash-subsumes-glob-and-grep.md` | `--disallowedTools Bash` **raises** the visible tool count: `Bash` suppresses `Glob` and `Grep`, undocumented | not filed yet |
+| `0001-bash-subsumes-glob-and-grep.md` | `--disallowedTools Bash` **raises** the visible tool count: `Bash` suppresses `Glob` and `Grep`, undocumented | not filed yet — tracked in [#1](https://github.com/gedu/build-with-agents/issues/1) |
 
 ## What upstream requires
 
