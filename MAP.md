@@ -3,7 +3,7 @@ id: map
 type: index
 targets: [any]
 status: validated
-verified: 2026-08-06
+verified: 2026-08-10
 sources: ["decisions/0001-agents-md-as-single-source-of-truth.md", "decisions/0004-mandatory-frontmatter-as-query-interface.md", "decisions/0009-redaction-is-a-repo-wide-rule.md", "decisions/0010-measurements-vary-the-harness-not-the-model.md", "decisions/0011-rig-produces-evidence-not-truth.md", "journal/2026-08-04-repo-skeleton-design.md"]
 ---
 
@@ -45,7 +45,7 @@ where to look and what you are allowed to trust.
 | `templates/` | Compositions of blocks, ready to copy | Yes, when `validated` | empty |
 | `sdd/` | SDD cycles: proposal, spec, design, tasks, verification | No — process record | 1 change (`measurement-rig`) |
 | `rig/` | Measurement harness: fixtures, runner, analyser. Raw captures are gitignored | Code yes; **output is evidence only**, citable once promoted to `theory/` with scope and spread (ADR 0011) | 1 experiment (`tool-surface`), in progress |
-| `upstream/` | Experiments against `gentle-ai` / `engram` / `gga`, staged bug reports | No — experiments | 4 reports (`gentle-ai`); `0001` filed as [#2478](https://github.com/Gentleman-Programming/gentle-ai/issues/2478), `0002`–`0004` staged |
+| `upstream/` | Experiments against `gentle-ai` / `engram` / `gga` / `claude-code`, staged bug reports | No — experiments | `gentle-ai`: `0001` filed as [#2478](https://github.com/Gentleman-Programming/gentle-ai/issues/2478), `0002` and `0004` staged, `0003` **rejected** (resolved on 2.3.0 before filing). `claude-code`: `0001` staged |
 
 ## Target coverage
 

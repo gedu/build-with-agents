@@ -2,12 +2,49 @@
 id: upstream/gentle-ai/generated-rules-pin-contract-v1
 type: research
 targets: [any]
-status: validated
-verified: 2026-08-05
-sources: ["https://github.com/Gentleman-Programming/gentle-ai/blob/main/.github/ISSUE_TEMPLATE/bug_report.yml", "https://github.com/Gentleman-Programming/gentle-ai/releases/tag/v2.3.0-rc.1"]
+status: rejected
+verified: 2026-08-10
+sources: ["https://github.com/Gentleman-Programming/gentle-ai/blob/main/.github/ISSUE_TEMPLATE/bug_report.yml", "https://github.com/Gentleman-Programming/gentle-ai/releases/tag/v2.3.0-rc.1", "journal/2026-08-10-upstream-audit-handoff.md"]
 ---
 
 # Report 0003 — generated agent rules hardcode `review-integration/v1`, which 2.3.0 changes
+
+## DO NOT FILE — resolved on 2.3.0 stable, 2026-08-10
+
+**The predicted failure did not occur, because `sync` did what FIELD 4 asked for.** This report
+predicted that an installation carrying `/v1` in its generated rules would, after upgrading to
+2.3.0, be following instructions naming a superseded contract with no sanctioned way to discover
+the current one. FIELD 4 listed three acceptable fixes; the second was *"`sync` regenerates the
+pinned version to match the installed release."* That is what happened.
+
+Verified first-hand on 2.3.0 stable, on the same installation this report was written from:
+
+```
+rg -c 'review-integration/v1' <home>/.claude/CLAUDE.md   ->  0
+rg -c 'review-integration/v2' <home>/.claude/CLAUDE.md   ->  4
+```
+
+Same four sites, opposite version. The `review capabilities --contract .../v1` instruction quoted
+in FIELD 10 is also gone from the generated block. There is nothing left to file: the observation
+about 2.2.4 was accurate, and the defect it predicted was fixed before it could bite.
+
+**The earlier claim that this report was "confirmed on stable" was wrong.** It was recorded in
+`journal/2026-08-10-upstream-audit-handoff.md` and inherited from there. The generated file's
+mtime is 23 minutes *earlier* than the commit asserting the opposite, so the claim was already
+false when it was written down. A finding verified at discovery time is not verified at write
+time; on a file the tool regenerates, those are different facts.
+
+**What is NOT covered by this closure.** A separate and still-open defect was found while checking
+this one: `gentle-ai review capabilities` with no arguments answers `contract:
+gentle-ai.review-integration/v1`, while `--contract gentle-ai.review-integration/v2 --agent
+claude-code` fails deterministically with `operation_failed`, `required_inputs: []`,
+`retry_safe: true` and `next_action: retry` that never succeeds. That is a different mechanism in
+a different area, and it does not belong in this report. Do not resurrect this file by pasting it
+in — stage it as its own report.
+
+Everything below is preserved as the original record. It is no longer filable.
+
+---
 
 **Copy-paste sheet.** Each `## FIELD n` heading matches one field of the upstream Bug Report
 form, in form order.
