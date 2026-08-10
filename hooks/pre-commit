@@ -125,19 +125,39 @@ staged_added_lines() {
 
 # Emits `path:line:content` for every line of every tracked file.
 all_tracked_lines() {
-  git ls-files -z | while IFS= read -r -d '' f; do
-    [ -f "$f" ] || continue
-    # -a forces binary files to be read as text. Without it grep prints
-    # "Binary file X matches" instead of the content, and a secret embedded in a blob
-    # is invisible while the run still reports "clean across N tracked files".
-    grep -a -nH '' -- "$f" 2>/dev/null || :
-  done
+  # The loop runs in the subshell on the right of the pipe, so a per-file failure cannot
+  # be reported through a variable. It is accumulated and returned as the subshell's exit
+  # status instead, which `pipefail` then propagates to the caller. Returning early is
+  # wrong here: the point of --all is to audit every file, so an unreadable one is
+  # recorded and the scan continues.
+  git ls-files -z | {
+    rc=0
+    while IFS= read -r -d '' f; do
+      [ -f "$f" ] || continue
+      # -a forces binary files to be read as text. Without it grep prints
+      # "Binary file X matches" instead of the content, and a secret embedded in a blob
+      # is invisible while the run still reports "clean across N tracked files".
+      #
+      # grep's three states matter here exactly as they do at the pattern loop below:
+      # 0 emitted lines, 1 the file is legitimately empty, >1 it could not be read.
+      # `|| :` collapsed all three, so an unreadable tracked file was skipped in silence
+      # and --all still reported "clean across N tracked files" — a fail-open in a gate.
+      # grep's stderr is deliberately no longer discarded: when this escalates to exit 2,
+      # its message is the only thing that says which file and why.
+      set +e
+      grep -a -nH '' -- "$f"
+      grc=$?
+      set -e
+      [ "$grc" -le 1 ] || rc=2
+    done
+    [ "$rc" -eq 0 ]
+  }
 }
 
 # A failure to read the candidate is exit 2, never an empty haystack that scans clean.
 case "$MODE" in
   staged) HAYSTACK="$(staged_added_lines)" || die_cannot_run "could not read the staged diff" ;;
-  all)    HAYSTACK="$(all_tracked_lines)"  || die_cannot_run "could not enumerate tracked files" ;;
+  all)    HAYSTACK="$(all_tracked_lines)"  || die_cannot_run "could not read every tracked file; see the error above it" ;;
 esac
 
 FOUND=0
