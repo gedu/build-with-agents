@@ -477,8 +477,9 @@ recorded below, followed by the scope the ADR has to cover so slice 3a is not bl
 boundary.
 
 The strongest argument is textual rather than a matter of taste. ADR 0013 names its own supersession
-trigger — *"when a third executable needs a test"* — and this change adds `run-pipeline.sh`,
-`collect.py`, and (since Decision 9a) `tools/generate-cases.py`, each carrying a self-test. **The
+trigger — *"when a third executable needs a test"* — and this change adds two executables that carry a
+self-test: `collect.py` (collector plus normalizer in one file) and, since Decision 9a,
+`tools/generate-cases.py`. That takes the repo from two such executables to four. **The
 trigger fires whether or not the fixture question is asked**, so ADR 0013 is revisited in this change
 either way. Doing that deliberately costs one file; doing it by accident costs the decision.
 
@@ -497,9 +498,9 @@ exists, which is the ADR-0012 fault in a different register.
 Recommended shape: **one ADR, two clauses.** Clause A states the boundary and restates the repo's
 verification surface (`hooks/pre-commit`, `bash -n`, `python3 -m py_compile`, per-executable
 self-tests) as unchanged. Clause B **declines ADR 0013's supersession trigger on the record**, with the
-reason — three executables now carry self-tests, and a `tests/` runner built to hold them is still
-infrastructure ahead of content — and restates the trigger more sharply. Declining a trigger explicitly
-is worth more than letting it lapse.
+reason — four executables carry self-tests once this change lands, up from the two ADR 0013 was written
+against, and a `tests/` runner built to hold them is still infrastructure ahead of content — and
+restates the trigger more sharply. Declining a trigger explicitly is worth more than letting it lapse.
 
 Rejected alternative: amend ADR 0013 in place. This repo's decisions are additive records, and "a
 fixture may carry a runner" is a different claim from "an executable carries its own test". Folding
@@ -515,8 +516,10 @@ survives being read by a stranger: a fixture's suite reports on the *fixture*, n
 no repo-level command runs it. Clause B addresses ADR 0013 directly rather than leaving its trigger to
 lapse: the trigger *"when a third executable needs a test"* is **met and explicitly declined on the
 record**, because the per-executable self-test pattern still holds for all four (`hooks/pre-commit`,
-`collect.py`, `run-pipeline.sh`, `tools/generate-cases.py`) and a `tests/` runner built to hold four
-self-tests is still infrastructure ahead of content. Clause B then restates the trigger more sharply, in
+`rig/derive.py` — ADR 0013's own cited precedent, which an earlier draft of this paragraph dropped —
+`rig/collect.py`, and `tools/generate-cases.py`) and a `tests/` runner built to hold four self-tests is
+still infrastructure ahead of content. `run-pipeline.sh` carries no self-test in this plan and is
+excluded from the roster. Clause B then restates the trigger more sharply, in
 the form the next real case will take: **when a self-test needs fixtures too large to inline.** The case
 generator's self-test is the first plausible candidate for that, which is exactly why declining now is a
 decision rather than a deferral. The ADR is written before slice 3a; it does not block slices 1 or 2,

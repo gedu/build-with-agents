@@ -24,11 +24,13 @@ not be answered as one:
 
 1. May a rig fixture carry its own runtime and test runner, without reversing ADR 0013's repo-level "no
    test runner" decision?
-2. This same change also commits three executables that carry their own test surface —
-   `rig/run-pipeline.sh`, the collector (`rig/collect.py`), and its signature normalizer's `--self-test`
-   flag (spec R-F1.3) — which means ADR 0013's own stated supersession trigger, *"when a third executable
-   needs a test"*, is textually met, independently of question 1. Sources: `decisions/0013-...md`, spec
-   R-F11.2.
+2. This same change also commits two executables that carry their own test surface — the collector
+   `rig/collect.py`, which holds the signature normalizer and its `--self-test` flag in one file (spec
+   R-F1.3), and the case generator `tools/generate-cases.py` — taking the repo from two such executables
+   to four, which means ADR 0013's own stated supersession trigger, *"when a third executable needs a
+   test"*, is textually met, independently of question 1. `rig/run-pipeline.sh` is deliberately not in
+   this list: nothing in the plan gives it a self-test, because it is guarded by its preflight and its
+   void stamps instead. Sources: `decisions/0013-...md`, spec R-F11.2.
 
 ## Decision
 
@@ -47,18 +49,21 @@ them.
 
 **Clause B.** ADR 0013's own stated supersession trigger — *"when a third executable needs a test"* —
 is met by this same change: after it lands, four executables carry a self-test (`hooks/pre-commit`,
-`rig/derive.py`, `rig/run-pipeline.sh`, `rig/collect.py`), not the two ADR 0013 was written against.
-This ADR explicitly **declines** the trigger on the record. The per-executable self-test pattern still
-holds cleanly for all four: each test still ships inside the file it tests, needs nothing but what
-already runs that file, and a `tests/` directory built to hold four still-independent tests is
+`rig/derive.py`, `rig/collect.py`, `tools/generate-cases.py`), not the two ADR 0013 was written against.
+`rig/run-pipeline.sh` is not among them — it is guarded by its preflight and its void stamps rather than
+by a self-test. This ADR explicitly **declines** the trigger on the record. The per-executable self-test
+pattern still holds cleanly for all four: each test still ships inside the file it tests, needs nothing
+but what already runs that file, and a `tests/` directory built to hold four still-independent tests is
 infrastructure ahead of content — the exact failure mode ADR 0013 named, now observed to still apply one
-executable later than the number in its own trigger.
+executable past the count in its own trigger.
 
 The trigger is restated sharper, in place of the count it used: **extraction becomes the right call when
 a self-test needs fixtures too large to inline**, not when a specific executable count is reached. The
-first plausible future candidate is `tools/generate-cases.py`'s self-test (failure-flood-triage's PR3):
-if proving that generator deterministic and discriminating ever needs committed input tables rather than
-inline synthetic fragments, that is the trigger firing for real, not a fourth exception to wave through.
+first plausible future candidate is `tools/generate-cases.py`'s self-test (failure-flood-triage's PR3),
+and that it is already a carrier is not in tension with naming it: it ships an inline-fixture self-test
+today, and the restated trigger is about a self-test's fixture *size*, not about whether one exists. If
+proving that generator deterministic and discriminating ever needs committed input tables rather than
+inline synthetic fragments, that is the trigger firing for real, not another exception to wave through.
 
 ## Consequences
 
@@ -74,6 +79,6 @@ inline synthetic fragments, that is the trigger firing for real, not a fourth ex
 | Rejected | Reason |
 |---|---|
 | Amend ADR 0013 to say "no test runner, except fixtures" | Reads as a carve-out invented after the fact for one experiment, when the two questions (repo verification surface vs. fixture content) were never actually in conflict — a fixture's suite was never repo verification |
-| Treat the third/fourth-executable trigger as fired and extract a runner now | There is still exactly one test per file, invoked the same way, with no shared discovery or convention needed across them; extracting a runner for four independent flag-gated self-tests is the "infrastructure ahead of content" failure ADR 0013 exists to name, not a fix for it |
+| Treat the executable-count trigger as fired and extract a runner now | There is still exactly one test per file, invoked the same way, with no shared discovery or convention needed across them; extracting a runner for four independent flag-gated self-tests is the "infrastructure ahead of content" failure ADR 0013 exists to name, not a fix for it |
 | Silently let the trigger lapse without recording the decision | ADR 0007: rationale that only exists in a conversation does not exist. A trigger textually met and not acted on needs the same record a trigger acted on would get, or the next reader re-derives the same question from scratch |
 | Give the fixture its own ADR number without touching 0013 at all | Loses the one place a reader would look for "does the fixture's Jest suite violate the no-test-runner decision" — the answer belongs next to the decision it is being asked about |
