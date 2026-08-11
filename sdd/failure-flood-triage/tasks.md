@@ -29,25 +29,25 @@ gate, threat-matrix adversarial checks, per-task verification) that do not compr
 | Field | Value |
 |---|---|
 | Estimated changed lines | ~2,000–2,300 authored total (up from the proposal's ~1,850: +ADR file, +derive.py `--experiment` dispatcher folded into PR5, +uncertainty on real donor-module byte count in PR3/PR4). Generated case rows are never committed (Decision 9a) and are excluded by construction, not by convention |
-| 400-line budget risk | **High for PR3 and PR4** (donor-module source size not yet known); Low–Medium elsewhere — see per-PR table below |
+| Changed-line ceiling | **700, ratified 2026-08-11 for the whole remaining stack** (was 400, then 500 raised per-PR). Two work units exceeded it before the number was corrected: PR1 at 422 and PR2 at 682. The per-PR estimates below were derived from these task bullets rather than from the `design.md` sections those bullets implement, which is why they read low — the implementations were not inflated. PR2 in particular cannot be split at all: ADR 0013 requires a self-test to ship inside the file it tests, so extracting `collect.py`'s ~150 self-test lines to fit a budget would violate a ratified decision. PR3/PR4 keep their named splits so no single PR becomes unreviewable |
 | Chained PRs recommended | **Yes** |
 | Suggested split | PR1 → PR2 → PR3 → PR4 → PR5 → PR6 (stacked) |
 | Delivery strategy | chained PRs, `size:exception` NOT taken |
 | Chain strategy | **stacked-to-main** — PR1 targets `main`; each subsequent PR targets the previous PR's branch |
 
 ```text
-Decision needed before apply: Yes
+Decision needed before apply: No — resolved 2026-08-11
 Chained PRs recommended: Yes
 Chain strategy: stacked-to-main
-400-line budget risk: High
+Changed-line ceiling: 700 (ratified 2026-08-11 for the remaining stack)
 ```
 
 **Decision needed before apply — both resolved 2026-08-11, so apply is unblocked:** (1) the per-module
 axis-table amplification target proposed in PR3.3 (below) is **operator-confirmed**. R-F9.2 still binds:
 the achieved ratio must be measured per run and never assumed — confirming a target does not license
 assuming the outcome. (2) The named contingency split for PR3/PR4 (below) is **pre-authorized** and
-applies without a further decision if their real authored diff exceeds 400, since real donor-module
-source length is unknown until the modules are actually copied in.
+applies without a further decision if their real authored diff exceeds the ratified 700, since real
+donor-module source length is unknown until the modules are actually copied in.
 
 ### Per-PR line estimate and split point
 
@@ -181,30 +181,42 @@ Depends on: nothing. Blocks: PR3 (R-F11 scenario — 3a must not proceed without
 Depends on: PR1 (independent content, sequenced by the stack). Blocks: PR3, PR4 (both need the
 collector to validate fixture/injection signatures).
 
-- [ ] 2.1 Create `rig/collect.py` (`python3`, stdlib only). Invokes the suite itself, pinned
+- [x] 2.1 Create `rig/collect.py` (`python3`, stdlib only). Invokes the suite itself, pinned
       `--runInBand` + JSON report file. Emits `collection/1` (suite state, totals, `failures`,
       `clusters`, `identifier_set_digest`).
-      Verify: `python3 -m py_compile rig/collect.py`.
-- [ ] 2.2 Implement the three suite states (`ran` / `did-not-start` / `partial`) decided from evidence
+      Verify: `python3 -m py_compile rig/collect.py`. **Done** — exit 0.
+- [x] 2.2 Implement the three suite states (`ran` / `did-not-start` / `partial`) decided from evidence
       (report parseable + count check), plus `collector-error` as a **run-axis void**, never a suite
       state (absent/underfloor toolchain, install missing, lockfile mismatch, collector's own crash).
       Verify: synthetic Jest-JSON fragments inlined in the file (no fixtures directory, per ADR 0013)
-      exercise all four outcomes.
-- [ ] 2.3 Implement the normalizer: relative `test_id`, signature over the first-failure message
+      exercise all four outcomes. **Done** — self-test cases (c.1)-(c.4) and (e) below exercise
+      `ran`/`did-not-start`/`partial`/`partial+suite-timeout`/`collector-error` from inlined synthetic
+      fragments; no fixtures directory created. Also implemented, per design.md 9b (explicitly binding
+      per this phase's launch instructions, though not spelled out in this task's own line):
+      `report_bytes` + a declared ceiling (`--max-report-bytes`, default 64 MiB) that exits 2
+      `collector-error: report-too-large` rather than streaming-parsing; a second, bounded `clusters/1`
+      artifact (`clusters_view()`) carrying no `member_test_ids`, so it is bounded by cluster count, not
+      failure count.
+- [x] 2.3 Implement the normalizer: relative `test_id`, signature over the first-failure message
       truncated at the first stack line, fixed-order normalization (ANSI/CRLF/whitespace/path/line:col),
       matcher-shaped-head-only `signature_text`, `sha256(...)[:16]`. Deterministic cluster ordering
       (`count desc, signature asc`).
-      Verify: `rig/collect.py --self-test`, cases (a)–(e):
-      (a) same cause, differing path/line/order → same signature;
-      **(b) two genuinely different causes → different signatures — the discrimination case a
-      constant-returning normalizer would fail, and the one everyone forgets to write**;
-      (c) each of the three suite states fires from a synthetic report;
-      (d) same input twice → byte-identical output;
-      (e) absent toolchain → `collector-error`, never a suite state.
-- [ ] 2.4 Confirm the `--self-test` flag is gated (never runs unconditionally inside a measured arm,
+      Verify: `rig/collect.py --self-test`, cases (a)–(e). **Done, all 9 checks PASS** (the 5 named
+      a-e plus 4 sub-checks under (c) for the fourth, at-scale sub-case and the bounded clusters view):
+      (a) same cause, differing absolute path/line/col/order **and** differing Expected/Received body
+      (the 9c amplification case, not only path/line/order) → same signature — PASS;
+      **(b) two genuinely different causes → different signatures — PASS**;
+      (c) `ran`/`did-not-start`/`partial`/`partial+suite-timeout` each fire from a synthetic report —
+      PASS ×4;
+      (d) same input twice → byte-identical output — PASS;
+      (e) absent toolchain → `collector-error`, never a suite state — PASS.
+- [x] 2.4 Confirm the `--self-test` flag is gated (never runs unconditionally inside a measured arm,
       unlike `derive.py`'s unconditional self-test — a different, correctly-not-reused pattern per
       design's correction #3).
       Verify: `rig/collect.py` with no flag prints/does nothing beyond normal collection; `./hooks/pre-commit --all`.
+      **Done** — no-flag invocation with no other arguments exits 2 with a required-arguments message
+      (never reaches or prints the self-test); `./hooks/pre-commit --all` exit 0 (see apply-progress for
+      the full run against the tracked tree).
 
 ## PR3 — Clean fixture + case generator (3a)
 
