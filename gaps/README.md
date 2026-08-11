@@ -14,7 +14,7 @@ Gap analyses of existing projects, measured against this repo's validated practi
 
 Produced by `skills/project-gap-analysis`. One file per analysis, `NNNN-<slug>.md`.
 
-Empty. No analysis has been run yet.
+One analysis recorded. No demand has reached two occurrences, so nothing has been built from it.
 
 ## No project is identifiable here
 

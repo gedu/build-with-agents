@@ -54,6 +54,19 @@ subtractive, and a record written directly is a record that never had the detail
 If a finding cannot be stated without one of those, it does not go in the record. Say that
 explicitly in the working report and stop — an unstatable finding is a real outcome, not a failure.
 
+### Permission to name is not a reason to name
+
+The owner may volunteer that the project can be named. That settles one question — whether you would
+be exceeding what you were allowed — and leaves the other one untouched.
+
+The gap record is committed to a **public** repository. A named record lets anyone correlate a list
+of weaknesses with a findable project. For anything holding value, credentials or user data, that is
+a published attack surface, and the owner granting permission does not make it less published.
+
+So: **name freely in the working report, de-identify the record anyway.** Nothing is lost — the
+owner already has the full-detail version. If they still want the record named after hearing the
+reason, that is their call to make explicitly, not a default to fall into.
+
 ## The checks
 
 Each check is a validated `theory/` claim turned into something observable in someone else's
@@ -106,6 +119,12 @@ the other.
 
 Look at: whether review and adversarial execution both exist. Having only one is `partial`, and
 name which one — that tells you which defect class is currently invisible.
+
+A third case, found on run 1 and easy to get wrong: **both channels exist, but the depth of one
+cannot be established from the repository alone.** Review is the usual one — pull requests prove a
+shape, not that anyone read the diff. Record `present` and name the unestablished part. Do not
+resolve it by assumption in either direction: an unverifiable channel is not a missing channel, and
+it is not a working one either.
 
 ### 6. Verifier availability — `theory/loops/verifier-availability.md`
 
@@ -181,7 +200,21 @@ answer lives here, in the file nothing supersedes.
 
 | # | Date | Project class | Record | Did the skill work |
 |---|---|---|---|---|
-| — | — | — | — | Not yet run |
+| 1 | 2026-08-11 | React Native + Expo mobile wallet, timeboxed, agent-built | `gaps/0001-rn-expo-wallet-timeboxed.md` | **Yes, with two gaps in the skill itself** — see below |
 
-Promotion to `status: validated` needs recorded runs, not a better rationale. Record failures with
-the same care as successes: a skill that only records its wins has a habit, not a criterion.
+Run 1 produced a complete record with all seven checks decided and no unstatable findings. Two
+things the skill did not cover, both found by running it and both now fixed above:
+
+- **Check 5's verdicts were underspecified.** The skill said "having only one channel is `partial`".
+  The case that actually occurred is different: both channels exist, but the *depth* of one — whether
+  pull requests were genuinely reviewed — is not establishable from a repository alone. That is
+  neither `present` nor `partial` as written. Resolved by recording it as `present` with the
+  unestablished part named, and the check now says so.
+- **Owner authorisation and de-identification are separate decisions.** The owner volunteered that
+  the project could be named. The record was still written de-identified, because the rule protects
+  against publishing an identifiable weakness map, not only against exceeding permission — and this
+  project was a wallet. The skill had no guidance for "permission granted, de-identify anyway".
+
+Promotion to `status: validated` needs recorded runs, not a better rationale. One run is not enough.
+Record failures with the same care as successes: a skill that only records its wins has a habit, not
+a criterion.
