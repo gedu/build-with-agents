@@ -58,7 +58,7 @@ source length is unknown until the modules are actually copied in.
 | PR3 | item4 (3a: clean fixture + case generator, v1+v2) | ~400–700 | **High** | **3a-i**: v1 stage-1 clean substrate (3 modules, tests, runtime) → **3a-ii**: v2 stage-2 clean substrate (remaining modules, `tools/generate-cases.py`, axis table, `case-table.sha256`) |
 | PR4 | item5 (3b: injections + measured answer-key, v1+v2) | ~300–500 | Medium–High | **3b-i**: v1 injections + `F0`/`R0`/`S0` → **3b-ii**: v2 injections + amplified key + cluster-per-injection measurement |
 | PR5 | item6 (`run-pipeline.sh` + surface preimage + `derive.py` dispatcher) | ~350–420 | Medium | **5a**: `run-pipeline.sh` + `rig/surfaces/failure-flood.txt` → **5b**: `derive.py --experiment` dispatcher, second row builder, `no-preregistration` void |
-| PR6 | item7 (hypotheses + `OPERATIONS.md` + `report.py` tables) | ~250 | Low | — |
+| PR6 | item7 (hypotheses + `OPERATIONS.md` + `report.py` tables + portable-procedure backlog entry) | ~270 | Low | — |
 
 ## The ADR rides with PR1, not PR2 — decided, with reasoning
 
@@ -292,6 +292,18 @@ all). This is the PR that makes a countable run possible — see the Hard Orderi
       invocation.
       Verify: this is the structural-impossibility proof named in the design's own verification
       strategy table — re-run once more after 6.1–6.2 land, confirming the same invocation now proceeds.
+- [ ] 6.7 Register the **portable procedure** as a named downstream deliverable in `BACKLOG.md`: the
+      collector → diagnostician → applier flow applied to a real failing suite outside this repo, which
+      is the form the originating incident actually needs and which no artifact in this cycle names.
+      Record it as **blocked**, with its unblock condition stated explicitly: the experiment's evidence
+      must first be promoted into `theory/` carrying its scope and spread, per ADR 0011. **Do not write
+      the block or skill in this cycle** — a procedure published before the measurement is a
+      recommendation without magnitude, which is the fault `theory/agents/tool-surface-design.md`
+      already carries and which this whole experiment exists to stop repeating. Note `blocks/` and
+      `templates/` are currently empty and are its eventual home, per `MAP.md`'s description of `gaps/`
+      as the demand signal for `blocks/`. `BACKLOG.md` is currently an empty file, so this task
+      establishes its shape and must satisfy `AGENTS.md`'s frontmatter contract (`type: index`).
+      Verify: `./hooks/pre-commit --all`; `MAP.md`'s area table still describes `BACKLOG.md` accurately.
 
 ## No-implementation, verification-only tasks
 
