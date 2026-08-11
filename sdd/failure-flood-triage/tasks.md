@@ -102,23 +102,33 @@ produce a countable row before PR6 lands, because `hypotheses/0002-*`/`0003-*` d
 
 Depends on: nothing. Blocks: PR3 (R-F11 scenario — 3a must not proceed without the ADR).
 
-- [ ] 1.1 Modify `rig/derive.py`: walk `assistant` stream events, de-duplicate by `message.id` (keep
+- [x] 1.1 Modify `rig/derive.py`: walk `assistant` stream events, de-duplicate by `message.id` (keep
       first occurrence in stream order), build the per-turn `occupancy_series`.
-      Verify: `python3 -m py_compile rig/derive.py`.
-- [ ] 1.2 Add fields to `tool-surface-v1` rows: `model_turns`, `occupancy_series`,
+      Verify: `python3 -m py_compile rig/derive.py`. **Done** — `parse_stream` now returns a sixth
+      value, `turns` (stream-ordered, de-duplicated `(message_id, usage)` pairs); compile passes.
+- [x] 1.2 Add fields to `tool-surface-v1` rows: `model_turns`, `occupancy_series`,
       `peak_occupancy_tokens` (max over series), `peak_occupancy_turn`, `cumulative_occupancy_tokens`
       (sum over series + output), `occupancy_aggregate_matches` (cross-check vs `result.usage`),
       `occupancy_is_monotone`, `context_window_tokens`. Bump `tool-surface-v1` `schema_version` 2 → 3.
       Verify: re-derive all 42 existing rows; project out `schema_version`, `checker_digest`, and every
       new key; every remaining byte identical to the pre-change row (the achievable claim per design's
       correction — anything stronger chases `checker_digest`'s self-hash, which changes on any edit).
-- [ ] 1.3 Confirm `occupancy_aggregate_matches: true` on all 42 rows; then, on one **copied** capture
+      **Done** — new `compute_occupancy()` helper; all eight fields added to the row. Projection
+      regression run: 42/42 rows byte-identical after excluding `schema_version`, `checker_digest`, and
+      the eight new keys. Zero mismatches.
+- [x] 1.3 Confirm `occupancy_aggregate_matches: true` on all 42 rows; then, on one **copied** capture
       (never the committed one), mutate one turn's usage and confirm the mismatch anomaly fires.
-      Verify: manual before/after diff of the anomaly field on the copy only.
-- [ ] 1.4 Record whether `occupancy_is_monotone` is `true` on all 42 rows or diverges anywhere.
+      Verify: manual before/after diff of the anomaly field on the copy only. **Done** — 42/42 rows
+      show `occupancy_aggregate_matches: true`. On a scratch copy of one capture's `stream.jsonl`
+      (never `rig/runs/`, which is gitignored and untouched), bumping one turn's
+      `cache_read_input_tokens` by 1000 flipped `occupancy_aggregate_matches` from `true` to `false`
+      and changed only that turn's `occupancy_series` entry — the mismatch anomaly fires correctly.
+- [x] 1.4 Record whether `occupancy_is_monotone` is `true` on all 42 rows or diverges anywhere.
       This is the R-F5's "settle before any new spend" gate — its result is read, not assumed, before
-      PR3 begins. Verify: value present and non-null on every row.
-- [ ] 1.5 Create `decisions/0014-a-fixtures-runtime-is-substrate-not-this-repos-runner.md`. Clause A:
+      PR3 begins. Verify: value present and non-null on every row. **Done and reported below** —
+      `occupancy_is_monotone` is `true` on all 42/42 rows, non-null everywhere. See the finding note
+      below the task list.
+- [x] 1.5 Create `decisions/0014-a-fixtures-runtime-is-substrate-not-this-repos-runner.md`. Clause A:
       a rig fixture (`rig/fixtures/failure-flood/*`) may carry its own runtime (Node/npm) and test
       runner (Jest); that runtime is substrate under measurement, never this repo's verification
       surface, which remains `hooks/pre-commit`, `bash -n`, `python3 -m py_compile`, and each committed
@@ -129,6 +139,42 @@ Depends on: nothing. Blocks: PR3 (R-F11 scenario — 3a must not proceed without
       because the per-executable self-test pattern still holds for all of them; restates the trigger
       more sharply — "when a self-test needs fixtures too large to inline."
       Verify: structural readback against R-F11.1/R-F11.2's required content; `./hooks/pre-commit --all`.
+
+**PR1 apply-time findings, recorded rather than silently absorbed:**
+
+- **`occupancy_is_monotone` is `true` on all 42/42 rows — settled, not sampled.** Every deduplicated
+  per-turn occupancy series in the corpus rises (or holds) turn over turn; peak equals the final turn
+  everywhere. Per R-F5's own framing, this means peak occupancy is **redundant with cumulative on this
+  task class** for `tool-surface-v1` — a real, reportable finding (design.md's own stated risk: "a 'no'
+  would mean `hypotheses/0002` and `0003` are closer to one claim than two"). It does not mean the peak
+  channel is wrong to build for `failure-flood-v1` — a longer, multi-step pipeline arm with fresh
+  per-step sessions and different cache behavior is exactly the case where the two channels could
+  diverge, and this task class (`tool-surface-v1`, single-session, growing cache) is not evidence either
+  way for that different shape. Reported here so PR6's hypotheses are written against the true, not
+  assumed, state of this instrument.
+- **The `rig/runs/` vs `rig/results/tool-surface-v1/runs.jsonl` count discrepancy named in this change's
+  launch instructions does not reproduce on this machine.** Both are exactly 42, with an exact 1:1
+  `run_id` correspondence (verified: `set(dir names) == set(run_id values)`, symmetric difference
+  empty). No incomplete or void capture is missing a directory, and no directory is missing a row.
+  Recorded as a correction rather than silently building an explanation for a gap that measurement does
+  not show.
+- **`derive.py`'s projection regression passed with zero mismatches** across all 42 rows, excluding
+  `schema_version`, `checker_digest`, and the eight new keys (`model_turns`, `occupancy_series`,
+  `peak_occupancy_tokens`, `peak_occupancy_turn`, `cumulative_occupancy_tokens`,
+  `occupancy_aggregate_matches`, `occupancy_is_monotone`, `context_window_tokens`).
+- **`decisions/0014-*.md`'s Clause B roster follows this task's explicit brief** (four self-test-carrying
+  executables: `hooks/pre-commit`, `rig/derive.py`, `rig/run-pipeline.sh`, `rig/collect.py`; the case
+  generator named as the future candidate, not counted among the four) **rather than
+  `design.md`'s own worked "what the ADR must settle" paragraph**, whose literal four-item list
+  (`hooks/pre-commit`, `collect.py`, `run-pipeline.sh`, `tools/generate-cases.py`) drops `rig/derive.py` —
+  the one executable ADR 0013 names as its original precedent — while adding the case generator to the
+  same list it is later named the *future* candidate for. Neither four-item list reconciles against ADR
+  0013's own "two already, a third triggers" framing: 2 pre-existing (`hooks/pre-commit`, `derive.py`) +
+  3 new (`run-pipeline.sh`, `collect.py`, `tools/generate-cases.py`) once every PR lands is 5, not 4,
+  under either roster. This does not change Clause B's decision (decline the trigger; the
+  infrastructure-ahead-of-content reasoning holds whether the count is 4 or 5) — flagged here as a
+  design.md internal inconsistency for the record, not resolved by silently picking whichever count
+  looks cleanest.
 
 ## PR2 — Collector + signature normalizer
 

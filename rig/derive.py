@@ -34,11 +34,13 @@ import re
 import sys
 from pathlib import Path
 
-SCHEMA_VERSION = 2  # v2: added defects_found/defects_missed/defects_extra (design.md
-# Decision 8 — no migrations, a schema_version bump is a rebuild, not a
-# patch to rows already on disk). Re-deriving rewrites every existing row
-# with this version and the three new fields; nothing here reads the old
-# value of schema_version to special-case anything.
+SCHEMA_VERSION = 3  # v3: added model_turns, occupancy_series, peak_occupancy_tokens,
+# peak_occupancy_turn, cumulative_occupancy_tokens, occupancy_aggregate_matches,
+# occupancy_is_monotone, context_window_tokens (failure-flood-triage spec
+# R-F5.1-5.4, design.md Decision 1). Same no-migrations rule as v2 (design.md
+# Decision 8): re-deriving rewrites every existing row with this version and
+# the eight new fields; nothing here reads the old value of schema_version to
+# special-case anything.
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXPERIMENT = "tool-surface-v1"
 # Fixture location is additively versioned per task_id (design.md Decision 4:
@@ -133,18 +135,27 @@ def fixture_digest(version: str) -> str:
 # ---- transcript parsing (best-effort; never trusts what was intended) ----
 
 def parse_stream(path: Path, truncated_tail_expected: bool):
-    """Returns (init_event, tool_calls, hook_names, result_event, anomalies).
+    """Returns (init_event, tool_calls, hook_names, result_event, anomalies, turns).
 
     tool_calls: [{"name": str, "target": str|None, "is_error": bool}, ...]
     target is resolved in memory for matching only — never written to a row
     (design.md's cwd rule extends to any other path-shaped tool input).
+
+    turns: [(message_id, usage_dict), ...], stream order, de-duplicated by
+    `message.id` keeping the FIRST occurrence (spec R-F5.1, design.md
+    Decision 1). One model turn emits several `assistant` events that echo
+    the same `message.usage` byte-for-byte — verified on sampled captures
+    (14 events / 4 turns in one, 6 events / 3 turns in another) — so summing
+    per event rather than per de-duplicated turn over-counts occupancy
+    roughly 3.5x.
     """
     init_event, result_event = None, None
     hook_names = set()
     tool_calls = []
     anomalies = []
+    turns = []
     if not path.is_file():
-        return None, [], set(), None, ["missing-result"]
+        return None, [], set(), None, ["missing-result"], []
 
     lines = [l for l in path.read_bytes().split(b"\n") if l.strip()]
     parsed = []
@@ -158,6 +169,7 @@ def parse_stream(path: Path, truncated_tail_expected: bool):
             anomalies.append("unparseable-stream")
 
     by_tool_use_id = {}
+    seen_message_ids = set()
     for ev in parsed:
         t = ev.get("type")
         if t == "system" and ev.get("subtype") == "init":
@@ -171,7 +183,12 @@ def parse_stream(path: Path, truncated_tail_expected: bool):
             if info.get("status") != "allowed" or info.get("overageStatus") not in ("allowed", None):
                 anomalies.append("rate-limit")
         elif t == "assistant":
-            for block in ev.get("message", {}).get("content", []):
+            msg = ev.get("message", {})
+            mid = msg.get("id")
+            if mid is not None and mid not in seen_message_ids:
+                seen_message_ids.add(mid)
+                turns.append((mid, msg.get("usage") or {}))
+            for block in msg.get("content", []):
                 if block.get("type") == "tool_use":
                     by_tool_use_id[block["id"]] = block
         elif t == "user":
@@ -188,7 +205,7 @@ def parse_stream(path: Path, truncated_tail_expected: bool):
     # made, whether or not its result survived.
     for tu in by_tool_use_id.values():
         tool_calls.append({"name": tu.get("name"), "target": None, "is_error": False})
-    return init_event, tool_calls, hook_names, result_event, anomalies
+    return init_event, tool_calls, hook_names, result_event, anomalies, turns
 
 
 def resolve_target(tool_use, tool_result_block, init_event):
@@ -216,6 +233,74 @@ def resolve_target(tool_use, tool_result_block, init_event):
         if isinstance(result, list) and result:
             return result[0] if isinstance(result[0], str) else None
     return None
+
+
+# ---- runway channels: peak and cumulative occupancy (spec R-F5.1-5.4) -----
+
+def compute_occupancy(turns, result_event, model):
+    """Peak/cumulative occupancy from the de-duplicated per-turn `assistant`
+    usage `parse_stream` already built (design.md Decision 1).
+
+    Why `input + cache_read + cache_creation` is the occupancy proxy: those
+    three fields partition one turn's prompt, so their sum is the prompt
+    size regardless of cache state. Output tokens are excluded from
+    occupancy and counted once, as the next turn's input — nothing is
+    double-counted (design.md line 80-83).
+
+    `occupancy_aggregate_matches` is the R-A1.4 proof this channel can fire
+    with no new run: `occupancy_series` is summed here from the
+    de-duplicated per-turn walk, and independently compared against
+    `result_event["usage"]`, which the CLI already aggregates over every
+    turn (verified arithmetically: 141134 = 16602+39942+40854+43736 on one
+    capture, 97170 = 16602+39833+40735 on another). Two paths to one number;
+    disagreement is the anomaly.
+
+    `cumulative_occupancy_tokens` is the sum over de-duplicated turns of the
+    same occupancy quantity, **plus** output tokens (spec R-F5.2) — output
+    tokens are taken from `result_event["usage"]` directly (already an
+    aggregate over every turn) rather than re-summed per turn, because the
+    CLI streams several partial `assistant` events per turn and only the
+    LAST one carries that turn's final output_tokens count; de-duplicating
+    by keeping the FIRST occurrence (correct for occupancy, whose per-turn
+    value is stable across duplicates) would under-count output_tokens.
+    """
+    series = []
+    for _mid, usage in turns:
+        occ = ((usage.get("input_tokens") or 0)
+               + (usage.get("cache_read_input_tokens") or 0)
+               + (usage.get("cache_creation_input_tokens") or 0))
+        series.append(occ)
+
+    model_turns = len(turns)
+    peak_occupancy_tokens = max(series) if series else None
+    # 1-indexed, first occurrence on a tie — matches the human-facing "turn N".
+    peak_occupancy_turn = series.index(peak_occupancy_tokens) + 1 if series else None
+    occupancy_is_monotone = all(series[i] <= series[i + 1] for i in range(len(series) - 1)) if series else None
+
+    cumulative_occupancy_tokens = occupancy_aggregate_matches = None
+    if result_event is not None:
+        result_usage = result_event.get("usage") or {}
+        result_input_side = ((result_usage.get("input_tokens") or 0)
+                              + (result_usage.get("cache_read_input_tokens") or 0)
+                              + (result_usage.get("cache_creation_input_tokens") or 0))
+        occupancy_aggregate_matches = sum(series) == result_input_side
+        cumulative_occupancy_tokens = sum(series) + (result_usage.get("output_tokens") or 0)
+
+    context_window_tokens = None
+    if result_event is not None and model is not None:
+        model_usage = (result_event.get("modelUsage") or {}).get(model) or {}
+        context_window_tokens = model_usage.get("contextWindow")
+
+    return {
+        "model_turns": model_turns,
+        "occupancy_series": series,
+        "peak_occupancy_tokens": peak_occupancy_tokens,
+        "peak_occupancy_turn": peak_occupancy_turn,
+        "cumulative_occupancy_tokens": cumulative_occupancy_tokens,
+        "occupancy_aggregate_matches": occupancy_aggregate_matches,
+        "occupancy_is_monotone": occupancy_is_monotone,
+        "context_window_tokens": context_window_tokens,
+    }
 
 
 # ---- the two checkers (outcome, practice) ---------------------------------
@@ -334,7 +419,7 @@ def build_row(run_dir: Path, surfaces, digests, answer_keys):
     prompt_path = run_dir / "prompt.txt"
     prompt_sha256 = sha256_hex(prompt_path.read_bytes()) if prompt_path.is_file() else None
 
-    init_event, tool_calls, hook_names, result_event, stream_anomalies = parse_stream(
+    init_event, tool_calls, hook_names, result_event, stream_anomalies, turns = parse_stream(
         run_dir / "stream.jsonl", status.get("truncated_tail", False)
     )
 
@@ -354,6 +439,11 @@ def build_row(run_dir: Path, surfaces, digests, answer_keys):
         mcp_server_count = len(init_event.get("mcp_servers", []))
         cwd = init_event.get("cwd", "")
         cwd_is_expected = bool(WORKSPACE_NAME_RE.match(Path(cwd).name)) if cwd else False
+
+    # Occupancy is a property of the de-duplicated turn walk and the result
+    # event alone — computed unconditionally, ahead of the state/void checks
+    # below, since none of them depend on it and it never downgrades state.
+    occupancy = compute_occupancy(turns, result_event, model)
 
     # derive.py's own read-back verification only applies to a run run.sh
     # itself believed complete — it can only ever DOWNGRADE complete to
@@ -443,6 +533,17 @@ def build_row(run_dir: Path, surfaces, digests, answer_keys):
         "output_tokens": (result_event or {}).get("usage", {}).get("output_tokens"),
         "cache_creation_input_tokens": (result_event or {}).get("usage", {}).get("cache_creation_input_tokens"),
         "cache_read_input_tokens": (result_event or {}).get("usage", {}).get("cache_read_input_tokens"),
+        # Runway channels (spec R-F5.1-5.4, design.md Decision 1): peak from a
+        # de-duplicated per-turn walk, cumulative independently cross-checked
+        # against the aggregate the CLI already reports on result_event.usage.
+        "model_turns": occupancy["model_turns"],
+        "occupancy_series": occupancy["occupancy_series"],
+        "peak_occupancy_tokens": occupancy["peak_occupancy_tokens"],
+        "peak_occupancy_turn": occupancy["peak_occupancy_turn"],
+        "cumulative_occupancy_tokens": occupancy["cumulative_occupancy_tokens"],
+        "occupancy_aggregate_matches": occupancy["occupancy_aggregate_matches"],
+        "occupancy_is_monotone": occupancy["occupancy_is_monotone"],
+        "context_window_tokens": occupancy["context_window_tokens"],
         "stop_reason": (result_event or {}).get("stop_reason"),
         "permission_denials": (result_event or {}).get("permission_denials", []),
         "tool_calls": [{"name": tc["name"], "is_error": tc["is_error"]} for tc in tool_calls],
