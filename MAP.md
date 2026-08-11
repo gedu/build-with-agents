@@ -30,7 +30,7 @@ where to look and what you are allowed to trust.
 | `OPERATIONS.md` | What to run and when — gates, rig, review lifecycle. Points at `--help` rather than duplicating flags | Yes | active |
 | `setup.sh` | Generates per-tool symlinks and installs git hooks; committed, output is not | Yes | active |
 | `hooks/` | Committed git hooks. `pre-commit` is the ADR 0009 redaction gate | Yes | 1 hook (`pre-commit`) |
-| `skills/` | Tool-neutral skills, one dir per skill (`SKILL.md` + optional `assets/`, `references/`) | Yes, when `validated` | 3 skills (`context-checkpoint` draft, `hypothesis-cycle` draft, `source-verdict` validated) |
+| `skills/` | Tool-neutral skills, one dir per skill (`SKILL.md` + optional `assets/`, `references/`) | Yes, when `validated` | 4 skills (`context-checkpoint` draft, `hypothesis-cycle` draft, `project-gap-analysis` draft, `source-verdict` validated) |
 | `theory/llm/` | How models behave: context, tokens, sampling, failure modes | Yes, when `validated` | 1 doc (`context-degradation-at-length`, validated) |
 | `theory/agents/` | Single-agent design: tools, memory, context isolation | Yes, when `validated` | 3 docs (`capability-load-cost`, `instruction-provenance`, `tool-surface-design`) |
 | `theory/orchestration/` | Multi-agent coordination, delegation, handoffs | Yes, when `validated` | 1 doc (`delegation-and-context-boundaries`, validated) |
@@ -38,6 +38,7 @@ where to look and what you are allowed to trust.
 | `research/` | Received links, contrasted against evidence, each with a verdict | Verdict only, as evidence | 11 verdicts (3 `supported`, 5 `partially supported`, 3 `unverifiable`) |
 | `decisions/` | Numbered ADRs (`NNNN-slug.md`) — the WHY | Yes | `0001`–`0013` ratified |
 | `hypotheses/` | Falsifiable claims with a declared test, registered before the run that could settle them | **No — zero citability** (ADR 0012). Not even as evidence | 1 open |
+| `gaps/` | Gap analyses of other projects against validated practice — goal (c), and the demand signal for `blocks/` | **Evidence only, and only in aggregate.** One record is one project, never a general claim | empty; **no project is identifiable here** |
 | `journal/` | Dated conversations and brainstorms | **Never as authority**; valid as provenance (ADR 0007) | 10 entries (2026-08-04, 2026-08-05 ×7, 2026-08-10 ×2) |
 | `blocks/_shared/` | Target-agnostic minimal blocks with a contract | Yes, when `validated` | empty |
 | `blocks/react/` | React-specific blocks | Yes, when `validated` | empty |
@@ -72,6 +73,7 @@ Do not create a target directory before there is validated content to put in it.
 | "Is this claim backed?" | the artifact's `sources` field; empty means not verified |
 | "What was discussed about X?" | `journal/` — context and provenance only, never authority |
 | "What are we still unsure about?" | `hypotheses/` — open claims with their tests. Never citable |
+| "What do real projects actually lack?" | `gaps/` — and a demand needs two independent records before it builds anything |
 | "Which tool entrypoints exist?" | `setup.sh --help`; nothing generated is committed |
 | "What do I run, and when?" | `OPERATIONS.md` |
 

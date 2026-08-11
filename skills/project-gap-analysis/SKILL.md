@@ -1,0 +1,187 @@
+---
+id: skills/project-gap-analysis
+type: skill
+targets: [any]
+status: draft
+verified: 2026-08-11
+sources: ["AGENTS.md", "MAP.md", "decisions/0009-redaction-is-a-repo-wide-rule.md", "decisions/0011-rig-produces-evidence-not-truth.md", "gaps/README.md", "theory/agents/capability-load-cost.md", "theory/agents/instruction-provenance.md", "theory/agents/tool-surface-design.md", "theory/llm/context-degradation-at-length.md", "theory/loops/reading-and-running-find-different-defects.md", "theory/loops/verifier-availability.md", "theory/orchestration/delegation-and-context-boundaries.md"]
+---
+
+# project-gap-analysis
+
+Analyse an existing project against this repo's validated practices and record what it is missing —
+without ever bringing that project's identity into a public repository.
+
+This is goal (c) in `AGENTS.md`. Its output is also the demand signal for goal (b): `blocks/` gets
+built from gaps that recurred, never from gaps that were imagined.
+
+`status: draft` — not yet run end to end. See **Recorded runs**.
+
+## The rule this skill exists to prevent
+
+**A gap analysis reads a private project and writes into a public one.** That is the whole risk, and
+it is structural rather than accidental: the analysis is *useful* precisely because it is specific,
+and specificity is what leaks.
+
+`hooks/pre-commit` cannot save you here. It blocks absolute home paths and known secret shapes. A
+private repository name, a client's name, an internal service name — written as a bare word — is the
+class the gate explicitly **cannot** pattern-match (ADR 0009). A clean commit is not evidence about
+this half.
+
+So identity is stripped **at the moment of writing, not at the moment of committing.** There is no
+review pass that catches it later, because by then it reads like ordinary prose.
+
+### Two artifacts, and only one of them is committed
+
+| Artifact | Where | Contains | Committed |
+|---|---|---|---|
+| Working report | the analysed project, or a scratch directory outside this repo | Everything. Real paths, real names, real line numbers — it is for the person who owns the project | **Never** |
+| Gap record | `gaps/NNNN-<slug>.md` in this repo | The findings with every identifier removed | Yes |
+
+Write the working report first and the gap record from it. Never the reverse: de-identifying is
+subtractive, and a record written directly is a record that never had the detail to lose.
+
+### What may cross into the gap record
+
+| Never | Write instead |
+|---|---|
+| Repository, product, client or team name | The project **class**: stack, rough size, what it is for |
+| Any path outside this repo | The role of the file: "the root agent instructions", "the CI workflow" |
+| Internal service, host or endpoint names | The class of dependency |
+| Verbatim code, config or prompts from the project | The *shape* of what was found, in your own words |
+| Head counts, org structure, roadmap | Nothing. None of it is a practice gap |
+
+If a finding cannot be stated without one of those, it does not go in the record. Say that
+explicitly in the working report and stop — an unstatable finding is a real outcome, not a failure.
+
+## The checks
+
+Each check is a validated `theory/` claim turned into something observable in someone else's
+project. **Every check cites its source; none is invented.** That is `AGENTS.md`'s no-invented-
+knowledge rule applied to a checklist — a check with no backing doc is an opinion with a checkbox.
+
+Run all seven. Answer each `present` / `partial` / `absent` / `n-a`, with the observation that
+decided it.
+
+### 1. Resident capability cost — `theory/agents/capability-load-cost.md`
+
+Cost is what is **loaded**, not what is connected. Look at how many tool, MCP and skill definitions
+sit in the window every turn versus being named and fetched on demand.
+
+Look at: agent/MCP configuration, how many servers are always-on, whether tool schemas are deferred.
+`absent` looks like every server connected eagerly because it might be useful.
+
+### 2. Instruction provenance — `theory/agents/instruction-provenance.md`
+
+For any given rule the agent follows, can you name the file it physically came from? Precedence
+documented without provenance is the failure mode: the agent knows which rule wins and has no way
+to change, report or verify the losing one.
+
+Look at: instruction layers, nested instruction files, and especially **generated blocks that a
+tool overwrites** — a rule you cannot edit locally is a rule you cannot reconcile.
+
+### 3. Tool surface as prose — `theory/agents/tool-surface-design.md`
+
+The model chooses by reading names and descriptions; schemas hold most of the bytes and do not
+participate in the choice. Are custom tools and skills named and described for a reader?
+
+Look at: custom tool/skill names and descriptions. `absent` looks like terse names with elaborate
+schemas — bytes spent where they cannot help selection.
+
+### 4. Reset practice — `theory/llm/context-degradation-at-length.md`
+
+Degradation with length is real and measured; **no published measurement supports a token number as
+the moment to reset.** So the failure here is bidirectional: no reset practice at all, *or* one
+triggered by a token count.
+
+Look at: how sessions end. A behavioural trigger (re-deriving a settled fact, contradicting an
+earlier decision, losing the verified/assumed distinction) is `present`. A number is `partial` and
+must be recorded as the specific error it is.
+
+### 5. Both defect channels — `theory/loops/reading-and-running-find-different-defects.md`
+
+Reading finds where the implementation departs from intent. Execution against hostile input finds
+where the author's model of the environment departs from the environment. Neither class contains
+the other.
+
+Look at: whether review and adversarial execution both exist. Having only one is `partial`, and
+name which one — that tells you which defect class is currently invisible.
+
+### 6. Verifier availability — `theory/loops/verifier-availability.md`
+
+**The highest-yield check.** A verifier that cannot run is not a weak gate, it is an absent gate
+reporting "not run". Does every gate distinguish *could not run* from *passed*?
+
+Look at: gates, hooks and CI steps that swallow a non-zero status — `|| true`, `|| :`,
+`2>/dev/null` on the thing being checked, a loop whose per-item status never reaches its caller.
+
+Worked example, from this repo rather than a hypothetical: `hooks/pre-commit` collapsed grep's three
+exit states with `|| :`, so an unreadable tracked file was skipped in silence while the run printed
+"clean across N tracked files" and exited 0. A redaction gate reporting a pass on content it never
+read. Found by review, fixed in `5703c92`, and now held by `hooks/pre-commit --self-test` (ADR 0013).
+This check exists because the failure happened here first.
+
+### 7. Delegation boundaries — `theory/orchestration/delegation-and-context-boundaries.md`
+
+A delegation creates a new, empty context. It protects the child from noise and silently drops every
+constraint the parent never wrote down.
+
+Look at: subagent, task or job definitions. Do they carry their constraints explicitly, or assume
+what the parent knows? `absent` looks like a prompt that would be ambiguous to someone who had not
+been in the conversation.
+
+### Before you run them: reconcile the list
+
+`theory/` grows. Enumerate the files with `status: validated` under `theory/` and compare against the
+seven above. If a validated doc has no check here, **stop and say so in the record** rather than
+silently analysing against a stale list. Add the check to this file in the same session, or record
+why it does not project onto a target project.
+
+## Procedure
+
+1. **Confirm scope with the owner.** Which project, and are you permitted to read it. Do not
+   analyse a repository you were not pointed at.
+2. **Ask how the project may be referred to.** Before writing a single line. A path does not tell
+   you whether something is public. This is the one question that must precede the work.
+3. **Reconcile the checklist** against `theory/`, per above.
+4. **Run the seven checks**, recording the observation that decided each verdict.
+5. **Write the working report**, in full detail, outside this repo.
+6. **Write the gap record** in `gaps/`, de-identifying as you write.
+7. **Record the run** in the table below.
+
+## Output shape — the gap record
+
+`gaps/NNNN-<slug>.md`, `type: research`, `status: validated` once the analysis is complete
+(the analysis was done; the *demand* is what stays provisional). Body:
+
+- **Project class** — stack, rough size, what it is for. No name.
+- **Checks** — the seven, each `present` / `partial` / `absent` / `n-a`, each with its
+  de-identified observation and its `theory/` citation.
+- **Unstatable findings** — a count, and why. Never the content.
+- **Demand** — for each `absent` or `partial`, what block would have closed it. Phrased as a
+  capability, not as a file name you have already decided on.
+
+## What a gap record may and may not cause
+
+**One record never justifies building a block.** A single project's gaps are evidence about that
+project, exactly as `rig/` output is evidence and not truth (ADR 0011).
+
+A block is built when **the same demand appears in at least two independent gap records** — different
+projects, different owners, analysed separately. Until then the demand is recorded and waits.
+
+The reason is the failure this repo is built to avoid: one analysis plus enthusiasm produces a
+`blocks/` directory full of things that solved one project's problem and are described as practice.
+That is inventing knowledge with extra steps.
+
+## Recorded runs
+
+Built in from the start, because `skills/context-checkpoint` spent three runs asking a future
+session to record its results and got zero — the request lived in a file each cycle superseded. The
+answer lives here, in the file nothing supersedes.
+
+| # | Date | Project class | Record | Did the skill work |
+|---|---|---|---|---|
+| — | — | — | — | Not yet run |
+
+Promotion to `status: validated` needs recorded runs, not a better rationale. Record failures with
+the same care as successes: a skill that only records its wins has a habit, not a criterion.
