@@ -222,11 +222,53 @@ collector to validate fixture/injection signatures).
 
 Depends on: PR1 (ADR must exist — R-F11 scenario), PR2 (collector validates the clean baseline).
 
-- [ ] 3.1 Create `rig/fixtures/failure-flood/v1/{src,tests,runtime}/**` — stage-1 clean substrate
+- [x] 3.1 Create `rig/fixtures/failure-flood/v1/{src,tests,runtime}/**` — stage-1 clean substrate
       (donor modules hosting 3 of the 6 root causes), author-authorized real code per the proposal's
       recorded authorization. `package.json` + `package-lock.json` under `runtime/`.
       Verify: **the fixture's own Jest run** (`npm ci && npx jest --runInBand`) reports zero failures —
       a non-zero clean baseline voids the fixture, not the run.
+      **Done (PR3a-i)** — three donor modules copied from the operator-authorized donor project (source
+      identified only as "the donor project" per redaction instruction), chosen as a subset of the
+      six-module set the case-count table (`applyKeypadInput` 15, `parseTokenAmount` 13, `confirmSeed` 12,
+      `parseTransfers` 9, `formatTokenAmount` 8, `isValidEthereumAddress` 8 — the six highest-case
+      import-free candidates, ~65 base cases total) implies for stage 2: `applyKeypadInput` (15 cases —
+      intended root cause: a boundary/off-by-one condition in the decimal-cap or leading-zero check),
+      `confirmSeed` (12 cases — intended root cause: an index/position-mapping defect between
+      `CONFIRM_POSITIONS` and the picks array), `parseTransfers` (9 cases — intended root cause: a
+      direction/fee-association mapping defect, e.g. case-sensitivity or fee-lookup keying). All three
+      modules and their test files import nothing from each other or from any third module, so no PR4
+      injection into one can shadow a signature in another. `parseTokenAmount` and `formatTokenAmount`
+      were deliberately NOT both taken into this stage-1 subset even though both rank in the top six:
+      `parseTokenAmount.test.ts` imports `formatTokenAmount` for one round-trip assertion, so an injection
+      into `formatTokenAmount` would also fail a `parseTokenAmount` test — a real masking risk for
+      whichever of PR3a-ii/PR4 assigns both of those two modules a root cause. Flagged here rather than
+      discovered at the 4.1 isolation-validation gate.
+      Redaction: every copied line read by hand before staging. One comment in `parseTransfers.ts`
+      naming a specific third-party indexer product was genericized to "a token-transfers indexer
+      endpoint" (conservative call — not the donor's own project/client/employer name, but not needed for
+      the module's behavior either, so removed rather than argued over). No absolute path, project name,
+      employer, person name, API key, or real-deployment contract address found in any copied byte;
+      confirmed no `react`, `react-native`, `expo-*`, or MMKV import in any copied file (all three source
+      modules and their tests are, and remain, import-free).
+      Runtime: `runtime/package.json` pins `jest` 29.7.0, `ts-jest` 29.4.12, `typescript` 5.9.2,
+      `@types/jest` 29.5.14, `@types/node` 20.19.9 (no `^`/`~` ranges); `runtime/package-lock.json`
+      (`lockfileVersion: 3`) generated once via `npm install` in a machine-local scratch directory outside
+      `<repo>`, never inside it. `runtime/jest.config.js` resolves `rootDir` and the `ts-jest` transform
+      via `__dirname`/`require.resolve` rather than `process.cwd()`, so it works whether invoked from
+      `runtime/` (`npm test`) or after `src/`+`tests/`+`runtime/` are later re-materialized elsewhere with
+      the same relative layout — no `node_modules` symlink required for this fixture's own Jest run.
+      Verified twice: (1) `npm install` + `npm test` in the scratch build directory; (2) the actual
+      committed-tree bytes copied to a fresh `mktemp -d` directory outside `<repo>`, `npm ci` (fresh
+      install from the committed lockfile), then `npx jest --config jest.config.js --runInBand` — **3
+      suites, 36 tests, 0 failures, exit 0** both times. Cleaned up after; no `node_modules/` anywhere
+      under `<repo>`, `.gitignore` unchanged.
+      **MANIFEST.sha256 deliberately deferred, not silently skipped**: task 3.5 computes one manifest over
+      `src/`, `tests/`, `runtime/`, `tools/`, `answer-key/case-table.sha256` **for both v1 and v2** — most
+      of that path set (`tools/`, `answer-key/case-table.sha256`, and all of v2) does not exist yet after
+      this task alone (3.2–3.4 pending). Freezing a manifest now would either omit paths 3.5 explicitly
+      requires (a manifest that is not what 3.5 specifies) or force a second incompatible freeze once
+      3.2–3.4 land. No `MANIFEST.sha256` is committed in this PR; task 3.5 remains the single point where
+      it is computed, once, over the complete set it was designed to cover.
 - [ ] 3.2 Create `rig/fixtures/failure-flood/v2/{src,tests,runtime}/**` — stage-2 clean substrate, same
       six root-cause-hosting modules, same clean behavior as v1 where modules overlap.
       Verify: same Jest run, zero failures, on v2.
