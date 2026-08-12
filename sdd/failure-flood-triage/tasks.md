@@ -570,6 +570,25 @@ Depends on: PR3 (clean substrate + generator must exist first).
       injected bytes before any further `git`-history-touching command, and the MANIFEST recompute-compare
       re-verified match (exit 0) afterward. No corruption reached the reported `F0`/`S0`/`R0` (those were
       measured from an independent, already-saved `mktemp` verification copy taken before the mistake).
+      **[x] Correction, PR4-signature-scope-fix (this batch), applied on top of the above rather than
+      redone from scratch**: the masking measured at 4.2 (3 unrelated causes across 3 modules collapsing
+      into 1 cluster) was a real, previously-unhandled over-collapse defect in `rig/collect.py`'s
+      signature, not an accepted masking outcome — closed by scoping the signature to
+      `hash(normalized_head + test_file)` (spec R-F1.4, `NORMALIZER_VERSION` 1 -> 2). v1's `src/`
+      injections are byte-unchanged (`git diff --stat` on `v1/src`, `v1/tests`, `v1/runtime` empty);
+      `answer-key/s1.json`'s `F0`/`R0`/`measured_vs_declared` and `MANIFEST.sha256` were re-measured and
+      rewritten under the corrected normalizer. **Re-measured: 4 failing cases (unchanged), now 4
+      distinct clusters (not 2)** — `applyKeypadInput.ts:28` -> `c2`, `confirmSeed.ts:15` -> `c3`,
+      `parseTransfers.ts:34` -> `c1`+`c4` (that cause's own two-heads over-split is unchanged from the
+      original measurement and remains absorbed by `R0`'s many-to-one mapping, design.md:449-450 —
+      over-split was never the defect being fixed). Same-module clustering re-verified, not assumed: two
+      new `collect.py --self-test` cases (g.1/g.2) prove identical heads in the same file still cluster
+      together while identical heads in different files no longer do; `parseTransfers`'s own two isolated
+      failures, re-run in isolation, reproduced the exact same two signatures (`04933d1bde59e977`,
+      `da54112bb72162e0`) as inside the combined run. `spec.md` (new R-F1.4) and `design.md` (algorithm
+      item 4b, 9c) amended in place to record the scope correction with the measured evidence, keeping the
+      original over-split reasoning rather than replacing it. Full detail in
+      `apply-progress.md`'s "PR4-signature-scope-fix" section.
 - [ ] 4.3 Repeat 4.1–4.2 for v2's 6 stage-2 root causes, injected through the same real modules the
       generator amplifies. Measure clusters-per-injection under amplification (design 9c) — a cause
       whose cluster count grows with `case_count` is a normalizer defect, not a key entry, and must be

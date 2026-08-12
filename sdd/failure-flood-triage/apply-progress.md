@@ -836,3 +836,205 @@ journal/tasks text.
 
 **PR4's 3b-i slice (tasks 4.1–4.2) is now closed.** Task 4.3 (v2's 6 stage-2 injections) and task 4.4
 (`answer-key/prereg.json`) remain `[ ]`, explicitly out of this slice's authorization.
+
+## PR4-signature-scope-fix — corrective work unit (this batch) — DONE
+
+Corrective, not one of the enumerated 4.1–4.4 tasks: PR4-i's own measurement (`answer-key/s1.json`, task
+4.2, above) found the signature normalizer collapsing 3 unrelated causes in 3 different modules into one
+cluster, because Jest's generic `.toBe()` equality head carries nothing before the Expected:/Received:
+cut and the signature was `hash(head)` alone. This closes that defect, re-measures v1's ground truth
+under the corrected normalizer, and amends the artifacts that stated the old rule. Task 4.2 stays marked
+`[x]` (its own work — 3 injections, isolation validation, the masking-measured-not-tuned discipline — was
+correct); this section is layered on top, with an addendum in `tasks.md` under 4.2 rather than a new
+checkbox, since the corrective work unit was not itself one of the seven approved work units.
+
+### What was over-split vs. what was over-collapsed — kept distinct, not conflated
+
+Two failure modes are visible in one fixture, and only one needed a fix:
+
+- **Over-split** (one cause, several signatures) — `parseTransfers.ts:34` already showed this
+  (`toBe`-head failure vs. `toMatchObject`-head failure, 2 signatures for 1 cause). **Not touched.**
+  `design.md:449-450` (pre-fix line numbers) already states: *"where a cause genuinely produces several
+  heads (a throw carrying a parameter value), slice 3b **measures** that count and `R0` records the
+  many-to-one mapping. The key absorbs it; the algorithm does not change."* `design.md:286`: *"`R0` is a
+  **many-to-one cluster → cause-site mapping**, measured in slice 3b rather than asserted."* Both quotes
+  verified against the file before any edit. No algorithm change was made for this mode.
+- **Over-collapse** (several causes, one signature) — 3 unrelated causes (`applyKeypadInput.ts:28`,
+  `confirmSeed.ts:15`, `parseTransfers.ts:34`'s case-insensitivity failure) sharing cluster
+  `277580d674667852` under `normalizer_version: 1`. **This is what was fixed.** Nothing in the spec or
+  design defended against it — R-F1.1's own masking scenario is about one cause shadowing another
+  *inside the same test*, not three unrelated causes in three different tests.
+
+### The fix (`rig/collect.py`)
+
+1. **Signature is now `hash(normalized_head + test_file)`**, not `hash(normalized_head)` alone.
+   `signature_of(signature_text, test_file)` takes both arguments — there is no longer a call site that
+   can omit the file. `relative_test_file()` extracted as a shared helper so the signature's file scope
+   and `test_id`'s own file component can never drift into two different relative-path conventions.
+   `␞` (Symbol for Record Separator, never a printable/whitespace byte) joins the two inputs before
+   hashing, so no normalized head text could ever collide with a path to fake a match.
+2. **`NORMALIZER_VERSION` bumped 1 -> 2**, with an inline comment stating why: a `collection/1` stamped
+   `1` (e.g. the pre-fix `answer-key/s1.json`) MUST NOT be silently compared against one stamped `2` — the
+   cluster key itself changed.
+3. **The clusters view carries `distinct_test_files` per cluster** — a sorted, deduplicated list of the
+   test files among that cluster's members, derived from existing `test_id` data (no new field on
+   `failure/1`). It does **not** carry `member_test_ids`: `_self_test_clusters_view_bounded` (case f,
+   updated) asserts both — `distinct_test_files` present, `member_test_ids` absent — so the view stays
+   bounded by cluster count (a cluster's distinct-file set is at most the fixture's own module count),
+   never by failure count.
+4. **Same-module clustering re-verified, not assumed to survive.** Two new self-test cases (g.1/g.2, the
+   same both-directions discipline task 3.3's own done-note names for the generator's order-dependence
+   bug — "either alone leaves a hole"): (g.1) an identical head in the SAME test file still produces the
+   SAME signature; (g.2) an identical head in DIFFERENT test files now produces DIFFERENT signatures.
+   `python3 rig/collect.py --self-test` → **exit 0, all 11 cases PASS** (the original a–f plus new g.1/g.2,
+   `c` itself covering 4 sub-cases):
+
+   ```
+   [PASS] (a) same cause, differing path/line/col/Expected-Received -> same signature
+   [PASS] (b) two genuinely different causes -> different signatures ...
+   [PASS] (c.1)/(c.2)/(c.3)/(c.4) the three suite states + suite-timeout sub-case
+   [PASS] (d) same input twice -> byte-identical output
+   [PASS] (e) absent toolchain -> CollectorError('toolchain-absent'), not a suite state
+   [PASS] (f) clusters view carries distinct_test_files but no member_test_ids, one row per cluster
+   [PASS] (g.1) identical head, SAME test file -> SAME signature
+   [PASS] (g.2) identical head, DIFFERENT test files -> DIFFERENT signatures
+   self-test: all cases passed
+   ```
+5. **Scope limit, stated in the code, not only here.** `rig/collect.py`'s module docstring and
+   `signature_of`'s own docstring now say explicitly: this fix is measured-safe against introducing a new
+   over-split failure only because this fixture's six host modules are import-free by construction (the
+   independence check already run at PR3a-i/ii — no `src/*.ts` or `tests/*.test.ts` file in `v1` or `v2`
+   imports another module or another test). A future fixture whose modules import each other could let
+   one real cause legitimately span two test files, which this rule would then over-split; `R0`'s
+   many-to-one mapping (unchanged) is what would absorb that, not a reason to loosen this fix.
+
+### Re-measurement — v1's ground truth, per ADR 0014 Clause A (mktemp outside `<repo>`)
+
+Committed `src/`/`tests`/`runtime` bytes (unchanged by this fix) copied to a fresh `mktemp` scratch
+directory outside `<repo>`; `npm ci`; `npx jest --config jest.config.js --runInBand --json
+--outputFile=report.json`:
+
+```
+Test Suites: 3 failed, 3 total
+Tests:       4 failed, 32 passed, 36 total
+```
+
+Identical totals to the pre-fix measurement (expected — no `src/` byte changed). `rig/collect.py` against
+that real report:
+
+```
+collect.py: suite_state=ran failures=4 clusters=4 report_bytes=28261
+```
+
+**Measured exactly as run, not tuned toward any count**: **4 failing cases (unchanged) across 4 distinct
+clusters (was 2)** — one cluster per failure in this fixture, not per cause:
+
+| cluster_id | signature | test file | representative test |
+|---|---|---|---|
+| c1 | `04933d1bde59e977` | `parseTransfers.test.ts` | "matches the account address case-insensitively" |
+| c2 | `607220f5cf3e52b9` | `applyKeypadInput.test.ts` | "ignores digits past the decimal cap" |
+| c3 | `65a9e5f9e5eef040` | `confirmSeed.test.ts` | "returns true when all picks match CONFIRM_POSITIONS" |
+| c4 | `da54112bb72162e0` | `parseTransfers.test.ts` | "maps an incoming transfer (to === account)" |
+
+Ran a second, independent collector pass over the same report file: byte-identical `collection/1`
+(`diff` empty, exit 0) — idempotence held on the real measurement, not only in the self-test.
+
+**Isolation re-verified per cause**, on a clean-reverted copy of the same three files (each injection
+applied alone, others reverted to their pre-injection text), `npm ci` + real `npx jest` + `rig/collect.py`
+per isolation:
+
+| cause_site | isolated failures | isolated signature(s) | matches combined run? |
+|---|---|---|---|
+| `applyKeypadInput.ts:28` | 1 | `607220f5cf3e52b9` | yes, byte-identical |
+| `confirmSeed.ts:15` | 1 | `65a9e5f9e5eef040` | yes, byte-identical |
+| `parseTransfers.ts:34` | 2 | `04933d1bde59e977`, `da54112bb72162e0` | yes, byte-identical, both |
+
+None produced zero new failures (R-F1.2 does not fire). Clean baseline re-confirmed zero-failure before
+each isolation (`3 suites, 36 passed, 0 failed`).
+
+`rig/fixtures/failure-flood/v1/answer-key/s1.json` rewritten: `normalizer_version: 2`; `F0`'s 4 failures
+keep their `test_id`s and gain their new signatures; `F0.clusters` now lists 4 clusters (c1–c4) each with
+`distinct_test_files`; `R0` unchanged in shape (`applyKeypadInput.ts:28` -> `["c2"]`, `confirmSeed.ts:15`
+-> `["c3"]`, `parseTransfers.ts:34` -> `["c1", "c4"]` — the over-split mapping, still absorbed, still
+recorded per-cause); `measured_vs_declared` rewritten: `clusters_present_in_F0` 2 -> 4,
+`total_failing_cases_measured` unchanged at 4 (still short of R-F9.1's stated 10 — that gap is
+unchanged and explicitly not this unit's to close, see below), plus a new `superseded_note` explaining
+why this is a replacement, not a revision, of the version-1 measurement. `C` and `S0` are unchanged
+(`identifier_set_digest`, `suite_state`, `totals` do not depend on the signature).
+
+**Stage 1's 4-vs-10 gap, left exactly as it was found.** R-F9.1 states the stage-1 target as 10 failing
+cases / 3 root causes; the measured total is 4, unchanged by this fix (structural — each module's own
+test suite limits observable isolated failures, recorded at PR4-i above). This corrective unit's scope
+was the signature rule, not the injection count; the gap is recorded here again rather than silently
+closed or silently left unremarked.
+
+### `MANIFEST.sha256` recompute
+
+Recomputed over `runtime/`, `src/`, `tests/`, `answer-key/` for v1 (same algorithm as PR3.5/PR4-i:
+sorted `sha256(bytes)  relpath` lines, skipping `__pycache__`/`.pyc`, no directory walk). `git diff --
+rig/fixtures/failure-flood/v1/MANIFEST.sha256` shows exactly **one** line changed —
+`answer-key/s1.json`'s hash — confirming `src/`, `tests/`, `runtime/` are byte-identical to before this
+unit (`git diff --stat` on those three paths: empty).
+
+### Artifacts amended to state the corrected rule, not only the fix
+
+- `sdd/failure-flood-triage/spec.md` — new **R-F1.4**, added after R-F1.3's scenarios: signature MUST
+  fold in the test file; two scenarios (distinct modules must not collapse; one module must still
+  cluster); an explicit scope-limit paragraph.
+- `sdd/failure-flood-triage/design.md` — algorithm item 4b (new, keeps item 4's original text unedited);
+  a full correction paragraph inside section 9c, placed directly after the ORIGINAL over-split reasoning
+  (kept verbatim, not deleted) rather than replacing it — both ends of the finding stay visible, per
+  instruction; the self-test case table gains row `g`; the `cluster/1`/`collection/1` JSON schema
+  examples updated (`distinct_test_files` added, `normalizer_version` example bumped to 2 with a note).
+- `sdd/failure-flood-triage/tasks.md` — an addendum under task 4.2's existing done-note (task stays
+  `[x]`, the addendum itself checked off) rather than a new task number, since this corrective unit was
+  authorized as a fix to already-approved work, not as an eighth work unit.
+
+### Verification, real exit codes
+
+- `python3 -m py_compile rig/collect.py` → exit **0**.
+- `python3 rig/collect.py --self-test` → exit **0**, all 11 cases PASS (listed above).
+- `./hooks/pre-commit --all` → exit **0**, `"redaction check: clean across 157 tracked files"`.
+- `./hooks/pre-commit` (staged only) → exit **0**.
+- `./hooks/pre-commit --self-test` → exit **0**, all 3 cases PASS.
+- `git diff --cached --stat -- rig/fixtures/failure-flood/v2` → empty, exit 0 (nothing staged for v2).
+- `git diff --stat -- rig/fixtures/failure-flood/v2` → empty, exit 0 (nothing unstaged for v2 either).
+
+### Line counts, each with the command that produced it
+
+`git diff --cached --numstat` (all six files staged this unit):
+
+```
+144  19   rig/collect.py
+1    1    rig/fixtures/failure-flood/v1/MANIFEST.sha256
+50   19   rig/fixtures/failure-flood/v1/answer-key/s1.json
+47   4    sdd/failure-flood-triage/design.md
+35   0    sdd/failure-flood-triage/spec.md
+19   0    sdd/failure-flood-triage/tasks.md
+```
+
+Raw total (additions + deletions, every file): 144+19+1+1+50+19+47+4+35+0+19+0 = **339**.
+
+Generated-golden exclusion (`sdd-phase-common.md:104`, quoted: "Generated goldens are excluded from
+authored risk count but remain included in complete snapshot identity and receipt validation"):
+`MANIFEST.sha256`'s 2 lines (1+1) are the same computed-hash-file class already excluded in PR3/PR4-i.
+`answer-key/s1.json` is NOT excluded — same reasoning PR4-i already recorded for it: it is a
+hand-assembled ground-truth artifact built from real measured collector output, not machine-generated
+boilerplate.
+
+Authored total = raw − MANIFEST exclusion = 339 − 2 = **337** (= 144+19 [collect.py] + 50+19 [s1.json] +
+47+4 [design.md] + 35+0 [spec.md] + 19+0 [tasks.md] = 163+69+51+35+19 = 337). Both 339 (raw) and 337
+(authored) are well inside the 700-line ceiling; no split was needed.
+
+### apply-progress-journal's own addendum this batch
+
+This section itself adds further insertions on top of the 339/337 above, per the same convention this
+cycle has applied throughout (the journal is counted, but is not fixture/rule content) — the combined
+number is whatever the orchestrator's own `git diff --cached --numstat` reports at staging time, since
+this section is still being written as that command would run.
+
+**Not committed or pushed** — staged only, per instruction; the commit remains the orchestrator's.
+
+**This corrective work unit is now closed.** Task 4.3 (v2's 6 stage-2 injections, under the now-corrected
+normalizer) and task 4.4 (`answer-key/prereg.json`) remain `[ ]`, unaffected by and not attempted in this
+unit.

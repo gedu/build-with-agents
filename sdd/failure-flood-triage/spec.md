@@ -146,6 +146,41 @@ different pattern, not the one being reused here.
 - THEN the flag MUST fail unless the two inputs normalize to two DIFFERENT signatures — determinism
   alone does not prove the normalizer discriminates anything
 
+**R-F1.4** (added by measurement, PR4-signature-scope-fix) The signature MUST be computed over the
+matcher-shaped head **and** the failing test's file, never the head alone. R-F1.3's own discrimination
+scenario proved the normalizer distinguishes two DIFFERENT heads; it never exercised two DIFFERENT
+causes sharing the SAME head in two different modules, which is exactly what `answer-key/s1.json`'s
+stage-1 measurement (task 4.2) hit: three unrelated causes in `applyKeypadInput.test.ts`,
+`confirmSeed.test.ts` and `parseTransfers.test.ts` all normalized to Jest's generic
+`expect(received).toBe(expected) // Object.is equality` head, with nothing distinguishing before the
+Expected:/Received: cut, and collapsed into one cluster. R-F1.1's own masking scenario ("A masked cause
+is not scored as missed") does not cover this mode either — it describes one cause shadowing another
+inside the SAME test, not three unrelated causes across three different tests. This requirement corrects
+the head-only rule's scope; it does NOT reverse it — see the discrimination note below.
+
+#### Scenario: Distinct causes in distinct modules do not collapse
+
+- GIVEN two failures whose normalized matcher-shaped heads are byte-identical
+- WHEN they come from two different test files
+- THEN their signatures MUST differ, so two unrelated causes across two modules are never reported as
+  one cluster
+
+#### Scenario: One cause within one module still clusters together
+
+- GIVEN two failures whose normalized matcher-shaped heads are byte-identical
+- WHEN they come from the SAME test file
+- THEN their signatures MUST match — this is the property R-F1.3's head-only rule protects (a
+  table-driven cause producing many cases within one module must still report as one cluster,
+  R-F9.1/9.2), and it MUST survive this correction, not merely be assumed to
+
+**Scope limit, stated rather than assumed.** This correction is measured safe against the opposite
+failure (one real cause legitimately producing failures in two different files, over-split by a
+file-scoped signature) only because this fixture's host modules are import-free by construction — no
+injected cause in `failure-flood/v1` or `v2` can span two test files. A fixture whose modules import
+each other could hit that case; `R0`'s many-to-one cluster-to-cause-site mapping (already required,
+see the design's own "the key absorbs it, the algorithm does not change" reasoning) is what would
+absorb it, not a further change to this requirement.
+
 ### R-F2 — Run-axis and suite-axis are independent (hard obligation 1)
 
 **R-F2.1** The system MUST record two independent fields per run: `run_state`

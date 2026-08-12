@@ -38,6 +38,34 @@ into hundreds of clusters. `signature_text` lives once per cluster
 (`cluster/1`), never once per `failure/1` — at scale that is the difference
 between a few KB and megabytes of repeated text.
 
+**Signature scope, corrected by measurement (PR4-signature-scope-fix, this
+revision, `NORMALIZER_VERSION` 1 -> 2).** `answer-key/s1.json`, measured
+under version 1, showed three UNRELATED causes in three different modules
+(`applyKeypadInput.test.ts`, `confirmSeed.test.ts`, `parseTransfers.test.ts`)
+collapsing into one cluster signature `277580d674667852`, because Jest's
+generic `.toBe()` equality head carries nothing before the Expected:/
+Received: cut and the signature was taken over the head text alone. The
+signature is now `hash(normalized_head + test_file)`: distinct causes in
+distinct modules can no longer collapse. A single cause producing many
+failures WITHIN one module still clusters together (`_self_test_
+signature_scoped_by_test_file`, cases g.1/g.2 below) — that is the exact
+property the head-only rule existed to protect (design.md 9c), and it must
+survive this fix, not just be assumed to.
+
+**Scope limit, stated explicitly rather than assumed away.** Folding the
+test file into the key is safe against OVER-SPLIT here only because this
+fixture's host modules are import-free by construction (PR3a-i/ii's own
+independence check: `rg -n "^import"` over every `v1`/`v2` `src/*.ts` and
+`tests/*.test.ts` file found none importing another module or another
+test) — one injected cause cannot legitimately span two test files in this
+fixture. A future fixture whose modules import each other could let one
+real cause produce failures in two different test files, which this rule
+would over-split into two clusters; that is not a defect to chase by
+loosening this function — it is exactly what `R0`'s many-to-one
+cluster -> cause-site mapping exists to absorb (design.md:286, 449-450),
+measured in slice 3b rather than asserted, not a reason to change the
+algorithm.
+
 No schema name carries a tool name (spec R-F10.1) — `collector: "jest-json@1"`
 is a recorded VALUE, so a later `tsc` or lint collector is a new plugin, not
 a schema change.
@@ -64,7 +92,12 @@ from unittest import mock
 
 SCHEMA_COLLECTION = "collection/1"
 COLLECTOR_ID = "jest-json@1"
-NORMALIZER_VERSION = 1
+# Bumped 1 -> 2 for the signature-scope fix (PR4-signature-scope-fix): the
+# signature now folds in the test file, so a `normalizer_version: 1` F0/S0/R0
+# (e.g. answer-key/s1.json before this fix) MUST NOT be silently compared
+# against output produced under version 2 — the cluster keys are not the
+# same function.
+NORMALIZER_VERSION = 2
 
 # Order-of-magnitude stated, not assumed (design.md 9b): ~2,500 failing cases
 # at ~1.5-4 KB each puts a real report at order 5-20 MB. json.load handles
@@ -132,17 +165,45 @@ def normalize_signature_text(raw_message: str, workspace_root: str = None) -> st
     return text.strip()
 
 
-def signature_of(signature_text: str) -> str:
-    return hashlib.sha256(signature_text.encode("utf-8")).hexdigest()[:16]
+# Delimiter between the normalized head and the test file inside the
+# signature's hash input. Not a printable/whitespace byte, so it cannot
+# collide with anything `normalize_signature_text` or a relative path could
+# ever legitimately produce.
+_SIGNATURE_SCOPE_SEP = "␞"
+
+
+def signature_of(signature_text: str, test_file: str) -> str:
+    """The cluster key: `sha256(normalized_head <SEP> test_file)[:16]`.
+
+    `test_file` is REQUIRED, not optional — a signature computed without it
+    is exactly the version-1 defect this fix closes (see the module
+    docstring's "Signature scope, corrected by measurement" note): three
+    unrelated causes in three different modules all producing Jest's
+    generic `.toBe()` equality head normalized to the identical text, with
+    nothing before the Expected:/Received: cut to distinguish them.
+    Folding in the file scopes the collision to within one module, where a
+    single cause producing many heads is still expected to cluster
+    together (design.md 9c) — see `_self_test_signature_scoped_by_test_
+    file` for both directions of that property."""
+    composite = f"{signature_text}{_SIGNATURE_SCOPE_SEP}{test_file}"
+    return hashlib.sha256(composite.encode("utf-8")).hexdigest()[:16]
+
+
+def relative_test_file(file_path: str, workspace_root: str) -> str:
+    """Relative test-file path — kills the random `mktemp` workspace path,
+    same as `build_test_id`'s own relpath (design.md, algorithm item 1).
+    Shared so the signature's file scope and the `test_id`'s file component
+    can never drift apart into two different relative-path conventions."""
+    try:
+        return os.path.relpath(file_path, workspace_root)
+    except ValueError:
+        return file_path
 
 
 def build_test_id(file_path: str, workspace_root: str, ancestor_titles, title: str) -> str:
     """`<relpath>::<ancestor titles joined ' > '>::<title>` — relative kills
     the random `mktemp` workspace path (design.md, algorithm item 1)."""
-    try:
-        rel = os.path.relpath(file_path, workspace_root)
-    except ValueError:
-        rel = file_path
+    rel = relative_test_file(file_path, workspace_root)
     ancestors = " > ".join(ancestor_titles or [])
     return f"{rel}::{ancestors}::{title}"
 
@@ -178,6 +239,7 @@ def collect_failures(report: dict, workspace_root: str, suite_state: str, partia
     failures = []
     for suite in report.get("testResults", []) or []:
         file_path = suite.get("name", "") or suite.get("testFilePath", "")
+        test_file = relative_test_file(file_path, workspace_root)
         for assertion in suite.get("assertionResults", []) or []:
             if assertion.get("status") != "failed":
                 continue
@@ -186,12 +248,16 @@ def collect_failures(report: dict, workspace_root: str, suite_state: str, partia
             )
             messages = assertion.get("failureMessages") or [""]
             sig_text = normalize_signature_text(messages[0], workspace_root)
-            failures.append({"test_id": test_id, "status": "failed", "signature": signature_of(sig_text), "signature_text": sig_text})
+            failures.append({"test_id": test_id, "status": "failed", "signature": signature_of(sig_text, test_file), "signature_text": sig_text})
 
     if suite_state != "ran":
+        # No real test file for the synthetic suite-level failure — the
+        # pseudo-id IS the scope, so it is its own key component (there is
+        # exactly one of these per collection, never a cross-module
+        # collision to guard against).
         head = report.get("diagnostics_head") or partial_reason or suite_state
         sig_text = normalize_signature_text(head, workspace_root)
-        failures.append({"test_id": "__suite__", "status": "failed", "signature": signature_of(sig_text), "signature_text": sig_text})
+        failures.append({"test_id": "__suite__", "status": "failed", "signature": signature_of(sig_text, "__suite__"), "signature_text": sig_text})
 
     failures.sort(key=lambda f: f["test_id"])
     return failures
@@ -200,7 +266,15 @@ def collect_failures(report: dict, workspace_root: str, suite_state: str, partia
 def build_clusters(failures):
     """Exact-signature grouping, one pass, O(n) (design.md 9c). Total order:
     `(count desc, signature asc)` (design.md, algorithm item 5) — `cluster_id`
-    is assigned from that rank, so it is deterministic and stable."""
+    is assigned from that rank, so it is deterministic and stable.
+
+    `distinct_test_files` is measured here, per member `test_id`'s own file
+    component (`test_id.split("::", 1)[0]`) — not carried on `failure/1`,
+    just derived from data already present. It is what lets the bounded
+    `clusters_view` reveal that a cluster spans multiple modules WITHOUT
+    reintroducing `member_test_ids`: it stays bounded by the number of
+    distinct files in that one cluster, which in this fixture is at most
+    the fixture's own module count."""
     by_signature = {}
     for f in failures:
         g = by_signature.setdefault(f["signature"], {"signature_text": f["signature_text"], "member_test_ids": []})
@@ -209,12 +283,14 @@ def build_clusters(failures):
     clusters = []
     for signature, g in by_signature.items():
         members = sorted(g["member_test_ids"])
+        distinct_test_files = sorted({m.split("::", 1)[0] for m in members})
         clusters.append({
             "signature": signature,
             "signature_text": g["signature_text"],
             "count": len(members),
             "representative_test_id": members[0],
             "member_test_ids": members,
+            "distinct_test_files": distinct_test_files,
         })
     clusters.sort(key=lambda c: (-c["count"], c["signature"]))
     for i, c in enumerate(clusters, start=1):
@@ -235,7 +311,7 @@ def build_collection(report: dict, workspace_root: str, suite_state: str, partia
     clusters = build_clusters(failures)
     public_failures = [{"test_id": f["test_id"], "status": f["status"], "signature": f["signature"]} for f in failures]
     public_clusters = [
-        {k: c[k] for k in ("cluster_id", "signature", "signature_text", "count", "representative_test_id", "member_test_ids")}
+        {k: c[k] for k in ("cluster_id", "signature", "signature_text", "count", "representative_test_id", "member_test_ids", "distinct_test_files")}
         for c in clusters
     ]
     collection = {
@@ -261,12 +337,19 @@ def clusters_view(collection: dict):
     counts, one representative each. Deliberately drops `member_test_ids` —
     that list is what makes the full `collection/1` large at scale, and this
     view's whole reason to exist is to stay small regardless of failure
-    count, bounded only by cluster count."""
+    count, bounded only by cluster count.
+
+    `distinct_test_files` IS carried (PR4-signature-scope-fix): it is the
+    minimum information that lets a diagnostician see a cluster spans more
+    than one module, without reintroducing `member_test_ids`. It stays
+    bounded by cluster count, not failure count — a cluster's distinct-file
+    set is at most the fixture's own module count, however many failing
+    cases that cluster holds."""
     return {
         "schema": "clusters/1",
         "suite_state": collection["suite_state"],
         "clusters": [
-            {k: c[k] for k in ("cluster_id", "signature", "signature_text", "count", "representative_test_id")}
+            {k: c[k] for k in ("cluster_id", "signature", "signature_text", "count", "representative_test_id", "distinct_test_files")}
             for c in collection["clusters"]
         ],
     }
@@ -401,9 +484,15 @@ def _self_test_normalizer_determinism_and_discrimination():
     div2 = suite["assertionResults"][2]["failureMessages"][0]
     parse_fail = suite["assertionResults"][3]["failureMessages"][0]
 
-    sig_div1 = signature_of(normalize_signature_text(div1, root))
-    sig_div2 = signature_of(normalize_signature_text(div2, root))
-    sig_parse = signature_of(normalize_signature_text(parse_fail, root))
+    # All three messages come from the one suite file in this fragment
+    # (`tests/math.test.js`), so the same test_file scope is passed to all
+    # three calls — this case is about the HEAD text normalization, not the
+    # file-scoping fix (that is `_self_test_signature_scoped_by_test_file`
+    # below).
+    test_file = relative_test_file(suite["name"], root)
+    sig_div1 = signature_of(normalize_signature_text(div1, root), test_file)
+    sig_div2 = signature_of(normalize_signature_text(div2, root), test_file)
+    sig_parse = signature_of(normalize_signature_text(parse_fail, root), test_file)
 
     case_a = sig_div1 == sig_div2
     ok = ok and case_a
@@ -471,14 +560,49 @@ def _self_test_absent_toolchain():
 
 def _self_test_clusters_view_bounded():
     """clusters_view drops member_test_ids — the field that makes the full
-    collection large at scale (design.md 9b)."""
+    collection large at scale (design.md 9b) — but DOES carry
+    `distinct_test_files` (PR4-signature-scope-fix): bounded by cluster
+    count, never by failure count, and it is what lets a diagnostician see
+    that a cluster spans more than one module without ever seeing the full
+    member list."""
     root = "/tmp/rig-workspace.abc123"
     totals = {"tests": 4, "passed": 2, "failed": 2, "suites_expected": 1, "suites_reported": 1}
     collection = build_collection(_SELF_TEST_REPORT_RAN, root, "ran", None, 512, totals)
     view = clusters_view(collection)
-    ok = all("member_test_ids" not in c for c in view["clusters"]) and len(view["clusters"]) == len(collection["clusters"])
-    print(f"  [{'PASS' if ok else 'FAIL'}] (f) clusters view carries no member_test_ids, one row per cluster")
+    no_member_ids = all("member_test_ids" not in c for c in view["clusters"])
+    has_distinct_files = all("distinct_test_files" in c for c in view["clusters"])
+    same_cluster_count = len(view["clusters"]) == len(collection["clusters"])
+    ok = no_member_ids and has_distinct_files and same_cluster_count
+    print(f"  [{'PASS' if ok else 'FAIL'}] (f) clusters view carries distinct_test_files but no member_test_ids, one row per cluster")
     return ok
+
+
+def _self_test_signature_scoped_by_test_file():
+    """Case (g), added by PR4-signature-scope-fix — the same discipline that
+    caught the generator's order-dependence at task 3.3 (`tasks.md`'s own
+    PR3a-iii done-note): a module-granularity discrimination test, in BOTH
+    directions, since either alone leaves a hole.
+
+    This is the direct regression test for `answer-key/s1.json`'s measured
+    finding: under normalizer_version 1, `applyKeypadInput.test.ts`,
+    `confirmSeed.test.ts` and `parseTransfers.test.ts` all produced the
+    identical Jest `.toBe()` equality head and collapsed into one cluster
+    signature (`277580d674667852`), even though they are three unrelated
+    causes in three different modules."""
+    head = "Error: expect(received).toBe(expected) // Object.is equality"
+
+    sig_same_file_a = signature_of(head, "tests/applyKeypadInput.test.ts")
+    sig_same_file_b = signature_of(head, "tests/applyKeypadInput.test.ts")
+    case_g1 = sig_same_file_a == sig_same_file_b
+    print(f"  [{'PASS' if case_g1 else 'FAIL'}] (g.1) identical head, SAME test file -> SAME signature"
+          " (within-module clustering, the property the head-only rule protected, must survive)")
+
+    sig_other_file = signature_of(head, "tests/confirmSeed.test.ts")
+    case_g2 = sig_same_file_a != sig_other_file
+    print(f"  [{'PASS' if case_g2 else 'FAIL'}] (g.2) identical head, DIFFERENT test files -> DIFFERENT signatures"
+          " (the over-collapse fix — s1.json's measured masking, closed)")
+
+    return case_g1 and case_g2
 
 
 def run_self_test() -> bool:
@@ -489,6 +613,7 @@ def run_self_test() -> bool:
         _self_test_idempotence(),
         _self_test_absent_toolchain(),
         _self_test_clusters_view_bounded(),
+        _self_test_signature_scoped_by_test_file(),
     ]
     ok = all(results)
     print("\nself-test: all cases passed" if ok else "\nSELF-TEST FAILED", file=sys.stderr if not ok else sys.stdout)

@@ -212,7 +212,8 @@ Algorithm, total and ordered:
 1. `test_id = <test file path relative to workspace root> :: <ancestor titles joined " > "> :: <title>`. Relative kills the random path.
 2. Signature input = the first failure message, **truncated at the first stack line** (`^\s+at `). Stack frames carry paths and line numbers and nothing else of value.
 3. Normalise in fixed order: strip ANSI, normalise CRLF, collapse whitespace runs, rewrite any surviving workspace-absolute path to its relative form, rewrite `:<digits>:<digits>` to `:L:C`.
-4. `signature_text` = the **matcher-shaped head** only (error class plus matcher), never the expected/received body — those vary per case *within* one cause, and a signature that varies per case is not a cluster key. `signature = sha256(signature_text)[:16]`, with `signature_text` kept in plain text on the record so the clustering is auditable.
+4. `signature_text` = the **matcher-shaped head** only (error class plus matcher), never the expected/received body — those vary per case *within* one cause, and a signature that varies per case is not a cluster key. `signature_text` is kept in plain text on the record so the clustering is auditable.
+4b. **Corrected by measurement, not by design review (PR4-signature-scope-fix, `NORMALIZER_VERSION` 1 -> 2; spec R-F1.4).** `signature = sha256(signature_text + test_file)[:16]` — the test file is now part of the key, not `sha256(signature_text)[:16]` alone as originally specified above. Slice 3b's own measurement (`answer-key/s1.json`, task 4.2) found three unrelated causes in three different modules (`applyKeypadInput.test.ts`, `confirmSeed.test.ts`, `parseTransfers.test.ts`) all normalizing to Jest's generic `.toBe()` equality head with nothing distinguishing before the Expected:/Received: cut, so head-only collapsed all three into one cluster — a real measured defect item 4 as originally written did not anticipate. Folding in the test file closes it: a cause's cluster count still does not grow with `case_count` *within* one module (the property item 4 was protecting — see 9c below), but two different modules can no longer share a cluster merely by sharing a generic head.
 5. Total order: records by `test_id`; clusters by `(count desc, signature asc)`. `cluster_id` is assigned from that rank, so it is deterministic and stable.
 
 `rig/collect.py --self-test` is flag-gated (ADR 0013's ratified shape — the flag lives on
@@ -227,6 +228,7 @@ and **case (b) is the one that gets skipped**:
 | c | Each of the three suite states fires from a synthetic report | R-A1.4 |
 | d | Same input twice → byte-identical output | Idempotence, the property `derive.py` already holds |
 | e | Absent toolchain → `collector-error`, not a suite state | The axis separation above |
+| g | (Added by PR4-signature-scope-fix, spec R-F1.4.) Two failures with an IDENTICAL head, same test file → **same** signature; two failures with an IDENTICAL head, DIFFERENT test files → **different** signatures | Neither (a) nor (b) exercises this axis — both fix the file. This is the direct regression test for the measured over-collapse (`answer-key/s1.json`, task 4.2) and, in the other direction, the proof that within-module clustering (9c) survived the fix |
 
 Synthetic Jest-JSON fragments are inlined in the file, per ADR 0013's no-fixtures-directory rule.
 
@@ -241,17 +243,24 @@ No schema *name* contains a tool name; the tool appears only as a recorded **val
 {"test_id": "<relpath>::<suite path>::<title>", "status": "failed", "signature": "<16-hex>"}
 
 // cluster/1   (signature/1 is the {signature, signature_text, count} projection)
+// distinct_test_files added by PR4-signature-scope-fix — the bounded (by
+// cluster count, never by failure count) signal that lets the diagnostician
+// see a cluster spans more than one module WITHOUT member_test_ids.
 {"cluster_id": "c1", "signature": "<16-hex>", "signature_text": "<normalized head>",
- "count": 12, "representative_test_id": "<test_id>", "member_test_ids": ["<test_id>", "..."]}
+ "count": 12, "representative_test_id": "<test_id>", "member_test_ids": ["<test_id>", "..."],
+ "distinct_test_files": ["<relpath>", "..."]}
 
 // collection/1  — the envelope, and the integrity guard's cheap half
 {"schema": "collection/1", "suite_state": "ran|did-not-start|partial",
- "collector": "jest-json@1", "normalizer_version": 1,
+ "collector": "jest-json@1", "normalizer_version": 2,
  "totals": {"tests": 138, "passed": 88, "failed": 50,
             "suites_expected": 18, "suites_reported": 18},
  "identifier_set_digest": "<sha256 over sorted test_ids>",
  "failures": ["<failure/1>"], "clusters": ["<cluster/1>"],
  "diagnostics_head": "<normalized startup error, only when did-not-start>"}
+// normalizer_version bumped 1 -> 2 with the signature-scope fix below — a
+// collection/1 stamped 1 MUST NOT be compared against one stamped 2; the
+// cluster key changed, not only its output.
 
 // fix-plan/1
 {"schema": "fix-plan/1",
@@ -426,7 +435,7 @@ roughly 10× peak RSS, so **streaming is not needed**, and building a chunked pa
 infrastructure ahead of content. What is needed instead:
 
 - `report_bytes` on the row, plus a **declared ceiling** above which the collector exits 2 `collector-error: report-too-large` rather than thrashing silently. A guessed streaming parser is replaced by a stated bound and an honest refusal.
-- **Two artifacts, not one.** The full `collection/1` is written to the run directory for scoring; a **bounded clusters view** — clusters, counts, one representative each — is what the diagnostician receives. It is bounded by cluster count, not failure count, and that bound *is* the pipeline's mechanism, so it must be its own artifact rather than a slice of a large one.
+- **Two artifacts, not one.** The full `collection/1` is written to the run directory for scoring; a **bounded clusters view** — clusters, counts, one representative each, plus (PR4-signature-scope-fix) each cluster's `distinct_test_files` — is what the diagnostician receives. It is bounded by cluster count, not failure count, and that bound *is* the pipeline's mechanism, so it must be its own artifact rather than a slice of a large one. `distinct_test_files` does not weaken that bound: it is at most the fixture's own module count per cluster, never `member_test_ids`' full list, and it is what makes a cluster spanning several modules visible in this bounded view at all — measurement showed the un-amended view had no such signal (see 9c below).
 - The three suite states survive unchanged and gain one at-scale sub-case: `partial` with `partial_reason: suite-timeout`. That needs its own bound — **the suite's timeout is separate from, and smaller than, the arm's** — derived from a measured clean-fixture wall (×3, floor stated, the rig's existing derivation rule) and recorded as `suite_timeout_s`. Without the separation, a slow flood and a hung agent are indistinguishable. A suite timeout on the **clean** baseline voids the fixture at the 3a gate; during an arm it is `partial`, a measurement.
 - `--runInBand` holds. A few thousand pure-function cases run in seconds single-threaded, and single-worker is what removes scheduling nondeterminism at the source rather than normalising it away.
 
@@ -449,6 +458,40 @@ diagnostician is shown. Taking only the matcher-shaped head is what keeps a caus
 small — and where a cause genuinely produces several heads (a throw carrying a parameter value), slice
 3b **measures** that count and `R0` records the many-to-one mapping. The key absorbs it; the algorithm
 does not change.
+
+**This reasoning is correct about OVER-split and was never the problem — measurement found the
+symmetric failure, OVER-collapse, which head-only left completely undefended.** Slice 3b-i's own stage-1
+measurement (task 4.2, `answer-key/s1.json`) put 3 unrelated causes into 3 different modules
+(`applyKeypadInput.ts`, `confirmSeed.ts`, `parseTransfers.ts`) and measured them collapsing into **one**
+cluster signature, not three: all three causes' first-reported failures normalize to the identical, fully
+generic Jest head `expect(received).toBe(expected) // Object.is equality`, with nothing before the
+Expected:/Received: cut to distinguish a boundary bug in one module from an index bug in another. The
+bounded clusters view (this section, above) made it worse, not merely blind to it: dropping
+`member_test_ids` meant the diagnostician saw one representative test with `count=3` and no signal that
+two *other*, unrelated causes had also landed in that cluster. `R-F1.1`'s own worked masking scenario
+("A masked cause is not scored as missed") does not cover this mode either — it describes one cause
+shadowing another *inside the same test*; this is three unrelated causes across three different tests
+sharing one cluster.
+
+**The fix, scoped narrowly to the actual defect (spec R-F1.4; `NORMALIZER_VERSION` 1 -> 2):**
+`signature = sha256(signature_text + test_file)[:16]` — the failing test's file joins the key. Two
+failures with an identical head in the SAME file still cluster together (the property this section's
+own reasoning above protects: a table-driven cause producing many cases within one module must still
+report as one cluster, not shatter into hundreds — re-verified by `collect.py --self-test` cases g.1/g.2,
+added for exactly this regression, and by re-measuring `s1.json` under the corrected normalizer). Two
+failures with an identical head in DIFFERENT files no longer collapse. The bounded clusters view also now
+carries each cluster's `distinct_test_files` (still no `member_test_ids`, still bounded by cluster count)
+so a cluster spanning more than one module is visible without un-bounding the view.
+
+**Scope limit, stated rather than assumed away.** Folding the file into the key is measured-safe against
+introducing a NEW over-split failure only because this fixture's six host modules are import-free by
+construction (PR3a-i/ii's own independence check: no `v1`/`v2` `src/*.ts` or `tests/*.test.ts` file
+imports another module or another test) — one injected cause cannot legitimately span two test files
+here. A future fixture whose modules import each other could let one real cause produce failures in two
+different files, which a file-scoped signature would then over-split into two clusters. That is not a
+reason to loosen this fix: it is exactly the case `R0`'s many-to-one cluster -> cause-site mapping already
+exists to absorb (this section, above — "the key absorbs it, the algorithm does not change"), unmodified
+by this correction.
 
 ### 9d. What MONOLITHIC receives, and the pre-digestion that would destroy the comparison
 
