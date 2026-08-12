@@ -449,8 +449,24 @@ def run_self_test():
     counts = {name: len(rows) for name, rows in build_all_cases(axis_table.AXIS_TABLE).items()}
     total = sum(counts.values())
     n_causes = len(counts)
-    print(f"  measured (not assumed, R-F9.2): {counts}, total={total}, "
-          f"ratio={total}:{n_causes} (~{total / n_causes:.0f}:1 against {n_causes} causes)")
+    # This prints GENERATED case counts only, never a case:cause ratio.
+    #
+    # An earlier version printed `ratio={total}:{n_causes}`, which was wrong in a
+    # way worth recording: R-F9.2 requires the achieved ratio to be MEASURED, and
+    # this program cannot measure it. The ratio the experiment cares about is
+    # FAILING cases per cause, and a generated case only fails if it exercises an
+    # injected path. Two independent measurements put that yield near 12%: v1's
+    # stage-1 answer key records 4 failures out of 36 tests, and task 3.3's own
+    # R-F9.1 check recorded 49 failures out of 392 generated cases. So a ratio
+    # derived from `total` would overstate the real one by roughly eight times.
+    #
+    # The failing count is only knowable after injections are applied and the
+    # suite is run — that is `rig/collect.py`'s job, and the number lands in
+    # `answer-key/s2.json`. Printing a ratio here would be exactly the
+    # assumed-instead-of-measured figure R-F9.2 forbids.
+    print(f"  generated cases (R-F9.2: generated, NOT failing): {counts}, total={total}")
+    print(f"  case:cause ratio is deliberately NOT reported here — it depends on the "
+          f"measured failing count, which only rig/collect.py can produce after injection")
 
     return determinism_ok and reordering_ok and discrimination_ok
 

@@ -363,8 +363,16 @@ Depends on: PR1 (ADR must exist — R-F11 scenario), PR2 (collector validates th
       **Per-module achieved multiplier is uniformly ~48× (confirmSeed ~47.2×)**, all inside the
       operator-confirmed ~44–51× band: `applyKeypadInput` 15→720, `confirmSeed` 12→567, `parseTransfers`
       9→432, `formatTokenAmount` 8→384, `isValidEthereumAddress` 8→384, `balanceOfCall` 7→336. **Measured
-      aggregate: 2,823 generated cases across 6 causes = ~470:1** — inside the target ~433–500:1 band,
-      measured by actually running the generator, not computed by hand and assumed (R-F9.2).
+      aggregate: 2,823 GENERATED cases across 6 causes.**
+      **CORRECTION 2026-08-12 — the "~470:1, inside the target band" this note originally claimed is
+      NOT MEASURED and is very likely wrong by roughly eight times.** 2,823 is the count of generated
+      cases; the ratio the experiment cares about is *failing* cases per cause, and a generated case only
+      fails if it exercises an injected path. Two independent measurements put that yield near 12%:
+      `v1/answer-key/s1.json` records 4 failures out of 36 tests, and this task's own R-F9.1 check
+      recorded 49 failures out of 392 generated cases. At 12% the real figure is ~340 failures, i.e.
+      ~57:1, not ~470:1. R-F9.2 requires the achieved ratio to be measured, so the generator's
+      `--self-test` no longer prints a ratio at all — only generated counts. **Task 4.3 measures the real
+      stage-2 failing count; the decision on how to close any gap waits for that number.**
       **Design question resolved, not assumed**: design.md 9a says amplification is consumed by "one
       `it.each` per module," but the v2 test files are the donor's own tests, not table-driven. Resolved
       by adding one `it.each` block per module (two for `balanceOfCall`, one per exported function) to the

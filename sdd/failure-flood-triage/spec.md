@@ -72,6 +72,18 @@ masking pair. Its best available replacements sum to 23, not 13, so the real six
 15+12+9+8+8+7 = **59**. That figure is not an estimate: the v2 fixture's own Jest baseline reports exactly
 59 tests passing, so the base is measured before the multiplier is chosen.
 
+**The aggregate and ratio columns above are TARGETS, not measurements, and one of them is very likely
+wrong by roughly eight times — recorded 2026-08-12.** The multiplier and the generated-case count are
+now measured facts (2,823 generated). The *ratio* is not, because the ratio the experiment cares about
+is **failing** cases per cause, and a generated case only fails if it exercises an injected path. Two
+independent measurements put that yield near 12%: `v1/answer-key/s1.json` records 4 failures out of 36
+tests, and task 3.3's own R-F9.1 check recorded 49 failures out of 392 generated cases. At that yield
+2,823 generated cases give roughly 340 failures, i.e. ~57:1 rather than ~433–500:1. Per R-F9.2 the
+achieved ratio must be measured and never assumed, so the generator's `--self-test` was changed to stop
+printing a ratio it cannot know, and task 4.3's measurement of v2's `F0` is what settles this. If the
+gap is real, closing it means either concentrating the axis tables on the injected paths — still real
+failures of real logic, so R-F9.1 holds — or generating more rows. That decision waits for the number.
+
 The correction costs one number in the generator's axis table and nothing else. Generated rows are never
 committed (design Decision 9a), and the collector's report ceiling is 64 MB against a 5–20 MB expected
 report, so the larger corpus needs no change there either. R-F9.2 still binds regardless: the achieved
