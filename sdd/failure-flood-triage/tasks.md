@@ -580,6 +580,23 @@ all). This is the PR that makes a countable run possible — see the Hard Orderi
       invocation.
       Verify: this is the structural-impossibility proof named in the design's own verification
       strategy table — re-run once more after 6.1–6.2 land, confirming the same invocation now proceeds.
+- [ ] 6.8 Register the **claim discipline** in `BACKLOG.md` as a candidate practice, blocked on
+      recurrence rather than on evidence. Two rules, both applied from task 3.4 onward and both already
+      shown to work on first use: (a) any appeal to a rule, convention, precedent or prior decision must
+      carry `path:line` plus the verbatim quote, and what cannot be quoted is reframed as "I am choosing
+      X because Y" rather than dressed as authority; (b) any number a command can produce must come with
+      that command, and a stated total must equal the sum of its own stated parts.
+      **Why it is blocked, and on what:** the trigger for extracting a checker is a second and third
+      occurrence, not this first one. Building a claim-verifier after one instance is infrastructure
+      ahead of content — the failure mode `decisions/0013-*` names and the reason `blocks/` and
+      `templates/` are still empty. When it recurs there will be real inputs, and this repo already has
+      the right shape: a committed executable carrying its own flag-gated `--self-test`.
+      **What made the original catchable, recorded because it inverts the intuition:** the axis is not
+      vague-versus-precise but verifiable-versus-not. A precise invented claim is *safer* than a vague
+      correct one, because the precise one is checkable in one grep. And the artifact failure was
+      arithmetic, not fabrication — a declared total of 636 against a `numstat` of 810, with the parts
+      listed right beside it. That needs addition, not a fabrication detector.
+      Verify: `./hooks/pre-commit --all`.
 - [ ] 6.7 Register the **portable procedure** as a named downstream deliverable in `BACKLOG.md`: the
       collector → diagnostician → applier flow applied to a real failing suite outside this repo, which
       is the form the originating incident actually needs and which no artifact in this cycle names.
