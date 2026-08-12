@@ -269,18 +269,91 @@ Depends on: PR1 (ADR must exist — R-F11 scenario), PR2 (collector validates th
       requires (a manifest that is not what 3.5 specifies) or force a second incompatible freeze once
       3.2–3.4 land. No `MANIFEST.sha256` is committed in this PR; task 3.5 remains the single point where
       it is computed, once, over the complete set it was designed to cover.
-- [ ] 3.2 Create `rig/fixtures/failure-flood/v2/{src,tests,runtime}/**` — stage-2 clean substrate, same
+- [x] 3.2 Create `rig/fixtures/failure-flood/v2/{src,tests,runtime}/**` — stage-2 clean substrate, same
       six root-cause-hosting modules, same clean behavior as v1 where modules overlap.
       Verify: same Jest run, zero failures, on v2.
+      **Done (PR3a-ii)** — v2 hosts all six root-cause-hosting modules. The three v1 modules
+      (`applyKeypadInput` 15, `confirmSeed` 12, `parseTransfers` 9 — 36 base cases) are present as
+      **byte-identical copies** (both `src/*.ts` and `tests/*.test.ts`; sha256 matched per file, not
+      merely asserted) rather than re-derived from the donor a second time — this is the checkable
+      reading of "same clean behavior as v1 where modules overlap": identical bytes cannot drift from
+      v1's behavior, whereas a second hand-copy could silently diverge on a redaction edit or an
+      import-path rewrite. v1 itself was not touched (`git diff` on `v1/` is empty before and after this
+      task, confirming Design Decision 4 — a fixture change is a new version directory, never an edit to
+      an existing one).
+
+      **Correction to this task's own launch brief, verified rather than trusted**: `parseTokenAmount`
+      (13 cases), named in the launch brief's case-count table as one of the "six highest-case
+      import-free candidates," is disqualified per R-F1.1 — flagged already at PR3a-i, re-verified here
+      by direct `import` grep on `parseTokenAmount.test.ts` as it exists in the donor project:
+      `import { formatTokenAmount } from './formatTokenAmount'` at line 1, for one round-trip assertion.
+      Taking both into the corpus would let an injection into `formatTokenAmount` also fail a
+      `parseTokenAmount` test — the masking pair R-F1.1 exists to prevent. `parseTokenAmount` is excluded
+      from the six; **the three added modules are `formatTokenAmount` (8 cases), `isValidEthereumAddress`
+      (8), `balanceOfCall` (7)** — the three highest-case import-free candidates remaining after
+      `parseTokenAmount`'s removal (the fourth candidate, `formatRelativeTime`, also 7 cases, was not
+      needed once three were chosen; `balanceOfCall` was preferred over it for defect-class diversity —
+      an encoding/hex-decoding defect surface distinct from `applyKeypadInput`'s boundary/off-by-one
+      defect, whereas `formatRelativeTime`'s threshold logic would have been a second instance of the
+      same defect class).
+
+      **Base-case total is 59, not ~65 — reported, not silently absorbed.** The ~65 figure in this
+      task's own launch brief and in PR3a-i's forward-looking arithmetic assumed `parseTokenAmount`'s 13
+      cases were part of the eventual six; disqualifying it removes 13 cases, and the best available
+      3-of-4 replacement from the remaining import-free candidates (`formatTokenAmount` 8,
+      `isValidEthereumAddress` 8, `balanceOfCall` 7, `formatRelativeTime` 7 — max 3-of-4 sum is 23) adds
+      back only 23, not 13. Six-module total: 36 (v1's three) + 23 (v2's three new) = **59 base cases**,
+      a 6-case (9%) shortfall against the ~65 target. Consequence for task 3.3's per-module amplification
+      target, flagged here for that task rather than fixed now (3.3 is out of scope for this batch): at
+      the operator-confirmed ~40–46× multiplier, 59 base cases yields ~2,360–2,714 generated cases
+      (~393–452:1 against 6 causes), versus the ~2,600–3,000 (~430–500:1) the corrected
+      multiplier was set to reach assuming 65 base cases. Closing the gap without changing the module set
+      again would need a multiplier of roughly **44–51×** at 59 base cases to land back in the
+      ~2,600–3,000 range — task 3.3's own arithmetic, not decided here.
+
+      Independence check, run on the copied set as actually copied (not assumed from the donor audit),
+      **both directions**: (1) `rg -n "^import"` over all six `v2/src/*.ts` files — zero import lines;
+      no source module depends on another, and none imports a test file. (2) `rg -n "^import"` over all
+      six `v2/tests/*.test.ts` files — each imports exactly one thing, its own namesake module via
+      `../src/<name>` (`applyKeypadInput`, `confirmSeed`, `parseTransfers`, `formatTokenAmount`,
+      `isValidEthereumAddress`, `balanceOfCall`) — no test imports a sibling module. No masking pair
+      exists among the six as committed.
+
+      Redaction: all three new files (`formatTokenAmount.ts`, `isValidEthereumAddress.ts`,
+      `balanceOfCall.ts`) and their three test files read by hand before staging. No donor project name,
+      absolute path, employer, person name, API key, token, hostname, or real-deployment address found.
+      `balanceOfCall.ts`'s `BALANCE_OF_SELECTOR` constant is the public ERC-20 `balanceOf(address)`
+      selector (a standard, not a private value); `balanceOfCall.test.ts`'s `ADDRESS` constant is a
+      synthetic hex string used only to exercise the encode/decode round-trip, not a real deployed
+      contract or wallet address. Confirmed (grep, not assumed): zero `react`/`react-native`/`expo-*`/MMKV
+      imports and zero donor-project-name/home-directory-path matches across the entire new `v2/` tree.
+
+      Runtime: `v2/runtime/package.json` pins the identical versions as v1 (no `^`/`~`): `jest` 29.7.0,
+      `ts-jest` 29.4.12, `typescript` 5.9.2, `@types/jest` 29.5.14, `@types/node` 20.19.9.
+      `v2/runtime/package-lock.json` (`lockfileVersion: 3`) generated once via `npm install` in a
+      `mktemp` directory outside `<repo>`. `v2/runtime/jest.config.js`/`tsconfig.json` are the same
+      `__dirname`/`require.resolve`-based pattern as v1's, unchanged in shape.
+
+      Verified twice, per ADR 0014 Clause A (never inside `<repo>`): (1) scratch build directory,
+      `npm install` + `npm test` → 6 suites, 59 tests, 0 failures, exit 0. (2) the actual staged bytes
+      copied to a second, fresh `mktemp -d` directory, `npm ci` (fresh install strictly from the
+      committed lockfile) → 281 packages, `npx jest --config jest.config.js --runInBand` → 6 suites, 59
+      tests, 0 failures, exit 0; re-ran via the committed `npm test` script → same. Both temp dirs removed
+      after; no `node_modules/` anywhere under `<repo>`, `.gitignore` unchanged. Clean baseline — the
+      fixture is not voided.
+
+      Not built in this task (explicitly deferred to 3.3/3.4/3.5, not started): `tools/generate-cases.py`,
+      the axis table, `answer-key/case-table.sha256`, `MANIFEST.sha256`.
 - [ ] 3.3 Create `tools/generate-cases.py` + its axis table (Decision 9a — commit the generator, not the
       expanded tables). **Per-module sizing (R-F9.2's design/tasks deliverable) — operator-confirmed
       2026-08-11; R-F9.2 still binds, so the achieved ratio MUST be measured, never assumed:**
-      target amplification **~40–46×** each module's existing real case count — corrected upward from
-      ~30–35× on 2026-08-12, because the six host modules total exactly 65 base cases and ~30–35× yields
-      only ~1,950–2,275 (~325–379:1), below the ratified target. Mirrors spec Decision B's worked
-      examples (15 → ~600–690 rows, 12 → ~480–550), for an aggregate stage-2 corpus on the order of
-      ~2,600–3,000 generated failing cases across the 6 modules (≈430–500 : 1 against 6 causes — a
-      stated comparison to the real incident's ~500:1, per R-F9.2, measured never assumed).
+      target amplification **~44–51×** each module's existing real case count, against a **measured base
+      of 59** — not the 65 an earlier draft assumed, which still counted the disqualified
+      `parseTokenAmount`. The v2 fixture's own Jest baseline reports exactly 59 tests, so the base is
+      measured before the multiplier is chosen. Mirrors spec Decision B's worked examples
+      (15 → ~660–765 rows, 12 → ~528–612), for an aggregate stage-2 corpus on the order of ~2,600–3,000
+      generated failing cases across the 6 modules (≈433–500 : 1 against 6 causes — a stated comparison
+      to the real incident's ~500:1, per R-F9.2, measured never assumed).
       No collector change is needed: its report ceiling is 64 MB against a 5–20 MB expected report.
       Verify: `python3 -m py_compile tools/generate-cases.py`;
       `tools/generate-cases.py --self-test` — byte-identical output across two runs **and** across two

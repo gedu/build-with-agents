@@ -53,18 +53,29 @@ detector that never fired.
 
 **Resolution: table-driven parameterization, not more donor modules or more root causes.** The same 6
 root causes get parameterized case tables on their host modules — e.g. `applyKeypadInput`'s 15 cases
-become on the order of 600–690 rows, `confirmSeed`'s 12 become on the order of 480–550 — so the achieved
-case:cause ratio reaches the incident's order of magnitude (~430–500:1), not the donor ceiling's
+become on the order of 660–765 rows, `confirmSeed`'s 12 become on the order of 528–612 — so the achieved
+case:cause ratio reaches the incident's order of magnitude (~433–500:1), not the donor ceiling's
 ~20:1–23:1.
 
-**The multiplier is ~40–46×, corrected 2026-08-12 because the ratified figures did not compute.** An
-earlier draft of this decision said ~30–35× while also claiming an aggregate of ~2,500–3,000 cases. Those
-two are inconsistent once the host set is actually selected: the six highest-case import-free donor
-modules total exactly 65 base cases, so ~30–35× yields ~1,950–2,275, i.e. ~325–379:1 — the right order of
-magnitude but below the ratified target. ~40–46× yields ~2,600–3,000, i.e. ~430–500:1. The correction
-costs one number in the generator's axis table and nothing else, because generated rows are never
+**The multiplier is ~44–51×, and the base is 59, both corrected 2026-08-12.** This figure was wrong twice
+before, the same way each time: it was derived from a host set that had not been selected yet.
+
+| Draft | Base assumed | Multiplier | Aggregate | Ratio |
+|---|---|---|---|---|
+| first | unstated | ~30–35× | ~2,500–3,000 claimed | ≈415–500:1 claimed |
+| second | 65 | ~40–46× | ~2,600–3,000 | ~430–500:1 |
+| **current** | **59, measured** | **~44–51×** | **~2,600–3,000** | **~433–500:1** |
+
+The first draft's multiplier and aggregate were mutually inconsistent. The second fixed that but assumed
+65 base cases, a total that still counted `parseTokenAmount`'s 13 — the module disqualified below as a
+masking pair. Its best available replacements sum to 23, not 13, so the real six-module total is
+15+12+9+8+8+7 = **59**. That figure is not an estimate: the v2 fixture's own Jest baseline reports exactly
+59 tests passing, so the base is measured before the multiplier is chosen.
+
+The correction costs one number in the generator's axis table and nothing else. Generated rows are never
 committed (design Decision 9a), and the collector's report ceiling is 64 MB against a 5–20 MB expected
-report, so the larger corpus needs no change there either.
+report, so the larger corpus needs no change there either. R-F9.2 still binds regardless: the achieved
+ratio is measured per run, never assumed from this table.
 
 **One host module named in the earlier draft is disqualified.** `parseTokenAmount` ranked second by case
 count but its test file imports `formatTokenAmount` for a round-trip assertion, which makes the pair a
