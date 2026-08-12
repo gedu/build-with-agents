@@ -65,6 +65,48 @@ before, the same way each time: it was derived from a host set that had not been
 | first | unstated | ~30–35× | ~2,500–3,000 claimed | ≈415–500:1 claimed |
 | second | 65 | ~40–46× | ~2,600–3,000 | ~430–500:1 |
 | **current** | **59, measured** | **~44–51×** | **~2,600–3,000** | **~433–500:1** |
+| **outcome, task 4.3** | 59, measured | ~48× achieved | **2,882 tests / 499 failing, measured** | **~83:1 — TARGET FAILED** |
+
+**The ratio target FAILED, and it is recorded as failed rather than replaced.** Task 4.3 measured 499
+failing of 2,882 tests — a 17.3% yield, giving 499:6 ≈ **83:1** against the ~433–500:1 written above. The
+target is not softened, reworded, or retroactively swapped for something the measurement satisfies. The
+explanation is the per-module yield spread, 3.9% to 43.5%: a generated row only fails if it exercises the
+injected path, and the axis tables span each module's general input space rather than concentrating on
+its injected boundary.
+
+**Amplifying to reach ~433–500:1 was rejected on measurement, not preference.** It would need roughly 6×
+more rows, ~3,000 failing cases, and the flood measurements below show that would put the monolithic
+arm's context load past what a 1M window can hold — converting a *cost* measurement into an
+*impossibility* measurement. The experiment is about which harness is cheaper, not which is possible.
+
+### Measured flood sizes — numbers only, no criterion attached yet
+
+Measured on the injected v2 fixture with generated case tables loaded, in a machine-local workspace
+outside `<repo>` (ADR 0014 Clause A). Test counts confirm the tables were loaded: 499 failed / 2,383
+passed / 2,882 total, matching `answer-key/s2.json` exactly.
+
+| Quantity | Measured | What reads it |
+|---|---|---|
+| Jest terminal output, cases loaded | **370,911 B (0.35 MB)** | the MONOLITHIC arm |
+| Jest terminal output, base only | 7,563 B (7.4 KB) | contrast, unamplified |
+| Jest `--json` report | 2,795,858 B (2.67 MB) | `rig/collect.py` only — **plain code, zero model tokens** |
+| bounded `clusters/1` view (`F0`) | **5,504 B (5.4 KB)** | the PIPELINE arm's diagnostician |
+
+**Byte asymmetry between the two arms' inputs: 67×.** Under an explicitly stated ASSUMPTION of 3–4
+characters per token — an assumption, not a measurement — the monolithic flood is roughly 93k–124k
+tokens, i.e. 9–12% of a 1M window on its first read and re-sent on every subsequent turn, against roughly
+1.4k–1.8k tokens for the diagnostician.
+
+One correction worth keeping because it changes which number matters: an earlier estimate put the
+monolithic load at 190k–500k tokens by reasoning from the 2.67 MB JSON report. That was the wrong
+artifact. The JSON report is the collector's input and the collector is plain code, so it costs zero
+model tokens; the monolithic arm reads terminal output, which is 7.5× smaller.
+
+**No success criterion is attached to these numbers here, deliberately.** Choosing a criterion after
+seeing the measurement is post-hoc metric selection — the fault ADR 0012 exists to prevent and the one
+this repo refused a vendor's figure over. A flood-size criterion is therefore *proposed and
+unregistered*: it grants nothing a pass, and its authority can only come from being pre-registered in
+`hypotheses/` during PR6, before any countable run.
 
 The first draft's multiplier and aggregate were mutually inconsistent. The second fixed that but assumed
 65 base cases, a total that still counted `parseTokenAmount`'s 13 — the module disqualified below as a
