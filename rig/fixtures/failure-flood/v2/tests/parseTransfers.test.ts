@@ -1,4 +1,5 @@
 import { parseTransfers, type IndexerTransfer } from '../src/parseTransfers';
+import { loadCases } from './_loadCases';
 
 const ACCOUNT = '0x998Cb71fC83Df5E21a3927E8861Aa33995522175';
 const ACCOUNT_LC = ACCOUNT.toLowerCase();
@@ -88,4 +89,18 @@ describe('parseTransfers', () => {
     );
     expect(result.map((t) => t.hash)).toEqual(['0xnew', '0xmid', '0xold']);
   });
+});
+
+// Amplified table (tools/generate-cases.py, design.md Decision 9a). `[]`
+// when no case table was generated for this run — see ./_loadCases.ts.
+const amplified = loadCases('parseTransfers');
+const describeAmplified = amplified.length > 0 ? describe : describe.skip;
+
+describeAmplified('parseTransfers (amplified)', () => {
+  it.each(amplified.map((c: any) => [c.case_id, c.transfers, c.account, c.expected]))(
+    'case %i',
+    (_caseId: number, transfers: IndexerTransfer[], account: string, expected: unknown) => {
+      expect(parseTransfers(transfers, account)).toEqual(expected);
+    },
+  );
 });

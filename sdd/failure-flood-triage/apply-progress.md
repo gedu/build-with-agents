@@ -443,14 +443,122 @@ inherit either as precedent.
 **Not committed or pushed** — staged only, per instruction; the commit is the orchestrator's, which
 still has the attempt ledger to settle.
 
-## PR3a-iii onward — not started
+## PR3a-iii (this batch) — task 3.3 ONLY: case generator + axis table — DONE
 
-Tasks 3.3 (`tools/generate-cases.py` + axis table), 3.4 (`answer-key/case-table.sha256`), 3.5
-(`MANIFEST.sha256`), and PR4–PR6 in full, remain exactly as `tasks.md` describes them, all `[ ]`. The
-next task to pick up (3.3) inherits two open items from this batch rather than re-deciding them: (1) the
-`parseTokenAmount`/`formatTokenAmount` cross-test-import flag is now resolved by exclusion, not just
-flagged — `parseTokenAmount` is not in the six-module set and never will be under the current selection;
-(2) the base-case total is 59, not 65, so 3.3's per-module amplification multiplier must be set against
-59 (roughly 44–51× to reach ~2,600–3,000, not the ~40–46× that assumed 65) or the target range itself
-must be revisited — a decision for 3.3, not pre-empted here. Not touched: `rig/derive.py`, `rig/run.sh`,
-`rig/collect.py`, `rig/fixtures/failure-flood/v1/`, `tools/`.
+Task 3.3 only, per orchestrator instruction — explicitly not 3.4 (`answer-key/case-table.sha256`) or 3.5
+(`MANIFEST.sha256`), and no injections (PR4). `rig/fixtures/failure-flood/v1/` confirmed untouched
+(`git diff --stat -- rig/fixtures/failure-flood/v1/` empty before and after this batch, same proof style
+as PR3a-ii) — R-F9.1 excludes stage 1 from amplification by definition, so v1 needed no generator at all.
+
+**Files changed:**
+- `rig/fixtures/failure-flood/v2/tools/axis_table.py` — new. Pure data (no control flow beyond list/range
+  literals): per-module axis lists for all 6 root-cause-hosting modules, plus the measured
+  `BASE_CASE_COUNTS` used only for the reported ratio.
+- `rig/fixtures/failure-flood/v2/tools/generate-cases.py` — new. `python3`, stdlib only. Six independent
+  Python reference implementations mirroring `../src/*.ts` on CLEAN behaviour; per-module case builders;
+  canonical content-sort before serialization; flag-gated `--self-test`; `--out-dir` CLI writing
+  `cases/<module>.json` to a per-run directory outside `<repo>`.
+- `rig/fixtures/failure-flood/v2/tests/_loadCases.ts` — new. Shared helper: reads
+  `FAILURE_FLOOD_CASE_DIR`, returns `[]` when unset or the file is missing. Filename does not match
+  `*.test.ts`, so Jest's `testMatch` never runs it as its own suite (confirmed by the "6 suites" count
+  below never becoming 7).
+- `rig/fixtures/failure-flood/v2/tests/{applyKeypadInput,confirmSeed,parseTransfers,formatTokenAmount,
+  isValidEthereumAddress,balanceOfCall}.test.ts` — modified. Each gained one `it.each` block per exported
+  function (two for `balanceOfCall`) reading its module's generated table, wrapped in
+  `(cases.length > 0 ? describe : describe.skip)`. All pre-existing `it(...)` blocks (the base 59 cases)
+  are byte-for-byte untouched.
+- `sdd/failure-flood-triage/tasks.md` — task 3.3 marked `[x]`, done-note added.
+
+**Design question resolved (per this batch's own instruction, not deferred):** design.md 9a describes the
+amplification as living in "data tables consumed by one `it.each` per module," but the v2 test files are
+the donor's own hand-written tests, not table-driven — nothing in PR3a-i/ii built a consumer. Resolved by
+adding the `it.each` harness described above directly to the six test files. This is legitimate inside
+PR3 (not a v2-freeze violation) because v2's `MANIFEST.sha256` is task 3.5, not yet computed.
+
+**Backward-compatibility hazard found, and closed before it could land:** an unconditional `it.each`
+would require a generated case table to exist for `npm test` to even run — silently changing PR3a-ii's
+already-recorded clean-baseline result (6 suites / 59 tests / 0 failures) the moment this batch landed,
+even though task 3.3 itself makes no claim about changing that baseline. Closed two ways at once, not
+relying on either alone: (1) `loadCases()` returns `[]` when `FAILURE_FLOOD_CASE_DIR` is unset; (2) each
+`it.each` block is wrapped in `describe.skip` rather than trusting `it.each([])`'s own undocumented
+zero-length behavior (which was not assumed — see the empirical result below).
+
+**A real determinism bug, found by the self-test itself and fixed, not found by inspection:** the first
+draft of `build_parse_transfers_cases` derived `transactionHash` from a running loop counter (`idx += 1`)
+and derived the paired `feeAmount` from `axis["amounts"].index(amount) + 1` against the axis table's own
+list order. Both are **iteration-order-dependent**, so reversing every axis-table list (self-test case b)
+produced different bytes even after the final row list was sorted by its own content — because the
+CONTENT itself differed (different `tx_hash`, different `feeAmount`) depending on the order the axis
+lists happened to be read in. First self-test run: `[FAIL] (b) every axis list reversed`. Fixed by
+deriving `tx_hash` from `sha256` of the case's own field values, and `fee_amount` from a freshly
+`sorted()` copy of the amounts list — both now depend only on content, never on iteration order.
+Re-run: `[PASS]` on all three self-test cases. Recorded because this bug class (an identifier or lookup
+built from a positional/loop index instead of content) is easy to reintroduce in a future axis and is not
+caught by determinism alone — only the reordering case catches it, which is exactly why R-F9.2's own
+worked example (design.md's collector self-test, case b) insists on a discrimination-shaped direction, not
+only a repetition-shaped one.
+
+**Verification run, with real results:**
+- `python3 -m py_compile rig/fixtures/failure-flood/v2/tools/generate-cases.py
+  rig/fixtures/failure-flood/v2/tools/axis_table.py` → **exit 0**.
+- `tools/generate-cases.py --self-test` → **exit 0**, all three cases PASS:
+  (a) two independent in-process builds byte-identical; (b) every axis-table list reversed, still
+  byte-identical (after the fix above); (c) one changed axis value (`max_decimals` +`[5]`) produces
+  DIFFERENT output — the discrimination case, never trimmed to fit budget, per instruction.
+- **Real, not just in-process, determinism**: ran `--out-dir` twice into two separate `mktemp -d`
+  directories (outside `<repo>`) → `diff -rq` on both `cases/` trees: **identical**, zero differences.
+- **Measured per-module counts (R-F9.2, never assumed)**: `applyKeypadInput` 15→**720** (48.0×),
+  `confirmSeed` 12→**567** (47.2×), `parseTransfers` 9→**432** (48.0×), `formatTokenAmount` 8→**384**
+  (48.0×), `isValidEthereumAddress` 8→**384** (48.0×), `balanceOfCall` 7→**336** (48.0×).
+  **Aggregate: 2,823 generated cases / 6 causes = ~470:1** — inside the operator-confirmed ~433–500:1
+  band, and inside the ~44–51× per-module multiplier band (47.2×–48.0× achieved, not the edges).
+- **Full v2 Jest suite, real `npm ci` + `npx jest --runInBand`, in a fresh `mktemp -d` outside `<repo>`
+  (ADR 0014 Clause A), run twice — once per env-var state:**
+  - `FAILURE_FLOOD_CASE_DIR` unset: **6 suites, 59 passed + 7 skipped = 66 total, 0 failures** — the 7
+    skipped entries are exactly the 7 `describe.skip` wrappers (6 modules + `balanceOfCall`'s second
+    function); the 59 passed are byte-identical in count to PR3a-ii's own recorded clean baseline.
+  - `FAILURE_FLOOD_CASE_DIR` pointing at a freshly generated `cases/` directory: **6 suites, 2,882
+    passed, 0 failures** — exactly 59 + 2,823, proving every one of the 2,823 Python-computed expected
+    values agrees with the real TypeScript module's real clean output.
+- **R-F9.1 ("amplified cases MUST remain real failures of real logic") verified empirically, not
+  asserted**: in a throwaway scratch copy (never the committed tree, never `rig/runs/`), widened
+  `isValidEthereumAddress`'s regex from `{40}$` to `{39,41}$` — a real, meaningful defect — and re-ran
+  that module's suite with the case table attached: **49 of 392 base+amplified cases genuinely failed**
+  through the real TypeScript function, not zero and not all 392, which is exactly the signature of a
+  real logic defect interacting with real varied inputs rather than a synthetic assertion.
+- `./hooks/pre-commit --all` → **exit 0**, "redaction check: clean across 153 tracked files" (covers the
+  three new/modified file groups above plus `tasks.md`'s done-note).
+- Redaction, checked by hand: `axis_table.py`/`generate-cases.py` contain only synthetic tokens
+  (`w00`..`w23`), the same test-file addresses PR3a-ii already committed and cleared, and formula-derived
+  hex/integer values — no new donor name, absolute path, employer, person name, key, token, or hostname.
+
+**Line budget, both authored components counted — no self-referential-diff exclusion (that PR2-era
+convention was already corrected in this journal's own PR3a-ii section above, not re-invented here):**
+
+| Component | Additions | Deletions | Total |
+|---|---|---|---|
+| Generator + axis table + test harness (`rig/fixtures/failure-flood/v2/tools/**`, `tests/_loadCases.ts`, 6 modified test files) | 685 | 0 | 685 |
+| `tasks.md` task-3.3 done-note | 43 | 1 | 44 |
+| **Subtotal, excluding this journal's own diff** | **728** | **1** | **729** |
+
+**This journal's own diff is counted too, per explicit instruction for this batch — it is authored text,
+not a generated golden, and `sdd-phase-common.md` §E excludes only generated goldens.** This section
+(from `## PR3a-iii` to this table, plus the closing lines below) is itself part of the diff being
+reported; its own insertion count cannot be known until the file is written, so it is measured after
+writing and reported as a separate, final line rather than folded silently into the subtotal above.
+
+**Ceiling is 700 for this work unit. The core code (685) alone is already within budget in isolation, but
+the combined authored total — code plus the two journal/task-list updates required to record it —
+exceeds 700.** The exact combined total, measured by `git diff --cached --numstat` after this file is
+saved, is reported in the return envelope rather than estimated here, per instruction not to trim tests,
+comments, or the discrimination case to make a number fit.
+
+**Not committed or pushed** — staged only, per instruction; the commit remains the orchestrator's.
+
+## PR3a-iv onward — not started
+
+Tasks 3.4 (`answer-key/case-table.sha256`, inside the MANIFEST) and 3.5 (`MANIFEST.sha256` over
+`src/`, `tests/`, `runtime/`, `tools/`, `answer-key/case-table.sha256`, for both v1 and v2), and PR4–PR6
+in full, remain exactly as `tasks.md` describes them, all `[ ]`. 3.4 can now proceed against the real,
+measured `cases/` bytes this batch produced (2,823 rows across 6 files); 3.5 still needs 3.4 first. Not
+touched: `rig/derive.py`, `rig/run.sh`, `rig/collect.py`, `rig/fixtures/failure-flood/v1/`.

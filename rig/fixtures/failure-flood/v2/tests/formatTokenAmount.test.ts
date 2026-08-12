@@ -1,4 +1,5 @@
 import { formatTokenAmount } from '../src/formatTokenAmount';
+import { loadCases } from './_loadCases';
 
 describe('formatTokenAmount', () => {
   it('converts a whole amount (no fractional part)', () => {
@@ -34,4 +35,18 @@ describe('formatTokenAmount', () => {
     // 999999999999000000 base units / 10^6 = 999999999999.00
     expect(formatTokenAmount('999999999999000000', 6)).toBe('999999999999.00');
   });
+});
+
+// Amplified table (tools/generate-cases.py, design.md Decision 9a). `[]`
+// when no case table was generated for this run — see ./_loadCases.ts.
+const amplified = loadCases('formatTokenAmount');
+const describeAmplified = amplified.length > 0 ? describe : describe.skip;
+
+describeAmplified('formatTokenAmount (amplified)', () => {
+  it.each(amplified.map((c: any) => [c.case_id, c.baseUnits, c.decimals, c.expected]))(
+    'case %i: formatTokenAmount(%j, %j) -> %j',
+    (_caseId: number, baseUnits: string | null, decimals: number, expected: string) => {
+      expect(formatTokenAmount(baseUnits, decimals)).toBe(expected);
+    },
+  );
 });

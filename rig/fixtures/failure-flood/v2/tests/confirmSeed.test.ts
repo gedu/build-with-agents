@@ -1,4 +1,5 @@
 import { CONFIRM_POSITIONS, getSeedWords, isConfirmCorrect, isPickCorrect } from '../src/confirmSeed';
+import { loadCases } from './_loadCases';
 
 const SAMPLE_SEED =
   'abandon ability able about above absent absorb abstract absurd abuse access accident';
@@ -67,4 +68,18 @@ describe('isConfirmCorrect', () => {
   it('returns false when all picks are null', () => {
     expect(isConfirmCorrect(SAMPLE_SEED, [null, null, null])).toBe(false);
   });
+});
+
+// Amplified table (tools/generate-cases.py, design.md Decision 9a). `[]`
+// when no case table was generated for this run — see ./_loadCases.ts.
+const amplified = loadCases('confirmSeed');
+const describeAmplified = amplified.length > 0 ? describe : describe.skip;
+
+describeAmplified('isConfirmCorrect (amplified)', () => {
+  it.each(amplified.map((c: any) => [c.case_id, c.seed, c.picks, c.expected]))(
+    'case %i',
+    (_caseId: number, seed: string, picks: (string | null)[], expected: boolean) => {
+      expect(isConfirmCorrect(seed, picks)).toBe(expected);
+    },
+  );
 });

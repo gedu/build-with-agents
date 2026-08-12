@@ -344,7 +344,7 @@ Depends on: PR1 (ADR must exist — R-F11 scenario), PR2 (collector validates th
 
       Not built in this task (explicitly deferred to 3.3/3.4/3.5, not started): `tools/generate-cases.py`,
       the axis table, `answer-key/case-table.sha256`, `MANIFEST.sha256`.
-- [ ] 3.3 Create `tools/generate-cases.py` + its axis table (Decision 9a — commit the generator, not the
+- [x] 3.3 Create `tools/generate-cases.py` + its axis table (Decision 9a — commit the generator, not the
       expanded tables). **Per-module sizing (R-F9.2's design/tasks deliverable) — operator-confirmed
       2026-08-11; R-F9.2 still binds, so the achieved ratio MUST be measured, never assumed:**
       target amplification **~44–51×** each module's existing real case count, against a **measured base
@@ -358,6 +358,48 @@ Depends on: PR1 (ADR must exist — R-F11 scenario), PR2 (collector validates th
       Verify: `python3 -m py_compile tools/generate-cases.py`;
       `tools/generate-cases.py --self-test` — byte-identical output across two runs **and** across two
       orderings of its input (no clock, no RNG, sorted keys, `\n` endings).
+      **Done** — `rig/fixtures/failure-flood/v2/tools/{generate-cases.py,axis_table.py}` (v2 only; R-F9.1
+      excludes stage-1 from amplification, so v1 gets no generator and its diff is confirmed empty).
+      **Per-module achieved multiplier is uniformly ~48× (confirmSeed ~47.2×)**, all inside the
+      operator-confirmed ~44–51× band: `applyKeypadInput` 15→720, `confirmSeed` 12→567, `parseTransfers`
+      9→432, `formatTokenAmount` 8→384, `isValidEthereumAddress` 8→384, `balanceOfCall` 7→336. **Measured
+      aggregate: 2,823 generated cases across 6 causes = ~470:1** — inside the target ~433–500:1 band,
+      measured by actually running the generator, not computed by hand and assumed (R-F9.2).
+      **Design question resolved, not assumed**: design.md 9a says amplification is consumed by "one
+      `it.each` per module," but the v2 test files are the donor's own tests, not table-driven. Resolved
+      by adding one `it.each` block per module (two for `balanceOfCall`, one per exported function) to the
+      six existing `v2/tests/*.test.ts` files plus a shared `tests/_loadCases.ts` helper — legitimate
+      inside PR3 per this task's own launch instruction, since v2 is not frozen until 3.5's MANIFEST.
+      **Backward-compatibility hazard found and closed**: an unconditional `it.each` would have required a
+      case table to exist for the already-verified clean-baseline `npm test` (PR3a-ii: 6 suites/59
+      tests/0 failures) to keep passing, silently changing that recorded result. Closed by gating each
+      block on `process.env.FAILURE_FLOOD_CASE_DIR`: `loadCases()` returns `[]` when unset, and each block
+      is wrapped in `(cases.length > 0 ? describe : describe.skip)` rather than trusting `it.each([])`'s
+      own undocumented empty-array behavior. Re-verified in a fresh `mktemp` outside `<repo>` (ADR 0014
+      Clause A): no env var → 6 suites, **59 passed + 7 skipped = 66 total, 0 failures** (byte-identical
+      base-case outcome to PR3a-ii); env var pointing at freshly generated tables → 6 suites, **2,882
+      passed, 0 failures** (59 + 2,823, exactly the measured aggregate above) — proving the Python
+      reference implementations agree with the real TypeScript clean logic on every one of 2,823 rows.
+      **R-F9.1 ("real failures of real logic") verified empirically, not asserted**: deliberately widened
+      `isValidEthereumAddress`'s regex to `{39,41}` in a throwaway scratch copy (never the committed tree)
+      — 49 of the 392 base+amplified cases for that module then genuinely failed through the real
+      TypeScript function, proving the amplified rows exercise real logic that a real injected bug would
+      break, not synthetic assertions.
+      **A determinism bug was found and fixed by the self-test itself, not by inspection**: the first
+      `parseTransfers` builder derived `transactionHash` from a running loop counter and derived the
+      paymaster `feeAmount` from the axis table's own list position — both are iteration-order-dependent,
+      so reversing the axis table's lists produced different bytes even after canonical content-sorting.
+      Fixed by deriving `tx_hash` from a `sha256` of the case's own field values, and `fee_amount` from a
+      freshly-`sorted()` copy of the amounts list rather than the axis table's own order. Recorded as a
+      finding because the same order-independence bug class ("uses a positional/loop-counter index instead
+      of content") is easy to reintroduce in a future axis, and the fix pattern (derive identifiers from
+      content, canonicalize before indexing) generalises.
+      Redaction: no new absolute paths, donor names, or values beyond what PR3a-i/ii already cleared —
+      `generate-cases.py`/`axis_table.py` contain only synthetic tokens (`w00`..`w23`), the same test-file
+      addresses already committed in PR3a-ii, and formula-derived hex/integer values.
+      `./hooks/pre-commit --all` → exit 0, "redaction check: clean across 153 tracked files".
+      **Not built in this task** (explicitly deferred to 3.4/3.5, not started): `answer-key/case-table.sha256`,
+      `MANIFEST.sha256`.
 - [ ] 3.4 Commit `answer-key/case-table.sha256` — the expected digest of the generated output —
       **inside** the MANIFEST, so it cannot be edited to match a tampered generation (the ordering that
       carries the whole guarantee).

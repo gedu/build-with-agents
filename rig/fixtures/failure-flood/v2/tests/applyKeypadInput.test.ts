@@ -1,4 +1,5 @@
 import { applyKeypadInput } from '../src/applyKeypadInput';
+import { loadCases } from './_loadCases';
 
 const MAX = 6;
 
@@ -62,4 +63,18 @@ describe('applyKeypadInput', () => {
   it('backspace removes a trailing decimal point', () => {
     expect(applyKeypadInput('12.', 'back', MAX)).toBe('12');
   });
+});
+
+// Amplified table (tools/generate-cases.py, design.md Decision 9a). `[]`
+// when no case table was generated for this run — see ./_loadCases.ts.
+const amplified = loadCases('applyKeypadInput');
+const describeAmplified = amplified.length > 0 ? describe : describe.skip;
+
+describeAmplified('applyKeypadInput (amplified)', () => {
+  it.each(amplified.map((c: any) => [c.case_id, c.current, c.key, c.maxDecimals, c.expected]))(
+    'case %i: applyKeypadInput(%j, %j, %j) -> %j',
+    (_caseId: number, current: string, key: string, maxDecimals: number, expected: string) => {
+      expect(applyKeypadInput(current, key as any, maxDecimals)).toBe(expected);
+    },
+  );
 });

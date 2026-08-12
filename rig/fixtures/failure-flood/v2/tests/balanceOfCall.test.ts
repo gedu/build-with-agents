@@ -1,4 +1,5 @@
 import { decodeBalanceHex, encodeBalanceOf } from '../src/balanceOfCall';
+import { loadCases } from './_loadCases';
 
 const ADDRESS = '0x998Cb71fC83Df5E21a3927E8861Aa33995522175';
 
@@ -36,4 +37,30 @@ describe('decodeBalanceHex', () => {
   it('returns "0" for an empty string', () => {
     expect(decodeBalanceHex('')).toBe('0');
   });
+});
+
+// Amplified tables (tools/generate-cases.py, design.md Decision 9a). `[]`
+// when no case table was generated for this run — see ./_loadCases.ts.
+const amplified = loadCases('balanceOfCall');
+const encodeCases = amplified.filter((c: any) => c.function === 'encodeBalanceOf');
+const decodeCases = amplified.filter((c: any) => c.function === 'decodeBalanceHex');
+const describeEncode = encodeCases.length > 0 ? describe : describe.skip;
+const describeDecode = decodeCases.length > 0 ? describe : describe.skip;
+
+describeEncode('encodeBalanceOf (amplified)', () => {
+  it.each(encodeCases.map((c: any) => [c.case_id, c.address, c.expected]))(
+    'case %i: encodeBalanceOf(%j) -> %j',
+    (_caseId: number, address: string, expected: string) => {
+      expect(encodeBalanceOf(address)).toBe(expected);
+    },
+  );
+});
+
+describeDecode('decodeBalanceHex (amplified)', () => {
+  it.each(decodeCases.map((c: any) => [c.case_id, c.resultHex, c.expected]))(
+    'case %i: decodeBalanceHex(%j) -> %j',
+    (_caseId: number, resultHex: string, expected: string) => {
+      expect(decodeBalanceHex(resultHex)).toBe(expected);
+    },
+  );
 });

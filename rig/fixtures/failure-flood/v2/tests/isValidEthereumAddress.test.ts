@@ -1,4 +1,5 @@
 import { isValidEthereumAddress } from '../src/isValidEthereumAddress';
+import { loadCases } from './_loadCases';
 
 describe('isValidEthereumAddress', () => {
   it('accepts a 0x-prefixed 40-hex-char address', () => {
@@ -32,4 +33,18 @@ describe('isValidEthereumAddress', () => {
   it('rejects the bare 0x prefix', () => {
     expect(isValidEthereumAddress('0x')).toBe(false);
   });
+});
+
+// Amplified table (tools/generate-cases.py, design.md Decision 9a). `[]`
+// when no case table was generated for this run — see ./_loadCases.ts.
+const amplified = loadCases('isValidEthereumAddress');
+const describeAmplified = amplified.length > 0 ? describe : describe.skip;
+
+describeAmplified('isValidEthereumAddress (amplified)', () => {
+  it.each(amplified.map((c: any) => [c.case_id, c.address, c.expected]))(
+    'case %i: isValidEthereumAddress(%j) -> %j',
+    (_caseId: number, address: string, expected: boolean) => {
+      expect(isValidEthereumAddress(address)).toBe(expected);
+    },
+  );
 });
