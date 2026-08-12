@@ -25,7 +25,7 @@ export function applyKeypadInput(current: string, key: KeypadKey, maxDecimals: n
   }
 
   const dotIndex = current.indexOf('.');
-  if (dotIndex !== -1 && current.length - dotIndex - 1 >= maxDecimals) {
+  if (dotIndex !== -1 && current.length - dotIndex - 1 > maxDecimals) {
     return current;
   }
 

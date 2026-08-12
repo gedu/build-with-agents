@@ -597,11 +597,61 @@ Depends on: PR3 (clean substrate + generator must exist first).
       item 4b, 9c) amended in place to record the scope correction with the measured evidence, keeping the
       original over-split reasoning rather than replacing it. Full detail in
       `apply-progress.md`'s "PR4-signature-scope-fix" section.
-- [ ] 4.3 Repeat 4.1–4.2 for v2's 6 stage-2 root causes, injected through the same real modules the
+- [x] 4.3 Repeat 4.1–4.2 for v2's 6 stage-2 root causes, injected through the same real modules the
       generator amplifies. Measure clusters-per-injection under amplification (design 9c) — a cause
       whose cluster count grows with `case_count` is a normalizer defect, not a key entry, and must be
       fixed in PR2 before this freezes, not absorbed into `R0`.
       Verify: per-injection isolation signature match, same as 4.1, on v2.
+      **Done.** Six causes injected into the COMMITTED `v2/src/`: `applyKeypadInput.ts:28` (`>=`→`>`,
+      reused from v1), `confirmSeed.ts:15` (`position`→`index`, reused), `parseTransfers.ts:34` (dropped
+      `.toLowerCase()`, reused), `formatTokenAmount.ts:23` (`decimals - 2`→`decimals - 1`, new),
+      `isValidEthereumAddress.ts:1` (`{40}`→`{41}`, new), `balanceOfCall.ts:3` (`ADDRESS_PADDING` 64→63,
+      new). Each validated in isolation, both without and with generated cases loaded — all six produced
+      non-zero failures (none rejected under R-F1.2); isolated failing sums (11 without cases, 499 with)
+      are exactly equal to the combined run's totals, confirming no masking (this fixture's modules are
+      import-free by construction).
+      **Real measured numbers, each with its command** (`rig/collect.py --cwd <runtime> --report-file …
+      --collection-output … --clusters-output … --expected-suites 6`, optionally
+      `FAILURE_FLOOD_CASE_DIR=<cases-dir>`): 59-test base (no case tables) → **11 failing / 66 total**, 8
+      clusters. Full amplified corpus (2,823 generated + 59 base = 2,882 tests) → **499 failing / 2,882
+      total**, 9 clusters. Yield = 499/2882 = **17.31%**. Achieved ratio = **499:6 (~83.2:1)**, NOT the
+      spec's ~433–500:1 order of magnitude — measured, not reached; no injection or axis value was tuned.
+      **Two real normalizer defects found and fixed in `rig/collect.py`, both anticipated by
+      `tasks.md`'s own instruction above and `design.md:711`'s threat matrix**: (1) the Expected:/Received:
+      cut only matched Jest's unprefixed scalar summary line, never its diff-prefixed structural form
+      (`- Expected  - N`/`+ Received  + N`) — measured on `parseTransfers`: 146 failing cases → 146
+      clusters (cluster count growing 1:1 with `case_count`, exactly the defect this task names) before
+      the fix, 3 after. `NORMALIZER_VERSION` 2→3; self-test case (h), both directions. (2) `workspace_root
+      = os.path.abspath(cwd)` does not resolve symlinks, leaking an absolute host path into
+      `test_id`/`signature` when the scratch workspace lived under a symlinked path (macOS `/tmp` →
+      `/private/tmp`) — fixed to `os.path.realpath(cwd)`; self-test case (i), both directions; no version
+      bump (path-resolution robustness, not an algorithm change). `v1/answer-key/s1.json` was re-measured
+      and rewritten under the same version-3 fix in this work unit (only `c4`'s signature value changed,
+      from the `.toMatchObject` failure; same 4 failures, same cluster count, same `identifier_set_digest`)
+      rather than left silently stale, and `v1/MANIFEST.sha256` recomputed — `v1/src`, `v1/tests`,
+      `v1/runtime` remain byte-unchanged throughout (`git diff --stat` empty).
+      **`F0` shape, resolved with quotes, not invented**: `design.md:241` calls `failure/1` "deliberately
+      minimal... at amplified scale there are thousands of these" — licensing a per-failure list. A first
+      attempt wrote all 499 entries (1,309 lines, pushing the whole unit's authored total to ~1,499 against
+      the 700 ceiling) and was rejected as unreviewable. A second attempt used `collection/1`'s own
+      `clusters` field, which itself carries `member_test_ids` (815 lines — still over, for an unrelated
+      reason). Final: `F0.clusters` is the bounded `clusters/1` view (`design.md` 9b: "bounded by CLUSTER
+      count, never by failure count") collect.py's own `clusters_view()` already produces — 9 entries, no
+      `member_test_ids`. `design.md:711`'s own amplification-safety freeze is explicitly "clusters-per-
+      injection... in R0", not a failure enumeration; `S0.identifier_set_digest` remains the integrity
+      proof for the exact 499-test_id failing set without enumerating it. `answer-key/v2/s2.json`: 298
+      lines. `MANIFEST.sha256` recomputed for both v1 and v2, accept-before and tamper-proof both
+      directions confirmed (exit 0 / exit 2), real committed tree untouched after each revert.
+      **Line counts**: `git diff --cached --numstat` — `rig/collect.py` 153+9, `v1/MANIFEST.sha256` 1+1,
+      `v1/answer-key/s1.json` 8+8, `v2/MANIFEST.sha256` 7+6, `v2/answer-key/s2.json` 298+0, six `v2/src/*.ts`
+      1+1 each (×6=12). Raw total = 162+2+16+13+298+12 = **503**. Generated-golden exclusion
+      (`sdd-phase-common.md:104`): both `MANIFEST.sha256` files only (2+13=15) — `s1.json`/`s2.json` are
+      NOT excluded, same reasoning as PR4-i/PR4-signature-scope-fix (hand-assembled from real measured
+      output). Authored total = 503 − 15 = **488**, inside the 700 ceiling.
+      Verify: `python3 -m py_compile rig/collect.py` exit 0; `rig/collect.py --self-test` exit 0, all 15
+      cases PASS (a, b, c.1–c.4, d, e, f, g.1, g.2, h.1, h.2, i); `./hooks/pre-commit` (staged) exit 0;
+      `./hooks/pre-commit --all` exit 0 ("redaction check: clean across 158 tracked files"). Nothing
+      committed or pushed — staged only.
 - [ ] 4.4 Commit `answer-key/prereg.json` — the frozen list of required hypothesis file paths — inside
       the MANIFEST (Hard Ordering Gate, layer 1).
       Verify: `./hooks/pre-commit --all`; MANIFEST accept-before / reject-tampered-after repeated for

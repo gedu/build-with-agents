@@ -20,7 +20,7 @@ export function formatTokenAmount(
 
   // Fractional part — we want exactly 2 decimal places, truncated.
   // Scale down to 2 dp by dividing by 10^(decimals-2).
-  const centsDivisor = BigInt(10) ** BigInt(Math.max(decimals - 2, 0));
+  const centsDivisor = BigInt(10) ** BigInt(Math.max(decimals - 1, 0));
   const remainder = raw % divisor;
   const cents = remainder / centsDivisor; // truncates automatically (integer division)
 

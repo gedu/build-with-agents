@@ -1,7 +1,7 @@
 {
   "task_id": "s1",
   "tier": 1,
-  "fixture_note": "Stage 1 (task_id s1) on failure-flood/v1 (design.md section 8, line 368). The agent's workspace materialises this fixture's src/, tests/ and runtime/ only; answer-key/ is never materialised (design.md 9a corollary, line 413 - 'the generator describes the injection structure and must not be visible to the agent', generalised here to the injections themselves even though v1 has no generator). F0/S0/R0 below are MEASURED by rig/collect.py against the real, injected, committed src/ - never the declared injection list (R-F1.1). Re-measured under normalizer_version 2 (PR4-signature-scope-fix) - the version-1 measurement of this same committed src/ is superseded, not merely revised, because the cluster key itself changed (see measured_vs_declared.superseded_note).",
+  "fixture_note": "Stage 1 (task_id s1) on failure-flood/v1 (design.md section 8, line 368). The agent's workspace materialises this fixture's src/, tests/ and runtime/ only; answer-key/ is never materialised (design.md 9a corollary, line 413 - 'the generator describes the injection structure and must not be visible to the agent', generalised here to the injections themselves even though v1 has no generator). F0/S0/R0 below are MEASURED by rig/collect.py against the real, injected, committed src/ - never the declared injection list (R-F1.1). Re-measured under normalizer_version 3 (task 4.3's Expected:/Received: cut fix) - the version-2 measurement of this same committed src/ is superseded for one cluster's signature VALUE only (see measured_vs_declared.superseded_note); the version-1-to-2 supersession (PR4-signature-scope-fix, unchanged reasoning) is kept below it.",
   "C": {
     "_purpose": "Clean-fixture baseline, zero failures, proven before any injection (R-F1.3).",
     "suite_state": "ran",
@@ -15,10 +15,10 @@
     "identifier_set_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
   "F0": {
-    "_purpose": "R-F1.1: measured, normalized failure set after all 3 injections together - never the declared list. Re-measured under normalizer_version 2 (signature = hash(normalized_head + test_file), PR4-signature-scope-fix). identifier_set_digest and the 4 test_ids are unchanged from normalizer_version 1 - only the signature values and cluster grouping changed, because the fix scopes the cluster key by test file and the measured test set itself did not change.",
+    "_purpose": "R-F1.1: measured, normalized failure set after all 3 injections together - never the declared list. Re-measured under normalizer_version 3 (task 4.3's Expected:/Received: cut fix, corrected by measurement on v2's parseTransfers cause). identifier_set_digest and the 4 test_ids are unchanged from normalizer_version 2 - only c4's signature VALUE and signature_text changed, because the cut now also fires on Jest's diff-prefixed ('- Expected  - N' / '+ Received  + N') summary line, not only the unprefixed scalar form; c1-c3 (all '.toBe()' scalar heads) are byte-identical to their version-2 values.",
     "schema": "collection/1",
     "collector": "jest-json@1",
-    "normalizer_version": 2,
+    "normalizer_version": 3,
     "failures": [
       {
         "signature": "607220f5cf3e52b9",
@@ -31,7 +31,7 @@
         "test_id": "../tests/confirmSeed.test.ts::isConfirmCorrect::returns true when all picks match CONFIRM_POSITIONS"
       },
       {
-        "signature": "da54112bb72162e0",
+        "signature": "7f2043443e4b144b",
         "status": "failed",
         "test_id": "../tests/parseTransfers.test.ts::parseTransfers::maps an incoming transfer (to === account)"
       },
@@ -91,13 +91,13 @@
           "../tests/parseTransfers.test.ts::parseTransfers::maps an incoming transfer (to === account)"
         ],
         "representative_test_id": "../tests/parseTransfers.test.ts::parseTransfers::maps an incoming transfer (to === account)",
-        "signature": "da54112bb72162e0",
-        "signature_text": "Error: expect(received).toMatchObject(expected)\n\n- Expected - 2\n+ Received + 2\n\nObject {\n\"amount\": \"10.0\",\n- \"direction\": \"in\",\n- \"peer\": \"0xdd1ffde9c04268d555b1f965c510b2d46bc230c3\",\n+ \"direction\": \"out\",\n+ \"peer\": \"0x998cb71fc83df5e21a3927e8861aa33995522175\",\n}"
+        "signature": "7f2043443e4b144b",
+        "signature_text": "Error: expect(received).toMatchObject(expected)"
       }
     ]
   },
   "S0": {
-    "_purpose": "R-F2.2: frozen suite state + its normalized signature, for later suite_state_cause classification. suite_state and totals are unaffected by the signature-scope fix (they do not depend on the cluster key); identifier_set_digest is unchanged from the version-1 measurement for the same reason (it is over test_ids, never signatures).",
+    "_purpose": "R-F2.2: frozen suite state + its normalized signature, for later suite_state_cause classification. suite_state and totals are unaffected by either the signature-scope fix (version 1->2) or the Expected:/Received: cut fix (version 2->3) - neither depends on the cluster key; identifier_set_digest is unchanged across all three versions for the same reason (it is over test_ids, never signatures). Re-verified by direct re-measurement at each version, not assumed to survive.",
     "suite_state": "ran",
     "identifier_set_digest": "64747c8b2eadfa8f3ca8d3780790aca84f842e3f989b8376333e9f9a569a1f4b",
     "totals": {
@@ -152,7 +152,7 @@
       "failing_cases": 10,
       "root_causes": 3
     },
-    "superseded_note": "This replaces the normalizer_version 1 measurement of this identical committed src/ (same 3 injections, same 4 failing test_ids, same identifier_set_digest). Under version 1, the signature was hash(normalized_head) only, and all 3 causes' first-reported failures shared the same generic Jest '.toBe()' equality head text with nothing before the Expected:/Received: cut, so they collapsed into ONE cluster (signature 277580d674667852, count 3) alongside a second, already-distinct cluster (parseTransfers' toMatchObject failure, signature 2df32737777805ca) - 2 clusters total for 3 causes. Under version 2, the signature is hash(normalized_head + test_file); the three previously-merged failures are now in three different files (applyKeypadInput.test.ts, confirmSeed.test.ts, parseTransfers.test.ts) and so get three different signatures - 4 clusters total for 4 failures, one cluster per failure in this fixture, not per cause.",
+    "superseded_note": "Two supersessions on record, kept in order (drift is the useful part of the record, not overwritten): (1) version-2->3 (task 4.3, this revision): the Expected:/Received: cut regex only matched an UNPREFIXED line ('Expected: 5'); Jest's structural .toMatchObject()/.toEqual() diff format instead prefixes that summary line with a unified-diff marker ('- Expected  - 2' / '+ Received  + 2'), which the un-widened regex never matched, so the ENTIRE diff body (every differing property value) stayed in signature_text. Found on v2's amplified parseTransfers cause (146 failing generated cases collapsing into 146 DISTINCT clusters, one per case - the exact 'cluster count grows with case_count' normalizer defect tasks.md:602 names). Fixed by allowing an optional diff-marker character before the whitespace. Only c4 (the .toMatchObject failure) changed value here: signature da54112bb72162e0 -> 7f2043443e4b144b, signature_text shrank from the full multi-line diff dump to the bare matcher head 'Error: expect(received).toMatchObject(expected)'. c1-c3 (all '.toBe()' scalar heads, already unprefixed) are byte-identical to their version-2 values. Cluster count, cluster_id assignment (c1-c4, unchanged - the new c4 signature still sorts last ascending), R0's cluster_ids, and identifier_set_digest are ALL unchanged; only one signature VALUE changed. (2) version-1->2 (PR4-signature-scope-fix, kept verbatim below rather than overwritten): This replaced the normalizer_version 1 measurement of this identical committed src/ (same 3 injections, same 4 failing test_ids, same identifier_set_digest). Under version 1, the signature was hash(normalized_head) only, and all 3 causes' first-reported failures shared the same generic Jest '.toBe()' equality head text with nothing before the Expected:/Received: cut, so they collapsed into ONE cluster (signature 277580d674667852, count 3) alongside a second, already-distinct cluster (parseTransfers' toMatchObject failure, signature 2df32737777805ca) - 2 clusters total for 3 causes. Under version 2, the signature is hash(normalized_head + test_file); the three previously-merged failures are now in three different files (applyKeypadInput.test.ts, confirmSeed.test.ts, parseTransfers.test.ts) and so get three different signatures - 4 clusters total for 4 failures, one cluster per failure in this fixture, not per cause.",
     "finding": "All 3 declared causes remain independently observable (none produced zero failures in isolation, so none was rejected under R-F1.2) - isolation measured 1, 1 and 2 failing cases respectively (applyKeypadInput, confirmSeed, parseTransfers), summing to 4, exactly the combined-run total (re-verified: each isolated injection's signature is byte-identical to its signature inside the combined run). The over-collapse defect measured under normalizer_version 1 (three unrelated causes in three different modules sharing one cluster because Jest's generic '.toBe()' head carried no distinguishing text) is closed: each of the 4 measured failures now has its own distinct cluster (c1-c4), and the bounded clusters view (design.md 9b) now also carries each cluster's distinct_test_files, so a diagnostician reading only that view can see cluster c1/c2/c3 each span exactly one module and c4 is parseTransfers' second, already-known-and-absorbed head. The remaining 2-clusters-for-1-cause split on parseTransfers.ts:34 (c1 '.toBe' head, c4 '.toMatchObject' head) is OVER-SPLIT, not over-collapse, and is the case design.md already names and absorbs by design: 'where a cause genuinely produces several heads..., slice 3b measures that count and R0 records the many-to-one mapping. The key absorbs it; the algorithm does not change' (design.md:449-450) - R0 above records cluster_ids [c1, c4] for that one cause_site accordingly, unchanged in shape from the version-1 measurement's own R0 for the same cause. Scope limit, stated rather than assumed: this fixture's three modules are import-free by construction (PR3a-i's own independence check), so no single cause here could legitimately span two test files; a signature scoped by test file is therefore safe against introducing a NEW over-split failure mode in THIS fixture. A future fixture whose modules import each other could let one real cause produce failures in two files, which this rule would then over-split - R0's many-to-one mapping is what absorbs that case too, not a reason to loosen the signature."
   }
 }

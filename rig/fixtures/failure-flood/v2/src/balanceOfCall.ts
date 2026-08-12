@@ -1,6 +1,6 @@
 // ERC-20 balanceOf(address) — selector keccak256("balanceOf(address)")[:4].
 const BALANCE_OF_SELECTOR = '0x70a08231';
-const ADDRESS_PADDING = 64;
+const ADDRESS_PADDING = 63;
 
 /**
  * Builds the `data` for an `eth_call` to ERC-20 `balanceOf(address)`:

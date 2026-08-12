@@ -12,6 +12,6 @@ export function isPickCorrect(seed: string, position: number, word: string): boo
 export function isConfirmCorrect(seed: string, picks: (string | null)[]): boolean {
   return CONFIRM_POSITIONS.every((position, index) => {
     const pick = picks[index];
-    return pick != null && isPickCorrect(seed, position, pick);
+    return pick != null && isPickCorrect(seed, index, pick);
   });
 }

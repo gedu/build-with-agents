@@ -1038,3 +1038,153 @@ this section is still being written as that command would run.
 **This corrective work unit is now closed.** Task 4.3 (v2's 6 stage-2 injections, under the now-corrected
 normalizer) and task 4.4 (`answer-key/prereg.json`) remain `[ ]`, unaffected by and not attempted in this
 unit.
+
+## PR4-task-4.3 — v2's six injections and the measured stage-2 ground truth — DONE
+
+**What.** Injected six root causes into the COMMITTED `rig/fixtures/failure-flood/v2/src/`: three reused
+from v1 at the same sites (`applyKeypadInput.ts:28`, `confirmSeed.ts:15`, `parseTransfers.ts:34`), three
+designed now (`formatTokenAmount.ts:23`, `isValidEthereumAddress.ts:1`, `balanceOfCall.ts:3`). Each
+validated in isolation (R-F1.2/R-F1.3) both without and with generated cases loaded. Measured `F0`/`S0`/`R0`
+under `normalizer_version: 3` with generated cases loaded, wrote `rig/fixtures/failure-flood/v2/answer-key/s2.json`,
+recomputed `v2/MANIFEST.sha256`. Two real normalizer defects were found by this measurement and fixed in
+`rig/collect.py`, which required re-measuring and rewriting the already-committed `v1/answer-key/s1.json`
+and recomputing `v1/MANIFEST.sha256` in the same work unit rather than leaving it stale.
+
+**Why.** Task 4.3's own instruction, plus R-F1.1/R-F1.2/R-F1.3/R-F9.2: ground truth must be measured
+against the real committed, injected fixture, never assumed from the declared injection list or a
+pre-registered target ratio.
+
+**The six causes and sites, each with its isolation result** (`rig/collect.py --cwd <runtime> --report-file
+… --collection-output … --clusters-output … --expected-suites 6`, `FAILURE_FLOOD_CASE_DIR=<cases-dir>` for
+the with-cases condition):
+
+| # | Site | Cause | No-cases failures | With-cases failures | With-cases clusters |
+|---|------|-------|---:|---:|---:|
+| 1 | `src/applyKeypadInput.ts:28` | `>=` relaxed to `>` in the decimal-cap comparison (reused from v1) | 1 | 41 | 1 |
+| 2 | `src/confirmSeed.ts:15` | `isPickCorrect(seed, position, pick)` → `isPickCorrect(seed, index, pick)` (reused) | 1 | 22 | 1 |
+| 3 | `src/parseTransfers.ts:34` | dropped `.toLowerCase()` on `account` (reused) | 2 | 146 | 3 |
+| 4 | `src/formatTokenAmount.ts:23` | `Math.max(decimals - 2, 0)` → `Math.max(decimals - 1, 0)` (new) | 2 | 45 | 1 |
+| 5 | `src/isValidEthereumAddress.ts:1` | `{40}` → `{41}` in the address-length regex (new) | 3 | 99 | 1 |
+| 6 | `src/balanceOfCall.ts:3` | `ADDRESS_PADDING = 64` → `63` (new) | 2 | 146 | 2 |
+| **sum** | | | **11** | **499** | **9 (combined)** |
+
+None produced zero new failures (R-F1.2: none rejected). Isolated sums (11, 499) are **exactly** equal to
+the combined-run totals in both conditions, and every isolated cluster's signature and count are
+byte-identical to its counterpart inside the combined run — re-verified, not assumed. This fixture's six
+modules are import-free by construction (task 3.2's own independence check, unchanged), so no cross-module
+masking was structurally possible. `parseTransfers.ts:34`'s cluster_ids `[c2, c7, c8]` is a within-module
+over-split for one cause (three heads: the amplified `.toEqual`, and the two base tests' `.toBe`/
+`.toMatchObject`), absorbed by `R0`'s many-to-one mapping per `design.md:449-450` — unchanged in kind from
+v1's own over-split, just three heads instead of two.
+
+**The two failing counts, the derived yield, and the achieved ratio — measured, not reached.**
+59-test base (no generated case tables, `FAILURE_FLOOD_CASE_DIR` unset): **11 failing / 66 total tests**
+(59 real + 7 skipped `describe.skip` blocks), 8 clusters. Full amplified corpus (2,823 generated cases +
+59 base = 2,882 tests, `FAILURE_FLOOD_CASE_DIR` set to a fresh `tools/generate-cases.py --out-dir` output —
+digest `b15b8d1698ea0b45e2c475c1d5c68e2dcac81458522771d724a3ca431e5becb1`, matching the committed
+`answer-key/case-table.sha256`): **499 failing / 2,882 total tests**, 9 clusters. Yield = 499 / 2882 =
+**17.3144%**. Achieved ratio = **499:6 (~83.17:1 per cause)** — NOT spec.md Decision B / task 3.3's
+~433–500:1 order of magnitude, and also not the ~57:1 the corrective-unit's own correction-note estimated.
+Per-module yield spread is real and reported, not smoothed: `applyKeypadInput` 41/720 (5.7%), `confirmSeed`
+22/567 (3.9%), `parseTransfers` 146/432 (33.8%), `formatTokenAmount` 45/384 (11.7%),
+`isValidEthereumAddress` 99/384 (25.8%), `balanceOfCall` 146/336 (43.5%) — `balanceOfCall`'s
+`ADDRESS_PADDING` off-by-one breaks essentially every `encodeBalanceOf` call regardless of input, while
+`applyKeypadInput`/`confirmSeed`'s boundary defects only break narrow input slices for the same structural
+reason task 4.2 already recorded for v1 (most cases don't reach the exact boundary the injected comparison
+moved). No injection or axis-table value was adjusted toward either estimate (R-F9.2, R-F1.1).
+
+**Two real normalizer defects found by this measurement and fixed in `rig/collect.py`, both anticipated
+by `tasks.md:602`'s own instruction and `design.md:711`'s threat matrix — quoted, not paraphrased.**
+`tasks.md:602`: "a cause whose cluster count grows with `case_count` is a normalizer defect, not a key
+entry, and must be fixed in PR2 before this freezes, not absorbed into `R0`." `design.md:711`: "Slice 3b
+measures clusters-per-injection on the amplified fixture and freezes it in `R0`. A cause whose cluster
+count grows with `case_count` is a normalizer defect, not a key entry."
+
+1. **The Expected:/Received: cut only matched Jest's unprefixed scalar summary line** (`Expected: 5`),
+   never its diff-prefixed structural form (`- Expected  - N` / `+ Received  + N`, used by
+   `.toEqual()`/`.toMatchObject()`). Measured on `parseTransfers` isolated with cases loaded: **146 failing
+   cases → 146 distinct clusters** (cluster count growing 1:1 with `case_count`) before the fix, **3**
+   after. Fixed by widening `_EXPECTED_RECEIVED_RE` to `r"^\s*[-+]?\s*(Expected|Received)\b.*$"`.
+   `NORMALIZER_VERSION` 2 → 3. Self-test case (h), both directions (h.1: differing diff-prefixed bodies,
+   same matcher header → same signature; h.2: genuinely different matcher header → different signature).
+2. **`workspace_root = os.path.abspath(cwd)` does not resolve symlinks**, so a scratch workspace under a
+   symlinked path (macOS's `/tmp` → `/private/tmp`) leaked an absolute host path into
+   `test_id`/`distinct_test_files`/`signature` — measured live: `distinct_test_files` read
+   `../../../../private/tmp/<host-scratch-path>/tests/balanceOfCall.test.ts` instead of
+   `../tests/balanceOfCall.test.ts`. This is a real violation of R-F1.3's own "deterministic across runs
+   (paths, ...)" requirement and of `build_test_id`'s own docstring promise ("relative kills the random
+   mktemp workspace path"). Fixed: `workspace_root = os.path.realpath(cwd)`. No `NORMALIZER_VERSION` bump
+   (path-resolution robustness, not an algorithm change — does not invalidate any prior byte-value
+   comparison taken on a non-symlinked path). Self-test case (i), both directions, using a real
+   `tempfile`/`os.symlink` scenario (a synthetic string fixture cannot exercise symlink resolution): the
+   fix produces the clean relative path, and the old `abspath` behaviour is shown to differ, not merely
+   assumed to.
+
+**v1's `answer-key/s1.json` re-measured and rewritten under the version-3 fix in this same work unit**,
+rather than left silently stale — `NORMALIZER_VERSION` 2 declared in a committed answer key that no
+longer matches what `rig/collect.py` produces would itself be the "measured, not assumed" violation this
+whole task exists to prevent. Re-measured on the real committed (unchanged) `v1/src`+`tests`+`runtime`:
+same 4 failures, same `identifier_set_digest` (`64747c8b2eadfa8f3ca8d3780790aca84f842e3f989b8376333e9f9a569a1f4b`),
+same cluster count (4) and same cluster-id assignment (c1–c4 unchanged — the new c4 signature still sorts
+last ascending). Only `c4`'s signature VALUE changed (`da54112bb72162e0` → `7f2043443e4b144b`, the
+`.toMatchObject` failure) and its `signature_text` shrank from the full multi-line diff dump to the bare
+matcher head `"Error: expect(received).toMatchObject(expected)"` — which is, cross-checked, byte-identical
+to v2's own `c8` (same cause, same site, same file, same fix). The version-1→2 supersession note
+(PR4-signature-scope-fix) was kept verbatim below the new version-2→3 note, not overwritten — drift is the
+useful part of the record. `v1/MANIFEST.sha256` recomputed (only the `answer-key/s1.json` line changed);
+accept-before and tamper-proof both directions confirmed (exit 0 / exit 2, reverted immediately);
+`v1/src`, `v1/tests`, `v1/runtime` confirmed byte-unchanged throughout (`git diff --stat` empty, both
+staged and unstaged).
+
+**The `F0` shape question, resolved with quotes — two rejected attempts recorded, not hidden.**
+`design.md:241` calls `failure/1` "deliberately minimal. At amplified scale there are thousands of these,
+so signature_text lives once per cluster and never once per failure" — licensing (even anticipating) a
+per-failure list. **Attempt 1**: wrote all 499 per-failure `{test_id, status, signature}` records
+literally, one compact line each — 1,309 lines for `s2.json` alone, pushing the whole work unit's authored
+total to ~1,499 against the 700-line ceiling. Rejected as unreviewable. **Attempt 2**: switched to
+`collection/1`'s own `clusters` field instead — but that field (`collect.py`'s `public_clusters`
+projection) itself carries `member_test_ids` per cluster, and two of the nine clusters here have 145 and
+144 members: still 815 lines, over budget for a reason that had nothing to do with `case_count`. It was
+the wrong artifact, not a smaller version of the right one. **Final**: `design.md` 9b already names a
+SEPARATE, already-bounded artifact for exactly this — `clusters_view()`'s `clusters/1` schema: "a bounded
+clusters view... clusters, counts, one representative each... bounded by CLUSTER count, never by failure
+count." `F0.clusters` in `s2.json` is that view (9 entries, no `member_test_ids`) — the same artifact the
+diagnostician itself receives, and the same one PR4-signature-scope-fix already used for the bounded view.
+`design.md:711`'s own amplification-safety freeze is explicitly "clusters-per-injection... in `R0`", not a
+failure enumeration, and scoring itself is cluster-level (design.md section 4: "`causes_present` counts
+distinct sites in `R0`; `clusters_present` counts the signatures they map to"). `S0.identifier_set_digest`
+remains the integrity proof for the exact 499-test_id failing SET without `F0` needing to enumerate it.
+Final `s2.json`: **298 lines**.
+
+**Line counts, both stated with their command.** `git diff --cached --numstat`: `rig/collect.py` 153+9,
+`v1/MANIFEST.sha256` 1+1, `v1/answer-key/s1.json` 8+8, `v2/MANIFEST.sha256` 7+6,
+`v2/answer-key/s2.json` 298+0, six `v2/src/*.ts` files 1+1 each (×6 = 12). Raw total =
+162+2+16+13+298+12 = **503**. Generated-golden exclusion (`sdd-phase-common.md:104`, same class as every
+prior PR in this stack): both `MANIFEST.sha256` files only, 2+13 = **15** — `s1.json`/`s2.json` are NOT
+excluded (hand-assembled from real measured output, not machine boilerplate, same reasoning PR4-i and
+PR4-signature-scope-fix already recorded). Authored total = 503 − 15 = **488**, inside the 700 ceiling.
+
+**Verification, real exit codes.** `python3 -m py_compile rig/collect.py` exit 0. `rig/collect.py
+--self-test` exit 0, all 15 cases PASS (a, b, c.1–c.4, d, e, f, g.1, g.2, h.1, h.2, i). `./hooks/pre-commit`
+(staged) exit 0. `./hooks/pre-commit --all` exit 0 ("redaction check: clean across 158 tracked files").
+`./hooks/pre-commit --self-test` exit 0 (unaffected, re-run for completeness). MANIFEST accept-before and
+tamper-proof both directions, both v1 and v2: exit 0 / exit 2 / exit 0 (reverted), each verified against
+the real committed tree, `git diff --stat` empty on `v1/src`/`v1/tests`/`v1/runtime` and on
+`v2/src`/`v2/tests`/`v2/runtime` (`v2/src` shown via `git diff --cached --stat`, since the six injections
+are staged, not left unstaged) throughout. Redaction: no absolute host path, donor name, employer, or
+person name in any committed byte — the two scratch-path mentions inside `s2.json`'s own prose describe
+the general macOS `/tmp`→`/private/tmp` symlink behavior generically or use an explicit `<host-scratch-path>`
+placeholder, confirmed by `rg` for the actual scratch directory name (no match).
+
+**Redaction/ADR 0014 process.** All measurement ran in `mktemp` scratch directories outside `<repo>` (ADR
+0014 Clause A); no `node_modules` anywhere under `<repo>` (confirmed after cleanup). `rig/fixtures/failure-flood/v1/**`
+was NOT edited beyond the two files this work unit's coordinator explicitly authorized
+(`answer-key/s1.json`, `MANIFEST.sha256`) — `v1/src`, `v1/tests`, `v1/runtime` remain byte-unchanged,
+proven above. Per PR4-i's own lesson (a `git checkout --` mistake that reverted an injection before
+staging), every injection edit to committed `v2/src/` bytes was `git add`-ed immediately, before any
+further git command.
+
+**Not committed or pushed** — staged only, per instruction.
+
+**Task 4.4 (`answer-key/prereg.json`) remains `[ ]`, out of this work unit's scope** — the coordinator's
+brief was explicit that this batch is task 4.3 only.

@@ -38,9 +38,9 @@ into hundreds of clusters. `signature_text` lives once per cluster
 (`cluster/1`), never once per `failure/1` — at scale that is the difference
 between a few KB and megabytes of repeated text.
 
-**Signature scope, corrected by measurement (PR4-signature-scope-fix, this
-revision, `NORMALIZER_VERSION` 1 -> 2).** `answer-key/s1.json`, measured
-under version 1, showed three UNRELATED causes in three different modules
+**Signature scope, corrected by measurement (PR4-signature-scope-fix,
+`NORMALIZER_VERSION` 1 -> 2).** `answer-key/s1.json`, measured under version
+1, showed three UNRELATED causes in three different modules
 (`applyKeypadInput.test.ts`, `confirmSeed.test.ts`, `parseTransfers.test.ts`)
 collapsing into one cluster signature `277580d674667852`, because Jest's
 generic `.toBe()` equality head carries nothing before the Expected:/
@@ -51,6 +51,27 @@ failures WITHIN one module still clusters together (`_self_test_
 signature_scoped_by_test_file`, cases g.1/g.2 below) — that is the exact
 property the head-only rule existed to protect (design.md 9c), and it must
 survive this fix, not just be assumed to.
+
+**Expected:/Received: cut, corrected by measurement (task 4.3, this revision,
+`NORMALIZER_VERSION` 2 -> 3).** Task 4.3's own instruction ("a cause whose
+cluster count grows with `case_count` is a normalizer defect, not a key
+entry, and must be fixed in PR2 before this freezes") caught a real gap: the
+cut regex only matched an UNPREFIXED `Expected:`/`Received:` line (Jest's
+scalar `.toBe()` format, e.g. `Expected: 5\nReceived: 3`). Jest's structural
+`.toEqual()`/`.toMatchObject()` diff format instead prefixes that same
+summary line with a unified-diff marker — `- Expected  - 2` / `+ Received  +
+2` — which the old regex's line-start anchor (whitespace only, no marker
+character) never matched, so the cut never fired and the ENTIRE per-case diff
+body (every differing property
+value) stayed in `signature_text`. Measured on v2's amplified
+`parseTransfers` cause (146 failing generated cases): 146 DISTINCT clusters,
+one per failing case — the exact growing-with-`case_count` defect this task's
+own instruction names, not a key entry to absorb into `R0`. Fixed by
+allowing an optional single diff-marker character before the whitespace (see
+`_EXPECTED_RECEIVED_RE` below). Re-measured after the fix: 146 failures,
+2 clusters (matching the other five causes' non-growing shape) — see
+`_self_test_signature_scoped_by_test_file`'s sibling case (h) below, and
+`answer-key/s1.json`/`answer-key/s2.json`'s own measured re-verification.
 
 **Scope limit, stated explicitly rather than assumed away.** Folding the
 test file into the key is safe against OVER-SPLIT here only because this
@@ -97,7 +118,13 @@ COLLECTOR_ID = "jest-json@1"
 # (e.g. answer-key/s1.json before this fix) MUST NOT be silently compared
 # against output produced under version 2 — the cluster keys are not the
 # same function.
-NORMALIZER_VERSION = 2
+# Bumped 2 -> 3 for the Expected:/Received: cut fix (task 4.3): the cut now
+# also matches a diff-prefixed summary line (`- Expected  - N` / `+ Received
+# + N`), not only the unprefixed scalar form. A `normalizer_version: 2`
+# F0/S0/R0 MUST NOT be silently compared against output produced under
+# version 3 — any signature over a structural (.toEqual/.toMatchObject) diff
+# changes value.
+NORMALIZER_VERSION = 3
 
 # Order-of-magnitude stated, not assumed (design.md 9b): ~2,500 failing cases
 # at ~1.5-4 KB each puts a real report at order 5-20 MB. json.load handles
@@ -121,7 +148,14 @@ class CollectorError(Exception):
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 _STACK_LINE_RE = re.compile(r"^\s*at [^\n]*$", re.MULTILINE)
-_EXPECTED_RECEIVED_RE = re.compile(r"^\s*(Expected|Received)\b.*$", re.MULTILINE)
+# Optional single diff-marker char (`-`/`+`) before the whitespace, per
+# task 4.3's measured fix (NORMALIZER_VERSION 2 -> 3): Jest's scalar `.toBe()`
+# format emits an unprefixed `Expected: 5` / `Received: 3` line, but its
+# structural `.toEqual()`/`.toMatchObject()` diff format prefixes the same
+# summary line with a unified-diff marker (`- Expected  - 2` / `+ Received  +
+# 2`) that the un-widened regex never matched, leaving the whole per-case
+# diff body (every differing property value) inside signature_text.
+_EXPECTED_RECEIVED_RE = re.compile(r"^\s*[-+]?\s*(Expected|Received)\b.*$", re.MULTILINE)
 _LINECOL_RE = re.compile(r":\d+:\d+")
 _WHITESPACE_RUN_RE = re.compile(r"[ \t]+")
 
@@ -135,8 +169,10 @@ def normalize_signature_text(raw_message: str, workspace_root: str = None) -> st
     2. normalise CRLF -> LF
     3. cut at the first stack line (`^\\s+at `) — stack frames carry only
        paths and line numbers, nothing else of value
-    4. cut at the first Expected:/Received: line — the expected/received
-       BODY varies per case within one root cause; the signature must not
+    4. cut at the first Expected:/Received: line, optionally diff-marker-
+       prefixed (`- Expected`/`+ Received`, task 4.3's fix, `NORMALIZER_
+       VERSION` 2 -> 3) — the expected/received BODY varies per case within
+       one root cause; the signature must not
     5. rewrite any surviving workspace-absolute path to its relative form
     6. rewrite `:<digits>:<digits>` to `:L:C`
     7. collapse whitespace runs, strip
@@ -388,8 +424,23 @@ def collect(cwd: str, report_file: str, suite_timeout_s: float, max_report_bytes
     dict. Raises CollectorError (run axis, exit 2) on anything that means
     the collector itself could not run — never on a suite outcome, however
     bad, which is always one of the three states instead (design.md
-    Decision 3)."""
-    workspace_root = os.path.abspath(cwd)
+    Decision 3).
+
+    `workspace_root` is `os.path.realpath(cwd)`, not `os.path.abspath(cwd)`
+    (fixed by measurement, task 4.3): Node resolves `process.cwd()`/reported
+    test file paths through any symlink in the path (e.g. macOS's `/tmp` ->
+    `/private/tmp`), but `abspath` does not. Measured live: running from a
+    `/tmp/...` workspace on macOS produced `os.path.relpath` outputs like
+    `../../../../private/tmp/<host-path>/tests/x.test.ts` instead of
+    `../tests/x.test.ts` — an absolute-host-path leak into `test_id` and
+    `distinct_test_files`, and into the signature itself (`signature_of`
+    hashes `test_file`), for a call that changed nothing about the injected
+    cause. `build_test_id`'s own docstring already promises "relative kills
+    the random mktemp workspace path" and R-F1.3 already requires the
+    normalizer to be "deterministic across runs (paths, ...)" — two
+    filesystem-equivalent paths to the same real workspace must therefore
+    resolve identically, which `realpath` guarantees and `abspath` did not."""
+    workspace_root = os.path.realpath(cwd)
     timed_out = run_suite(cwd, report_file, suite_timeout_s, jest_args)
 
     if timed_out:
@@ -605,6 +656,97 @@ def _self_test_signature_scoped_by_test_file():
     return case_g1 and case_g2
 
 
+def _self_test_diff_prefixed_expected_received_cut():
+    """Case (h), added by task 4.3's own measured fix (`NORMALIZER_VERSION`
+    2 -> 3) — the direct regression test for v2's `parseTransfers` cause,
+    which measured 146 failing generated cases collapsing into 146 DISTINCT
+    clusters (one per case) before this fix, exactly the "cluster count grows
+    with case_count" normalizer defect task 4.3's own instruction names.
+
+    Jest's structural `.toEqual()`/`.toMatchObject()` diff format prefixes
+    its summary line with a unified-diff marker (`- Expected  - N` /
+    `+ Received  + N`), unlike the scalar `.toBe()` format cases (a)/(b)
+    already exercise (`Expected: 5`, no prefix). Both directions, since
+    either alone leaves a hole: two failures with the same matcher header but
+    DIFFERING per-case diff bodies must still normalize identically (h.1);
+    two failures with genuinely different matcher headers must still differ
+    (h.2) — the discrimination case (b) already covers, re-asserted here
+    against the diff-prefixed format specifically."""
+    test_file = "tests/parseTransfers.test.ts"
+    diff_body_1 = (
+        "Error: expect(received).toEqual(expected) // deep equality\n\n"
+        "- Expected  - 2\n+ Received  + 2\n\n  Array [\n    Object {\n"
+        '      "direction": "in",\n-     "peer": "0xaaa",\n+     "peer": "0xbbb",\n'
+        "    },\n  ]\n    at Object.<anonymous> (/ws/tests/parseTransfers.test.ts:29:16)"
+    )
+    diff_body_2 = (
+        "Error: expect(received).toEqual(expected) // deep equality\n\n"
+        "- Expected  - 3\n+ Received  + 3\n\n  Array [\n    Object {\n"
+        '      "direction": "out",\n+     "feeAmount": "0.5",\n-     "peer": "0xccc",\n'
+        '+     "peer": "0xddd",\n    },\n  ]\n    at Object.<anonymous> (/ws/tests/parseTransfers.test.ts:103:50)'
+    )
+    other_matcher = "Error: expect(received).toBe(expected) // Object.is equality"
+
+    sig_1 = signature_of(normalize_signature_text(diff_body_1), test_file)
+    sig_2 = signature_of(normalize_signature_text(diff_body_2), test_file)
+    case_h1 = sig_1 == sig_2
+    print(f"  [{'PASS' if case_h1 else 'FAIL'}] (h.1) same matcher header, DIFFERING diff-prefixed"
+          " Expected/Received bodies -> SAME signature (the cluster-grows-with-case_count fix)")
+
+    sig_other = signature_of(normalize_signature_text(other_matcher), test_file)
+    case_h2 = sig_1 != sig_other
+    print(f"  [{'PASS' if case_h2 else 'FAIL'}] (h.2) genuinely different matcher header -> DIFFERENT signature"
+          " (discrimination re-asserted against the diff-prefixed format)")
+
+    return case_h1 and case_h2
+
+
+def _self_test_workspace_root_resolves_symlinks():
+    """Case (i), added by task 4.3's own measured fix: `collect()`'s
+    `workspace_root` must be `realpath(cwd)`, not `abspath(cwd)`, so that
+    when `cwd` is passed as a SYMLINKED alias (e.g. macOS's `/tmp` ->
+    `/private/tmp`) but Jest/Node report the test file's REAL, resolved
+    path (as measured live during task 4.3), the relative path still comes
+    out clean. A real `tempfile`/`os.symlink` scenario, not a synthetic
+    string, because the defect is specifically about symlink resolution,
+    which no string fixture can exercise. Both directions: the FIX
+    (`realpath`) must produce the clean relative path, and the OLD behaviour
+    (`abspath`, which does not resolve symlinks) must be shown to differ —
+    otherwise this case could pass by coincidence."""
+    import tempfile
+
+    # `tempfile.mkdtemp()` itself is not guaranteed fully resolved (macOS's
+    # own `$TMPDIR` is under `/var`, itself a symlink to `/private/var`), so
+    # resolve it explicitly — `real_dir` here must be the TRUE fully-resolved
+    # path the fix is expected to reproduce, not an accidental second alias.
+    real_dir = os.path.realpath(tempfile.mkdtemp())
+    alias = os.path.join(tempfile.gettempdir(), f"collect-self-test-alias-{os.getpid()}")
+    try:
+        os.symlink(real_dir, alias)
+        os.makedirs(os.path.join(real_dir, "tests"))
+        # Simulates `collect(cwd=alias, ...)`: Jest/Node report the file via
+        # its REAL path, not the alias `cwd` was invoked with.
+        test_file_reported = os.path.join(real_dir, "tests", "x.test.ts")
+
+        workspace_root_fixed = os.path.realpath(alias)
+        rel_fixed = relative_test_file(test_file_reported, workspace_root_fixed)
+        clean_relative = rel_fixed == os.path.join("tests", "x.test.ts")
+
+        workspace_root_old = os.path.abspath(alias)
+        rel_old = relative_test_file(test_file_reported, workspace_root_old)
+        old_behaviour_leaked = rel_old != rel_fixed
+
+        ok = clean_relative and old_behaviour_leaked
+    finally:
+        if os.path.islink(alias):
+            os.remove(alias)
+        shutil.rmtree(real_dir, ignore_errors=True)
+    print(f"  [{'PASS' if ok else 'FAIL'}] (i) a symlinked cwd alias, with the file reported via its real"
+          " path, still relativizes to a clean relative path under realpath (never an absolute-host-path"
+          " leak), and the old abspath behaviour is shown to differ, not merely assumed to")
+    return ok
+
+
 def run_self_test() -> bool:
     print("collect.py self-test (spec R-F1.3, design.md 'The normalizer'):")
     results = [
@@ -614,6 +756,8 @@ def run_self_test() -> bool:
         _self_test_absent_toolchain(),
         _self_test_clusters_view_bounded(),
         _self_test_signature_scoped_by_test_file(),
+        _self_test_diff_prefixed_expected_received_cut(),
+        _self_test_workspace_root_resolves_symlinks(),
     ]
     ok = all(results)
     print("\nself-test: all cases passed" if ok else "\nSELF-TEST FAILED", file=sys.stderr if not ok else sys.stdout)
