@@ -53,8 +53,24 @@ detector that never fired.
 
 **Resolution: table-driven parameterization, not more donor modules or more root causes.** The same 6
 root causes get parameterized case tables on their host modules — e.g. `applyKeypadInput`'s 15 cases
-become on the order of 500 rows, `parseTokenAmount`'s 13 become on the order of 400 — so the achieved
-case:cause ratio reaches the incident's order of magnitude (~500:1), not the donor ceiling's ~20:1–23:1.
+become on the order of 600–690 rows, `confirmSeed`'s 12 become on the order of 480–550 — so the achieved
+case:cause ratio reaches the incident's order of magnitude (~430–500:1), not the donor ceiling's
+~20:1–23:1.
+
+**The multiplier is ~40–46×, corrected 2026-08-12 because the ratified figures did not compute.** An
+earlier draft of this decision said ~30–35× while also claiming an aggregate of ~2,500–3,000 cases. Those
+two are inconsistent once the host set is actually selected: the six highest-case import-free donor
+modules total exactly 65 base cases, so ~30–35× yields ~1,950–2,275, i.e. ~325–379:1 — the right order of
+magnitude but below the ratified target. ~40–46× yields ~2,600–3,000, i.e. ~430–500:1. The correction
+costs one number in the generator's axis table and nothing else, because generated rows are never
+committed (design Decision 9a), and the collector's report ceiling is 64 MB against a 5–20 MB expected
+report, so the larger corpus needs no change there either.
+
+**One host module named in the earlier draft is disqualified.** `parseTokenAmount` ranked second by case
+count but its test file imports `formatTokenAmount` for a round-trip assertion, which makes the pair a
+masking risk under R-F1.1. It is excluded from the host set. The exclusion was found at
+fixture-authoring time from the test file's own imports, before any injection existed — which is where
+masking risk is cheapest to find.
 
 **Amplified cases MUST remain real failures of real logic.** Parameterization is additional input rows
 exercised through the same donor module and the same injected root cause — never a synthetic assertion

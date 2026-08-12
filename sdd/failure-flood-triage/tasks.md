@@ -275,11 +275,13 @@ Depends on: PR1 (ADR must exist — R-F11 scenario), PR2 (collector validates th
 - [ ] 3.3 Create `tools/generate-cases.py` + its axis table (Decision 9a — commit the generator, not the
       expanded tables). **Per-module sizing (R-F9.2's design/tasks deliverable) — operator-confirmed
       2026-08-11; R-F9.2 still binds, so the achieved ratio MUST be measured, never assumed:**
-      target amplification ~30–35× each module's existing real case count,
-      mirroring spec Decision B's two worked examples (15 → ~500 rows, 13 → ~400 rows), for an aggregate
-      stage-2 corpus on the order of ~2,500–3,000 generated failing cases across the 6 modules
-      (≈415–500 : 1 against 6 causes — a stated comparison to the real incident's ~500:1, per R-F9.2,
-      not an assumption).
+      target amplification **~40–46×** each module's existing real case count — corrected upward from
+      ~30–35× on 2026-08-12, because the six host modules total exactly 65 base cases and ~30–35× yields
+      only ~1,950–2,275 (~325–379:1), below the ratified target. Mirrors spec Decision B's worked
+      examples (15 → ~600–690 rows, 12 → ~480–550), for an aggregate stage-2 corpus on the order of
+      ~2,600–3,000 generated failing cases across the 6 modules (≈430–500 : 1 against 6 causes — a
+      stated comparison to the real incident's ~500:1, per R-F9.2, measured never assumed).
+      No collector change is needed: its report ceiling is 64 MB against a 5–20 MB expected report.
       Verify: `python3 -m py_compile tools/generate-cases.py`;
       `tools/generate-cases.py --self-test` — byte-identical output across two runs **and** across two
       orderings of its input (no clock, no RNG, sorted keys, `\n` endings).
