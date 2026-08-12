@@ -371,6 +371,28 @@ def serialize(rows):
     return json.dumps(rows, sort_keys=True) + "\n"
 
 
+def case_table_digest(all_cases):
+    """The single hex digest committed at `answer-key/case-table.sha256`
+    (task 3.4; design.md 9a's `case_table_digest` row field). Computed from
+    the in-memory serialized bytes, never from a disk read-back, so this
+    value is reproducible from `all_cases` alone regardless of where (or
+    whether) `cases/` is written.
+
+    Combining convention: sorted "sha256(bytes)  cases/<module>.json" lines,
+    one sha256 over the joined result — the SAME two-step pattern
+    `rig/run.sh`'s `hash_fixture_files` already uses for a set of files
+    (`rig/run.sh:122-141`: read each file, line = "hash  relpath", sha256 of
+    the sorted, newline-joined lines). Reused rather than invented so a
+    future consumer (`run-pipeline.sh`'s preflight, task 5.1) has exactly one
+    digest-of-a-file-set convention to implement, not two."""
+    lines = []
+    for name in sorted(all_cases):
+        rel = f"cases/{name}.json"
+        content = serialize(all_cases[name]).encode()
+        lines.append(f"{hashlib.sha256(content).hexdigest()}  {rel}")
+    return hashlib.sha256("\n".join(lines).encode()).hexdigest()
+
+
 def write_cases(table, out_dir):
     cases_dir = Path(out_dir) / "cases"
     cases_dir.mkdir(parents=True, exist_ok=True)
@@ -461,6 +483,10 @@ def main(argv=None):
         base = axis_table.BASE_CASE_COUNTS[name]
         n = len(all_cases[name])
         print(f"  {name}: {n} cases (base {base}, ~{n / base:.1f}x) -> {paths[name]}")
+    # task 3.4: printed so it can be captured and frozen into
+    # answer-key/case-table.sha256 (inside the MANIFEST, task 3.5) — this
+    # generator never writes into <repo> itself (ADR 0014 Clause A).
+    print(f"case_table_digest: {case_table_digest(all_cases)}")
     return 0
 
 

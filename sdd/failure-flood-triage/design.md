@@ -581,9 +581,17 @@ hypotheses/0002, 0003 ──► theory/  (one write, only if a number survives)
 | `rig/collect.py` | Create | Collector + signature normalizer + `--self-test`. `python3`, stdlib only |
 | `rig/run-pipeline.sh` | Create | Multi-step arm driver: preflight (manifest, toolchain, lockfile, prereg), per-step materialise/invoke/persist, per-invocation read-back, `--shakedown` |
 | `rig/surfaces/failure-flood.txt` | Create | The new preimage. Captured twice, compared, then committed |
-| `rig/fixtures/failure-flood/v1/{src,tests,runtime,tools,prompts,answer-key}/**` | Create | Clean substrate (3a), injections + measured `F0`/`R0`/`S0` (3b), `prereg.json`, `MANIFEST.sha256` over all six paths |
-| `…/v1/tools/generate-cases.py` + its axis table | Create | Decision 9a. Deterministic case-table generator, manifest-covered, never materialised, carries `--self-test` |
-| `…/v1/answer-key/case-table.sha256` | Create | The expected digest of the generated tables. Inside the manifest, which is what makes the digest a freeze rather than a note |
+| `rig/fixtures/failure-flood/v1/{src,tests,runtime,prompts,answer-key}/**` | Create | Clean substrate (3a), injections + measured `F0`/`R0`/`S0` (3b), `prereg.json`, `MANIFEST.sha256`. **No `tools/`** — see the correction below |
+| `…/v2/tools/generate-cases.py` + its axis table | Create | Decision 9a. Deterministic case-table generator, manifest-covered, never materialised, carries `--self-test` |
+| `…/v2/answer-key/case-table.sha256` | Create | The expected digest of the generated tables. Inside the manifest, which is what makes the digest a freeze rather than a note |
+
+**Correction, 2026-08-12: the three rows above originally assigned the generator, its axis table and the
+case-table digest to `v1`.** That contradicted R-F9.1 (`spec.md`: "Stage 1 = 10 failing cases / 3 root
+causes… excluded from the stage-2 test") — stage 1 is unamplified by definition, so it has no generator,
+therefore no generated output, therefore no digest to freeze. Implementation followed the requirement
+rather than this table: `rig/fixtures/failure-flood/v1/` has no `tools/` on disk, and `v1`'s manifest
+covers 10 files across `src/`, `tests/` and `runtime/` only. Corrected here so the table stops
+contradicting the requirement it is supposed to implement.
 | `rig/fixtures/failure-flood/v2/**` | Create | Stage 2, amplified. Same clean substrate and same six causes, different axis table, frozen separately |
 | `rig/results/failure-flood-v1/runs.jsonl` | Create | Committed rows for the new experiment |
 | `hypotheses/0002-*.md`, `hypotheses/0003-*.md` | Create | Slice 5. Their existence is a launch precondition, enforced in preflight |
