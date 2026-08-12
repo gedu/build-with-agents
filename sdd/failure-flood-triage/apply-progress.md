@@ -644,3 +644,195 @@ required to fit.
 
 **PR3 is now closed: tasks 3.1–3.5 all `[x]`.** PR4 (injections + measured answer-key, tasks 4.1–4.4)
 is next; it depends on PR3's now-complete clean substrate + generator + manifest.
+
+## PR4 (tasks 4.1–4.2 only, the pre-authorized 3b-i slice) — DONE
+
+Tasks 4.1 and 4.2 only. **Not started**: task 4.3 (v2's 6 stage-2 injections) and task 4.4
+(`answer-key/prereg.json`) — out of this slice's scope, `rig/fixtures/failure-flood/v2/**` confirmed
+untouched (`git diff --stat -- rig/fixtures/failure-flood/v2` empty throughout).
+
+### Design ambiguity, resolved before implementing — with quotes
+
+Task 4.1's literal text ("Inject the 3 stage-1 root causes into v1's `src/`") appears to collide with
+the already-frozen `MANIFEST.sha256` (task 3.5) and R-F1.3's "clean fixture MUST be proven zero-failure
+before each injection." Resolved by reading, not guessing:
+
+- `design.md:455`: **"MONOLITHIC's workspace is the injected `src/`, the tests, the runtime, the
+  generated case tables, a `node_modules` symlink, `Bash`, and a write tool."** — the workspace an agent
+  receives literally IS the injected `src/`; there is no descriptor-plus-materialised-copy layer.
+- `design.md:584`: the file-changes row for `rig/fixtures/failure-flood/v1/{src,tests,runtime,prompts,
+  answer-key}/**` names its own action as covering "injections + measured `F0`/`R0`/`S0` (3b)" — i.e.
+  the injection IS a change to that path set, `src/` included, not a separate never-materialised layer.
+- `design.md:413`'s never-materialised rule (`prompts/`, `answer-key/`, `tools/`) is stated as "the
+  generator describes the injection structure and must not be visible to the agent" — this is about
+  `answer-key/` (ground truth: `F0`/`R0`/`S0`) and, for v2, the generator/axis-table that would reveal
+  amplification structure. It does **not** apply to `src/` itself, which the agent must see (diagnosing
+  the bug IS the experiment). v1 has no generator at all (`R-F9.1`, task 3.3's done-note), so this rule
+  reduces here to exactly the pre-existing "`answer-key/` is never inside cwd" case.
+- `design.md` section 8 (line 368-369): **"Stage 1 ... is `task_id: s1` on `failure-flood/v1`. Stage 2
+  ... injected into the same clean substrate and frozen separately."** — each fixture version is
+  injected once and frozen; the "never edit an existing fixture version" rule the launch brief attributed
+  to a "Decision 4" does not exist under that name — the closest textual match is the Open Questions line
+  ("a different ratio is a new fixture version, never an edit" — about ratio changes creating v3, not
+  about the 3a→3b progression within one version's own authoring). Flagged as a real inaccuracy in the
+  launch brief, not silently worked around.
+
+**Consequence for "clean, reproducible, not a one-time claim":** the committed `src/` becomes the
+injected (buggy) state as its final artifact for this version; "clean" is preserved via git history (the
+PR3a-i commit) plus a scratch backup taken before injecting, and was reproduced fresh **three times** —
+once per injection, isolated, reverted after each — exactly what R-F1.3 requires structurally, not merely
+asserted once.
+
+### Task 4.1 — injections, each validated in isolation
+
+**The three intended causes recorded at PR3a-i (`apply-progress.md:221-226` above) were re-verified
+against the current source and confirmed still correct** — no cross-module imports found (already
+verified at 3a-i), each module's boundary/index/direction logic unchanged since then:
+
+1. `src/applyKeypadInput.ts:28` — boundary/off-by-one in the decimal-cap comparison:
+   `current.length - dotIndex - 1 >= maxDecimals` → `... > maxDecimals` (relaxes the cap by one digit).
+2. `src/confirmSeed.ts:15` — index/position-mapping defect in `isConfirmCorrect`:
+   `isPickCorrect(seed, position, pick)` → `isPickCorrect(seed, index, pick)` (uses the loop's own index
+   instead of `CONFIRM_POSITIONS`' actual position value; `CONFIRM_POSITIONS` itself is untouched).
+3. `src/parseTransfers.ts:34` — direction/fee-association mapping defect: `account.toLowerCase()` →
+   `account` (drops the case-insensitive compare that both `direction` and, downstream, `feeAmount`
+   depend on).
+
+**Isolation validation, one at a time, on a `mktemp` scratch copy outside `<repo>` (ADR 0014 Clause A),
+reverted to a saved clean backup between each, real `npx jest --runInBand` + `rig/collect.py`:**
+
+- Clean baseline (`C`): `npm ci` → 281 packages; `npx jest --runInBand` → 3 suites, **36 passed, 0
+  failed**, exit 0. `rig/collect.py` → `suite_state=ran`, `failures=0`, `identifier_set_digest`
+  = `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` (sha256 of the empty string, as
+  expected for zero failures).
+- Injection 1 alone: **1 failure** — `applyKeypadInput.test.ts::...::ignores digits past the decimal
+  cap`, signature `277580d674667852`. Reverted; re-ran clean → 36/36 again.
+- Injection 2 alone: **1 failure** — `confirmSeed.test.ts::isConfirmCorrect::returns true when all picks
+  match CONFIRM_POSITIONS`, signature `277580d674667852` (same signature as injection 1 — flagged
+  immediately, not glossed over; explained under task 4.2 below). Reverted; re-ran clean → 36/36 again.
+- Injection 3 alone: **2 failures** — `...maps an incoming transfer (to === account)` (signature
+  `2df32737777805ca`) and `...matches the account address case-insensitively` (signature
+  `277580d674667852`).
+
+None of the three produced zero new failures, so **none was rejected** (R-F1.2 scenario does not fire
+here — reported honestly rather than manufactured).
+
+### Task 4.2 — `F0`/`S0`/`R0` frozen, measured
+
+All 3 injections applied together, verified **twice independently**: once on the working scratch copy,
+once more on a **fresh, separate `mktemp` copy of the real staged repo bytes** (`npm ci` there too) —
+both gave byte-identical `collection/1` output (same `identifier_set_digest`
+`64747c8b2eadfa8f3ca8d3780790aca84f842e3f989b8376333e9f9a569a1f4b`).
+
+**Measured**: `suite_state=ran`, **4 failed / 32 passed / 36 total**, **2 distinct clusters** (`c1`
+count 3, signature `277580d674667852`; `c2` count 1, signature `2df32737777805ca`). Committed to
+`rig/fixtures/failure-flood/v1/answer-key/s1.json` (task_id `s1`, per `design.md:368`) — `C`, `F0`, `S0`,
+`R0`, and a `measured_vs_declared` section recording this section's findings inside the frozen artifact
+itself, not only in this journal. No `prompts/` directory exists yet, so the "committed before
+`prompts/t*.txt` exists" ordering holds vacuously.
+
+**R0** (per cause site, measured cluster_ids and the isolated test that proved it):
+
+| cause_site | cluster_ids | isolated failing test |
+|---|---|---|
+| `src/applyKeypadInput.ts:28` | `c1` | "ignores digits past the decimal cap" |
+| `src/confirmSeed.ts:15` | `c1` | "returns true when all picks match CONFIRM_POSITIONS" |
+| `src/parseTransfers.ts:34` | `c1`, `c2` | "matches...case-insensitively" (`c1`), "maps an incoming transfer" (`c2`) |
+
+**Masking, measured not declared (R-F1.1) — the headline finding of this slice.** All 3 causes stay
+individually observable (none rejected at 4.1), but combined they collapse to **2 distinct cluster
+signatures, not 3**: `applyKeypadInput`'s, `confirmSeed`'s, and one of `parseTransfers`'s failures all
+normalize to the identical signature `277580d674667852` — Jest's generic
+`expect(received).toBe(expected) // Object.is equality` head, with nothing distinguishing before
+`rig/collect.py`'s `normalize_signature_text` cuts at the first `Expected:`/`Received:` line. This is a
+**different** masking mode than R-F1.1's own worked scenario (one cause shadowing another inside the
+*same* test): here, three unrelated causes in three different modules and three different tests share
+one cluster. The diagnostician's bounded `clusters` view (design.md 9b) deliberately drops
+`member_test_ids`, so cluster `c1` is presented as one representative test (`applyKeypadInput`'s) with
+`count=3` — nothing in that bounded view signals that two other, unrelated causes also landed in it.
+**Not adjusted to avoid this** — R-F1.1 explicitly forbids tuning injections away from a measured
+collision — recorded instead, both here and inside `s1.json`'s own `measured_vs_declared.finding`. `R0`
+still records each cause's real `cluster_ids` individually (table above), so grading against the exact
+`<path>:<line>` site (never the cluster id alone, per design.md section 4's device) stays sound even
+though the cluster signature itself cannot discriminate the three.
+
+**Stage-1 target vs. measured, reported honestly rather than tuned.** R-F9.1: *"Stage 1 = 10 failing
+cases / 3 root causes, shakedown."* **Measured: 4 failing cases, not 10.** This is not the masking above
+reducing the count — every one of the 4 isolated failures survived into the combined run unchanged; the
+gap is that isolation itself only ever produced 1 + 1 + 2 = 4, never more, for a structural reason
+specific to each module's own test suite, not an implementation shortfall:
+- `applyKeypadInput.test.ts` has exactly 2 tests that bracket the decimal-cap boundary ("ignores digits
+  past the cap" and "appends the last allowed digit"); any single off-by-one on that comparison flips
+  exactly one of the two, never both (they are complementary boundary tests by construction) — tried both
+  `>=`→`>` and the equivalent `- 1`-dropping variant, same result each time.
+- `confirmSeed.test.ts`'s `isConfirmCorrect` describe block has 4 tests, but 3 of them already return
+  `false` for a reason unrelated to position mapping (a wrong word or a `null` pick at index 0), so
+  `Array.prototype.every`'s short-circuit exits before the injected position bug is ever reached in those
+  3 — only the "all correct" test can observe it, regardless of which index/position variant is chosen
+  (tried an index-substitution and a `position ± 1` shift; both isolate to exactly 1 failure for the same
+  short-circuit reason).
+No alternative reading of either "e.g." example in the recorded intent was selected to inflate this count,
+and none was rejected in favor of a weaker one either — `parseTransfers`'s case-insensitivity reading was
+kept over "keying the fee `Map` on the wrong hash" specifically because it is the *richer* of the two
+named examples (2 failures vs. a verified 1), not because 4 needed padding toward 10.
+
+**MANIFEST recompute, deliberate, reason quoted.** Task 3.5's own done-note (`tasks.md:441`, this journal
+above) already deferred `answer-key/` `F0`/`R0`/`S0` "to PR4" — recomputing now is that deferred step.
+`rig/fixtures/failure-flood/v1/MANIFEST.sha256` recomputed over `runtime/`, `src/`, `tests/`,
+`answer-key/` (still no `tools/` — none exists for v1): `src/` bytes changed (the 3 injections) and
+`answer-key/s1.json` is new, so the pre-injection MANIFEST would mismatch on the very first
+recompute-compare otherwise.
+
+**Verification, real exit codes, on the real committed/staged tree:**
+- Accept-before (fresh recompute vs. the just-written `MANIFEST.sha256`) → exit **0**.
+- Tamper direction 1: one tracked byte appended to `src/applyKeypadInput.ts` → mismatch, exit **2** →
+  restored from a saved copy → recompute matches again, exit **0**.
+- Tamper direction 2: one hex character flipped in the committed `MANIFEST.sha256` itself → mismatch,
+  exit **2** → restored from a saved copy → match again, exit **0**. `git diff --stat` on both paths
+  empty after each restore.
+- `rig/collect.py --self-test` → exit **0**, all 9 self-test cases PASS (unaffected by this slice; run
+  as a precondition check before trusting the collector's own output above).
+- `./hooks/pre-commit --all` → exit **0**, `"redaction check: clean across 157 tracked files"`.
+  `./hooks/pre-commit` (staged only) → exit **0**. `./hooks/pre-commit --self-test` → exit **0**, all 3
+  cases PASS.
+- Manual redaction grep (`rg -n -i "eduardo|graciano|callstack|/Users/"` and the donor-identifier check)
+  over the new/changed files → no matches.
+
+**Process note, recorded rather than hidden.** Mid-verification, `git checkout --
+src/applyKeypadInput.ts` was run before that one file had been `git add`-ed, which reverted it to the
+pre-injection *committed* state instead of the intended injected state — a real mistake, not a simulated
+one. Caught immediately by `git status`/`git diff` (the file showed no staged change when it should
+have), the injection was re-copied from the still-intact scratch working copy, `git add` run immediately
+afterward on the whole `v1/` fixture so the index always holds the intended bytes before any further
+`git`-history-touching command, and the MANIFEST recompute-compare re-verified match (exit 0) afterward.
+No corruption reached the reported `F0`/`S0`/`R0` above: those were measured from an independent,
+already-saved `mktemp` verification copy of the repo's staged bytes taken *before* this mistake occurred,
+and re-confirmed identical to the working-scratch measurement after the recovery.
+
+**Line counts, each with the command that produced it:**
+
+`git diff --cached --numstat` (fixture files only, before the journal/tasks edit):
+
+```
+4    3    rig/fixtures/failure-flood/v1/MANIFEST.sha256
+127  0    rig/fixtures/failure-flood/v1/answer-key/s1.json
+1    1    rig/fixtures/failure-flood/v1/src/applyKeypadInput.ts
+1    1    rig/fixtures/failure-flood/v1/src/confirmSeed.ts
+1    1    rig/fixtures/failure-flood/v1/src/parseTransfers.ts
+```
+
+Fixture raw total: 4+3+127+0+1+1+1+1+1+1 = **140**. All of it is authored/measured content — `s1.json`
+is a hand-assembled ground-truth artifact from real collector output, not machine-generated boilerplate,
+and the `MANIFEST.sha256`/`src/*.ts` lines are one-line hash entries and single-line logic edits — no
+generated-golden exclusion applies here (unlike PR3a-iii/PR3's `case-table.sha256`/lockfile cases).
+The journal (`apply-progress.md`, this section) and `tasks.md`'s 4.1/4.2 done-notes add further insertions
+on top of the 140 above; both are counted in full as authored text per the same rule this cycle has
+applied throughout — the exact combined number is stated by the orchestrator's own `git diff --cached
+--numstat` at staging time, since this section is still being written as that command would run. 140 is
+the fixture-only floor, already well inside the 700-line ceiling with substantial headroom for the
+journal/tasks text.
+
+**Not committed or pushed** — staged only, per instruction; the commit remains the orchestrator's.
+
+**PR4's 3b-i slice (tasks 4.1–4.2) is now closed.** Task 4.3 (v2's 6 stage-2 injections) and task 4.4
+(`answer-key/prereg.json`) remain `[ ]`, explicitly out of this slice's authorization.

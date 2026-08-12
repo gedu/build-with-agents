@@ -31,7 +31,7 @@ const PAYMASTER_LABEL = 'paymasterTransaction';
  * tx's fee), derives direction/peer against the account, and sorts newest-first.
  */
 export function parseTransfers(transfers: IndexerTransfer[], account: string): Transaction[] {
-  const accountLc = account.toLowerCase();
+  const accountLc = account;
 
   const feeByHash = new Map<string, string>();
   for (const transfer of transfers) {

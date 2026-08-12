@@ -489,15 +489,87 @@ edits are out of this phase's scope), flagged here as this cycle's convention re
 
 Depends on: PR3 (clean substrate + generator must exist first).
 
-- [ ] 4.1 Inject the 3 stage-1 root causes into v1's `src/`. For each injection in isolation against the
+- [x] 4.1 Inject the 3 stage-1 root causes into v1's `src/`. For each injection in isolation against the
       clean fixture, run `rig/collect.py` and confirm it produces its expected, frozen signature.
       Verify: an injection producing zero new failures is **rejected from the corpus** before any prompt
       exists (R-F1.2 scenario).
-- [ ] 4.2 Freeze v1's `F0` (measured failure set), `S0` (measured suite state + signature), `R0`
+      **Done.** Ambiguity resolved before implementing, with quotes (not guessed): design.md:455
+      ("MONOLITHIC's workspace is the injected `src/`...") and design.md:584 (v1's file-changes row
+      names "injections... (3b)" against the `{src,tests,runtime,prompts,answer-key}/**` path set
+      itself) both show the injected bytes are the committed `src/`, not a descriptor applied to a copy
+      — there is no generator/patch layer for v1 (R-F9.1, task 3.3's done-note). "Clean" is preserved via
+      git history (the PR3a-i commit) and a scratch backup taken before injecting, reproduced fresh
+      before each of the 3 isolation runs below — not a one-time claim. The three intended causes
+      recorded at PR3a-i (`apply-progress.md:221-226`) were re-verified against the current source and
+      confirmed still correct: `applyKeypadInput`'s decimal-cap boundary, `confirmSeed`'s
+      `CONFIRM_POSITIONS`/`picks` index mapping, `parseTransfers`'s direction/fee-association mapping.
+      **Isolation (mktemp scratch outside `<repo>`, ADR 0014 Clause A), one at a time, reverted to clean
+      between each, `rig/collect.py` against real `npx jest` output**: (1) `applyKeypadInput.ts:28`
+      (`>=`→`>` in the decimal-cap comparison) — 1 failure, signature `277580d674667852`. (2)
+      `confirmSeed.ts:15` (`isPickCorrect(seed, position, pick)`→`isPickCorrect(seed, index, pick)`) — 1
+      failure, same signature `277580d674667852` (Jest's generic `.toBe` equality head, no distinguishing
+      text before the Expected:/Received: cut — see 4.2's masking finding). (3) `parseTransfers.ts:34`
+      (`account.toLowerCase()`→`account`, losing the case-insensitive compare) — 2 failures, signatures
+      `277580d674667852` and `2df32737777805ca`. None produced zero new failures, so none was rejected.
+- [x] 4.2 Freeze v1's `F0` (measured failure set), `S0` (measured suite state + signature), `R0`
       (root-cause label per member of `F0`, from the isolation validation in 4.1 — measured, never the
       declared injection list). Handle the masked-cause scenario: a shadowed cause is absent from the
       scoring key, not present-but-missed.
       Verify: `F0`/`R0`/`S0` committed under `answer-key/`, dated before `prompts/t*.txt` exists.
+      **Done.** Committed `rig/fixtures/failure-flood/v1/answer-key/s1.json` (task_id `s1`, design.md:368)
+      — `C`, `F0`, `S0`, `R0`, and a `measured_vs_declared` section. Measured on a fresh `mktemp` copy of
+      the real committed (post-injection) `src/`+`tests/`+`runtime/` bytes, `npm ci`, `npx jest
+      --runInBand`, `rig/collect.py`: **suite_state=ran, 4 failed / 32 passed / 36 total, 2 distinct
+      clusters** (`c1` count 3, `c2` count 1). No `prompts/` directory exists yet, so the commit-order
+      requirement holds vacuously true.
+      **R-F1.1 masking, measured not declared, reported rather than tuned away**: all 3 injected causes
+      remain independently observable (none rejected at 4.1), but injected TOGETHER they collapse to only
+      **2 distinct cluster signatures, not 3** — `applyKeypadInput.ts:28`, `confirmSeed.ts:15` and
+      `parseTransfers.ts:34`'s "matches...case-insensitively" failure all normalize to the identical
+      signature `277580d674667852` because their first-reported message is Jest's generic
+      `expect(received).toBe(expected) // Object.is equality` head with nothing distinguishing before the
+      normalizer's Expected:/Received: cut (`rig/collect.py`'s `normalize_signature_text`). This is a
+      different masking mode than R-F1.1's own worked scenario (one cause shadowing another inside the
+      SAME test) — here three unrelated causes across three different modules and tests share one cluster.
+      The diagnostician's bounded `clusters` view (design.md 9b) drops `member_test_ids`, so cluster `c1`
+      is presented as one representative test (`applyKeypadInput`'s) with `count=3`, with no signal that
+      two other, unrelated causes also produced members of it. Not adjusted to avoid this — R-F1.1
+      explicitly forbids tuning injections away from a measured collision — recorded in `s1.json`'s
+      `measured_vs_declared.finding` instead; `R0` still lists each cause's real `cluster_ids`
+      individually so grading against the exact `<path>:<line>` site (never the cluster id alone) stays
+      sound.
+      **Stage-1 target vs. measured, honestly not tuned**: R-F9.1 states the shakedown target as "10
+      failing cases / 3 root causes." The real measured total is **4 failing cases**, not 10: isolation
+      measured 1 + 1 + 2 = 4 (not the naive additive worst case, and no reduction from masking either,
+      since every isolated failure survived into the combined run — the masking above reduces distinct
+      *clusters*, not distinct *failing tests*). The gap is structural, not an implementation shortfall:
+      `applyKeypadInput`'s and `confirmSeed`'s test suites each have exactly one test pair that brackets
+      the injected boundary (2 tests probing the decimal cap; `isConfirmCorrect`'s 4 tests, 3 of which
+      already return `false` for an unrelated reason — a null pick or a wrong word — so `Array.every`
+      short-circuits at index 0 before the position bug is ever exercised in those 3). No alternative
+      off-by-one variant explored for either module (several were tried, see this journal's PR4 section
+      in `apply-progress.md`) breaks more than 1 test in isolation, for the same structural reason in
+      each case. Reported as measured; not tuned to reach 10.
+      **MANIFEST recompute, deliberate, reason quoted**: task 3.5's own done-note (`tasks.md:441`)
+      already deferred `answer-key/` `F0`/`R0`/`S0` "to PR4" — recomputing here is that deferred step, not
+      scope creep. `rig/fixtures/failure-flood/v1/MANIFEST.sha256` recomputed (`runtime/`, `src/`,
+      `tests/`, `answer-key/`, no `tools/` — none exists for v1) since `src/` bytes changed (the
+      injections) and `answer-key/s1.json` is new; the old MANIFEST, computed over the pre-injection
+      clean bytes, would otherwise mismatch on the very first recompute-compare. Verified accept-before
+      (fresh recompute over the real committed tree matches the just-written manifest, exit 0), then
+      tamper-proof in both directions on the real tree, reverted immediately each time: (1) one tracked
+      byte appended to `src/applyKeypadInput.ts` → mismatch, exit 2 → restored from a saved copy → match,
+      exit 0. (2) one hex character flipped in the committed `MANIFEST.sha256` itself → mismatch, exit 2
+      → restored from a saved copy → match, exit 0. `git diff --stat` on both paths empty after each
+      restore.
+      **Process note, recorded rather than hidden**: mid-verification, `git checkout --
+      src/applyKeypadInput.ts` was run before that file had been staged, which reverted it to the
+      pre-injection committed state (not to the injected state intended) — a real mistake, not a
+      simulated one. Caught immediately by `git status`/`git diff`, the injection was re-copied from the
+      scratch working copy, `git add` run immediately afterward so the index always holds the intended
+      injected bytes before any further `git`-history-touching command, and the MANIFEST recompute-compare
+      re-verified match (exit 0) afterward. No corruption reached the reported `F0`/`S0`/`R0` (those were
+      measured from an independent, already-saved `mktemp` verification copy taken before the mistake).
 - [ ] 4.3 Repeat 4.1–4.2 for v2's 6 stage-2 root causes, injected through the same real modules the
       generator amplifies. Measure clusters-per-injection under amplification (design 9c) — a cause
       whose cluster count grows with `case_count` is a normalizer defect, not a key entry, and must be

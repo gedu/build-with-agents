@@ -1,0 +1,127 @@
+{
+  "task_id": "s1",
+  "tier": 1,
+  "fixture_note": "Stage 1 (task_id s1) on failure-flood/v1 (design.md section 8, line 368). The agent's workspace materialises this fixture's src/, tests/ and runtime/ only; answer-key/ is never materialised (design.md 9a corollary, line 413 - 'the generator describes the injection structure and must not be visible to the agent', generalised here to the injections themselves even though v1 has no generator). F0/S0/R0 below are MEASURED by rig/collect.py against the real, injected, committed src/ - never the declared injection list (R-F1.1).",
+  "C": {
+    "_purpose": "Clean-fixture baseline, zero failures, proven before any injection (R-F1.3).",
+    "suite_state": "ran",
+    "totals": {
+      "failed": 0,
+      "passed": 36,
+      "suites_expected": 3,
+      "suites_reported": 3,
+      "tests": 36
+    },
+    "identifier_set_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "F0": {
+    "_purpose": "R-F1.1: measured, normalized failure set after all 3 injections together - never the declared list.",
+    "schema": "collection/1",
+    "collector": "jest-json@1",
+    "normalizer_version": 1,
+    "failures": [
+      {
+        "signature": "277580d674667852",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput::ignores digits past the decimal cap"
+      },
+      {
+        "signature": "277580d674667852",
+        "status": "failed",
+        "test_id": "../tests/confirmSeed.test.ts::isConfirmCorrect::returns true when all picks match CONFIRM_POSITIONS"
+      },
+      {
+        "signature": "2df32737777805ca",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers::maps an incoming transfer (to === account)"
+      },
+      {
+        "signature": "277580d674667852",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers::matches the account address case-insensitively"
+      }
+    ],
+    "clusters": [
+      {
+        "cluster_id": "c1",
+        "count": 3,
+        "member_test_ids": [
+          "../tests/applyKeypadInput.test.ts::applyKeypadInput::ignores digits past the decimal cap",
+          "../tests/confirmSeed.test.ts::isConfirmCorrect::returns true when all picks match CONFIRM_POSITIONS",
+          "../tests/parseTransfers.test.ts::parseTransfers::matches the account address case-insensitively"
+        ],
+        "representative_test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput::ignores digits past the decimal cap",
+        "signature": "277580d674667852",
+        "signature_text": "Error: expect(received).toBe(expected) // Object.is equality"
+      },
+      {
+        "cluster_id": "c2",
+        "count": 1,
+        "member_test_ids": [
+          "../tests/parseTransfers.test.ts::parseTransfers::maps an incoming transfer (to === account)"
+        ],
+        "representative_test_id": "../tests/parseTransfers.test.ts::parseTransfers::maps an incoming transfer (to === account)",
+        "signature": "2df32737777805ca",
+        "signature_text": "Error: expect(received).toMatchObject(expected)\n\n- Expected - 2\n+ Received + 2\n\nObject {\n\"amount\": \"10.0\",\n- \"direction\": \"in\",\n- \"peer\": \"0xdd1ffde9c04268d555b1f965c510b2d46bc230c3\",\n+ \"direction\": \"out\",\n+ \"peer\": \"0x998cb71fc83df5e21a3927e8861aa33995522175\",\n}"
+      }
+    ]
+  },
+  "S0": {
+    "_purpose": "R-F2.2: frozen suite state + its normalized signature, for later suite_state_cause classification.",
+    "suite_state": "ran",
+    "identifier_set_digest": "64747c8b2eadfa8f3ca8d3780790aca84f842e3f989b8376333e9f9a569a1f4b",
+    "totals": {
+      "failed": 4,
+      "passed": 32,
+      "suites_expected": 3,
+      "suites_reported": 3,
+      "tests": 36
+    }
+  },
+  "R0": [
+    {
+      "cause_site": "src/applyKeypadInput.ts:28",
+      "cause_label": "boundary/off-by-one in the decimal-cap comparison ('>=' relaxed to '>', allowing one extra fractional digit past maxDecimals) - recorded, never graded",
+      "cluster_ids": [
+        "c1"
+      ],
+      "isolated_test_ids": [
+        "../tests/applyKeypadInput.test.ts::applyKeypadInput::ignores digits past the decimal cap"
+      ]
+    },
+    {
+      "cause_site": "src/confirmSeed.ts:15",
+      "cause_label": "index/position-mapping defect in isConfirmCorrect - CONFIRM_POSITIONS' position value replaced by the loop's own index when calling isPickCorrect - recorded, never graded",
+      "cluster_ids": [
+        "c1"
+      ],
+      "isolated_test_ids": [
+        "../tests/confirmSeed.test.ts::isConfirmCorrect::returns true when all picks match CONFIRM_POSITIONS"
+      ]
+    },
+    {
+      "cause_site": "src/parseTransfers.ts:34",
+      "cause_label": "direction/fee-association mapping defect - account address no longer lowercased before the case-insensitive-by-design comparison against transfer.to - recorded, never graded",
+      "cluster_ids": [
+        "c1",
+        "c2"
+      ],
+      "isolated_test_ids": [
+        "../tests/parseTransfers.test.ts::parseTransfers::maps an incoming transfer (to === account)",
+        "../tests/parseTransfers.test.ts::parseTransfers::matches the account address case-insensitively"
+      ]
+    }
+  ],
+  "measured_vs_declared": {
+    "_purpose": "R-F1.1: the declared injection list MUST NEVER be used as ground truth. Recorded here exactly as measured, not adjusted to hit any target.",
+    "injected_causes_declared": 3,
+    "causes_present_in_R0": 3,
+    "clusters_present_in_F0": 2,
+    "total_failing_cases_measured": 4,
+    "stage1_target_per_R_F9_1": {
+      "failing_cases": 10,
+      "root_causes": 3
+    },
+    "finding": "All 3 declared causes remain independently observable (none produced zero failures in isolation, so none was rejected under R-F1.2) - isolation measured 1, 1 and 2 failing cases respectively (applyKeypadInput, confirmSeed, parseTransfers), summing to 4, not the additive worst case. When all 3 are injected together the combined suite measures exactly 4 failing cases (not 10) across only 2 distinct cluster signatures (not 3): cluster c1 (signature 277580d674667852, the generic Jest '.toBe' equality head 'Error: expect(received).toBe(expected) // Object.is equality') is shared by ALL THREE root causes because none of their first-reported failure messages carries any distinguishing text before the normalizer's Expected:/Received: cut. This is a measured signature-collision masking mode distinct from R-F1.1's worked scenario (one cause shadowing another within the SAME test) - here, three causes in three different modules collapse into one cluster across DIFFERENT tests. The diagnostician's bounded clusters view (design.md 9b) drops member_test_ids, so c1 is presented as one representative test (applyKeypadInput's) with count=3, giving no visible signal that confirmSeed's and parseTransfers' case-insensitivity bug also produced members of that same cluster. Not adjusted to avoid this (R-F1.1 explicitly forbids tuning injections to avoid masking); R0 above records cluster_ids per cause_site as measured, so grading against the exact <path>:<line> site (not the cluster id alone) remains sound even though the cluster signature does not discriminate the three causes."
+  }
+}
