@@ -3,7 +3,7 @@ id: gaps/index
 type: index
 targets: [any]
 status: draft
-verified: 2026-08-11
+verified: 2026-08-12
 sources: ["AGENTS.md", "MAP.md", "decisions/0009-redaction-is-a-repo-wide-rule.md", "decisions/0011-rig-produces-evidence-not-truth.md", "decisions/0012-a-hypothesis-is-never-citable.md", "skills/project-gap-analysis/SKILL.md"]
 ---
 
@@ -14,7 +14,7 @@ Gap analyses of existing projects, measured against this repo's validated practi
 
 Produced by `skills/project-gap-analysis`. One file per analysis, `NNNN-<slug>.md`.
 
-One analysis recorded. No demand has reached two occurrences, so nothing has been built from it.
+Two analyses recorded. One demand has reached two occurrences and resolved to an existing draft skill rather than to a new block; nothing has been built here yet.
 
 ## No project is identifiable here
 
@@ -74,7 +74,7 @@ id: gaps/NNNN-<slug>
 type: research
 targets: [react, react-native, any]
 status: validated
-verified: 2026-08-11
+verified: 2026-08-12
 sources: []
 ---
 ```

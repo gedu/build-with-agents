@@ -67,6 +67,22 @@ So: **name freely in the working report, de-identify the record anyway.** Nothin
 owner already has the full-detail version. If they still want the record named after hearing the
 reason, that is their call to make explicitly, not a default to fall into.
 
+### The one exception: a public source may be named
+
+A public open-source repository is named, exactly as `research/` names its sources. De-identifying
+one is worse on both counts: the class description identifies it to anyone who cares, and every
+claim in the record becomes **unverifiable** to a reader who could otherwise open the repository and
+check it.
+
+The limit is narrow. Public means *the practice being analysed is already published* — not that the
+company is well known, not that a contributor made the code available to you, and not that a
+repository is public while the finding concerns something it did not publish. When in doubt the
+default rule wins, because a wrong call here is not correctable after a push.
+
+A named record is also a public statement about someone else's work. State findings from evidence,
+name what was sampled rather than audited, and record what the project does well with the same care
+as what it lacks — the record is worthless as demand signal if it only looks for absences.
+
 ## The checks
 
 Each check is a validated `theory/` claim turned into something observable in someone else's
@@ -192,6 +208,27 @@ The reason is the failure this repo is built to avoid: one analysis plus enthusi
 `blocks/` directory full of things that solved one project's problem and are described as practice.
 That is inventing knowledge with extra steps.
 
+### A record may carry a solution instead of a demand
+
+When a check comes out **better** in one project than another, that advances no demand — a project
+that already solved something is not a second project asking for it. It supplies something more
+useful: a **worked pattern**, in production, that a reader can go and open.
+
+Record it as such. When the second occurrence does arrive, the block is **extracted from the working
+example rather than designed from the complaint**, which is the difference between a block that has
+been run and a block that has been imagined.
+
+### Two occurrences licenses the demand, not a general claim
+
+Reaching two occurrences means the demand is real rather than imagined. It does **not** license a
+statement about projects of that kind generally. `skills/source-verdict`'s scope test — the claim may
+never be wider than the evidence — applies to this repo's own findings exactly as it applies to
+someone else's blog post.
+
+Also check where the answer already lives. A demand that resolves to an existing draft artifact is
+not a request for a new one, and building the new one anyway is how a repository ends up with two
+half-finished answers to the same question.
+
 ## Recorded runs
 
 Built in from the start, because `skills/context-checkpoint` spent three runs asking a future
@@ -201,6 +238,7 @@ answer lives here, in the file nothing supersedes.
 | # | Date | Project class | Record | Did the skill work |
 |---|---|---|---|---|
 | 1 | 2026-08-11 | React Native + Expo mobile wallet, timeboxed, agent-built | `gaps/0001-rn-expo-wallet-timeboxed.md` | **Yes, with two gaps in the skill itself** — see below |
+| 2 | 2026-08-12 | Large open-source React Native app, 6 years, hundreds of contributors | `gaps/0002-expensify-app.md` | **Yes, with two more gaps** — and the demand rule fired for the first time |
 
 Run 1 produced a complete record with all seven checks decided and no unstatable findings. Two
 things the skill did not cover, both found by running it and both now fixed above:
@@ -215,6 +253,22 @@ things the skill did not cover, both found by running it and both now fixed abov
   against publishing an identifiable weakness map, not only against exceeding permission — and this
   project was a wallet. The skill had no guidance for "permission granted, de-identify anyway".
 
-Promotion to `status: validated` needs recorded runs, not a better rationale. One run is not enough.
-Record failures with the same care as successes: a skill that only records its wins has a habit, not
-a criterion.
+Run 2 was chosen for **owner independence and scale contrast** rather than convenience: a different
+owner, hundreds of contributors, six years, ~11,970 files against ~200. Two more gaps in the skill,
+both now fixed above:
+
+- **No exception for a public source.** The de-identification rule was written for private projects
+  and read as absolute. Applied literally to a well-known open-source repository it would have
+  protected nothing — the class description identifies it anyway — while making every claim
+  uncheckable. Now stated as an exception with its limit.
+- **A record can carry a solution, not only a demand.** Two checks came out better here than in
+  run 1, which advances no demand but supplies a working pattern for one. The skill only modelled
+  records as sources of demand.
+
+**The demand rule fired for the first time.** Check 4 reached two independent occurrences, and it
+resolved to an existing draft skill rather than to a new block — which is the outcome the rule is
+supposed to produce when the answer already exists.
+
+Promotion to `status: validated` needs recorded runs, not a better rationale. Two runs, both of which
+changed the skill, is evidence that it executes and evidence that it is not settled. Record failures
+with the same care as successes: a skill that only records its wins has a habit, not a criterion.
