@@ -28,6 +28,7 @@ where to look and what you are allowed to trust.
 | `AGENTS.md` | Root instructions, rules, frontmatter schema | Yes | active |
 | `MAP.md` | This index — where knowledge lives | Yes | active |
 | `OPERATIONS.md` | What to run and when — gates, rig, review lifecycle. Points at `--help` rather than duplicating flags | Yes | active |
+| `ASK.md` | For the human: what these skills let you ask for, in your own words. The only file here not addressed to an executor | Yes | draft, 5 entries |
 | `setup.sh` | Generates per-tool symlinks and installs git hooks; committed, output is not | Yes | active |
 | `hooks/` | Committed git hooks. `pre-commit` is the ADR 0009 redaction gate | Yes | 1 hook (`pre-commit`) |
 | `skills/` | Tool-neutral skills, one dir per skill (`SKILL.md` + optional `assets/`, `references/`) | Yes, when `validated` | 5 skills (`checkout-isolation` draft, `context-checkpoint` draft, `hypothesis-cycle` draft, `project-gap-analysis` draft, `source-verdict` validated) |
@@ -74,6 +75,7 @@ Do not create a target directory before there is validated content to put in it.
 | "What was discussed about X?" | `journal/` — context and provenance only, never authority |
 | "What are we still unsure about?" | `hypotheses/` — open claims with their tests. Never citable |
 | "What do real projects actually lack?" | `gaps/` — and a demand needs two independent records before it builds anything |
+| "What can I actually ask for?" | `ASK.md` — the five skills in plain request form. The only file written for the human |
 | "Which tool entrypoints exist?" | `setup.sh --help`; nothing generated is committed |
 | "What do I run, and when?" | `OPERATIONS.md` |
 
