@@ -1618,3 +1618,72 @@ in this batch; the diagnose role's live run above therefore had the same full `s
 copy MONOLITHIC gets, not the bounded clusters view design.md describes — a pre-existing gap, not
 introduced or expanded here, flagged for whichever task owns that wiring). Tasks 5.5, 5.7, 5.8 remain
 `[ ]`, each blocked exactly as PR5a's own entry already described.
+
+## PR5c — tasks 5.5 and 5.8 ONLY (not 5.7) — DONE
+
+Scope: exactly tasks 5.5 and 5.8 of PR5, on top of PR5a (5.1/5.2/5.3/5.6) and PR5b (5.4/5.4b). Task 5.7
+is explicitly untouched (requires a clean, committed tree; runs after this commit). No PR6 task touched.
+Full narrative for both tasks lives in `tasks.md`'s own 5.5/5.8 done-notes (this journal cross-refs
+rather than duplicates, to stay inside the session's line budget); this entry adds only what tasks.md
+does not already carry.
+
+**Task 5.5 summary.** A real, previously-unexplained bug was found and fixed first: `hash_paths()`'s
+`python3 - "$1" <<'PY'` redirected the process's own stdin to the heredoc, so the piped file list was
+never read (`sys.stdin` inside the script hit EOF immediately) — every call hashed an empty list.
+Reproduced standalone (`READ_COUNT=0` regardless of input) before any fixture-facing edit; fixed by
+moving the piped list off stdin into `HASH_PATHS_INPUT="$(cat)"`, re-tested (`READ_COUNT=1`, a real edit
+now flips the digest). This is the exact, previously-flagged cause of PR5b's `substrate_changed: false`
+anomaly. Classification: `WORKSPACE_PATHS` split into `SRC_PATHS` (writable) and `RO_PATHS`
+(`tests/`/`runtime/`/`cases/`, read-only for every role); `RO_SUBSTRATE_VIOLATION` fires for any
+role/step touching `RO_PATHS`, `DIAGNOSTICIAN_SRC_VIOLATION` only for `role == "diagnose"` touching
+`SRC_PATHS`. Either sets `ARM_STATE=failed`, placed AFTER the unconditional `--shakedown` override so
+"never void" holds literally even under a shakedown run (verified standalone with the exact boolean
+sequence). `exit "$ARM_EXIT"` replaces the previously-hardcoded `exit 0`. Live-verified (agent-executed
+shell, the real fixed functions sourced verbatim against the real v1 fixture): diagnose-role `src/` edit
+→ `DIAGNOSTICIAN_SRC_VIOLATION` only; the same edit under `role=apply` → no violation; a test-file edit
+and a `package.json` edit (the two new threat-matrix cases) → `RO_SUBSTRATE_VIOLATION`, reaching
+`failed`, never `green`/`void`; an untouched workspace → no false positive. All five cases passed.
+
+**Task 5.8 summary.** `build_row` (tool-surface-v1) is untouched. A new `EXPERIMENTS` registry
+(`runs_root`, `results_dir`, `fixture_roots`, `run_id_re`, `row_builder`, `load_answer_keys`,
+`load_surfaces`, `fixture_digest`, `apply_ambient_drift_pairing` — `True` only for tool-surface-v1)
+backs a manually-parsed `--experiment` flag defaulting to `tool-surface-v1`. `build_row_failure_flood`
+reads `status.json` for state (same file `build_row` reads), applies Hard Ordering Gate layer 3
+(`state=="complete" and not shakedown_used and not prereg_digest` → `void:no-preregistration`,
+downgrade-only, a backstop since layer 2 already refuses that case at the runner), plus its own
+surface/permission-mode read-back downgrades. Occupancy reuses `parse_stream`/`compute_occupancy`
+unchanged. Green-restore reuses task 5.5's `ro_substrate_violation` as the integrity guard, exactly as
+spec R-F4.2 requires ("MUST reuse the runner's verified file-hash mutation check"). Diagnostic
+attribution (`causes_claimed`/`causes_correct`) is deliberately left `null` and disclosed in-code: no
+step threads the model's `root-cause-report.txt` out of the ephemeral workspace before it is discarded
+(same class of gap 5.4b closed for `fix-plan.txt`, not yet closed for this file) — confirmed live that
+the s1 transcript's final message reports causes only in prose, never the frozen `path:line` file
+format, so scoring the prose would score the wrong artifact. Two real bugs found by live-running the
+dispatcher (not code review): `load_failure_flood_answer_keys()` crashed on `prereg.json` (no
+`task_id`) — fixed to skip non-task-answer-key files; `run_self_tests()` unconditionally read
+`ak["tool_sets"]`, tool-surface-v1's own shape — fixed to skip answer keys without it (no behaviour
+change for tool-surface-v1, every existing key there already has it).
+
+**Verification, live and real, both tasks.**
+- `bash -n rig/run-pipeline.sh` → 0. `python3 -m py_compile rig/derive.py` → 0.
+- **42-row projection regression**: committed `rig/results/tool-surface-v1/runs.jsonl` snapshotted
+  before this task's edits; re-derived with `python3 rig/derive.py` (bare, default-experiment path);
+  diffed field-by-field. **42/42 rows byte-identical excluding only `checker_digest`** (unavoidable,
+  `sha256` of `derive.py`'s own bytes) — no new keys needed excluding this time, since the dispatcher
+  adds no fields to tool-surface-v1 rows. The regenerated `runs.jsonl` (42 lines, checker_digest only)
+  is committed, matching PR1's own precedent.
+- `--experiment failure-flood-v1` run against the two real `s1-monolithic-9054`/`s2-pipeline-9054`
+  `--shakedown` run directories left from PR5b (gitignored). Both correctly derive `state: void,
+  void_reason: shakedown` with real per-step occupancy/`bash_call_count` and
+  `ro_substrate_violation`/`diagnostician_src_violation: false`. The generated
+  `rig/results/failure-flood-v1/runs.jsonl` was deleted afterward — committing it is 5.7's territory.
+- `./hooks/pre-commit --all` → 0, "redaction check: clean across 163 tracked files" (run twice, before
+  and after staging).
+
+**Line counts.** `git diff --cached --numstat`: `rig/derive.py` 346+9, `rig/results/tool-surface-v1/
+runs.jsonl` 42+42, `rig/run-pipeline.sh` 139+23 — **3 files, 527+/74- = 601 raw** (code only). Including
+this journal and `tasks.md`'s own done-notes: **5 files changed** per `git diff --cached --shortstat`.
+Sum check: 346+42+139=527, 9+42+23=74, 527+74=601 — matches shortstat exactly.
+
+**Scope not expanded beyond 5.5/5.8.** Task 5.7 untouched, reserved for the orchestrator after this
+commit. No PR6 task touched. Tasks 5.5 and 5.8 marked `[x]`; task 5.7 remains `[ ]`.

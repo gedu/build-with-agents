@@ -371,6 +371,14 @@ def run_self_tests(answer_keys) -> bool:
     ok = True
     print("checker self-test (R-A1.4 — each detector must be observed to fire):")
     for task_id, ak in sorted(answer_keys.items()):
+        # tool_sets (expected/off_set) is tool-surface-v1's own answer-key
+        # shape; failure-flood's answer keys (task 5.8) carry C/F0/S0/R0
+        # instead and define no checker_self_test at all — skip rather than
+        # crash. This is a pure generalisation: every existing tool-surface
+        # answer key already has tool_sets, so this branch never changes
+        # behaviour for that experiment.
+        if "tool_sets" not in ak:
+            continue
         cases = ak.get("checker_self_test", {})
         expected, off_set = ak["tool_sets"]["expected"], ak["tool_sets"]["off_set"]
         for case_name, case in cases.items():
@@ -589,30 +597,358 @@ def apply_ambient_drift_pairing(built):
                 r["defects_found"] = r["defects_missed"] = r["defects_extra"] = None
 
 
+# ---- task 5.8: --experiment dispatcher, per-experiment registry ----------
+# design.md sec 6: "the deciding argument is the slice order, not taste:
+# slice 1 already edits derive.py for the occupancy fields, and its
+# verification is the 42-row projection check. By the time slice 4 needs the
+# dispatcher, that check exists and re-runs." `build_row` (tool-surface-v1's
+# own row builder) is UNTOUCHED by this section — not restructured, not
+# renamed, not re-signatured — so the projection regression has nothing new
+# to explain if it fails.
+
+def fixture_digest_at(root: Path):
+    """Same convention as fixture_digest() above, generalised to an
+    arbitrary root — fixture_digest() itself stays untouched (it is
+    tool-surface-v1's own hardcoded FIXTURE_ROOTS lookup) so nothing that
+    already calls it can observe a behaviour change."""
+    manifest = root / "MANIFEST.sha256"
+    return sha256_hex(manifest.read_bytes()) if manifest.is_file() else None
+
+
+FAILURE_FLOOD_EXPERIMENT = "failure-flood-v1"
+FAILURE_FLOOD_SCHEMA_VERSION = 1
+FAILURE_FLOOD_RUN_ID_RE = re.compile(r"^(s[12])-(monolithic|pipeline)-([0-9][A-Za-z0-9]*)$")
+FAILURE_FLOOD_FIXTURE_VERSIONS = {"s1": "v1", "s2": "v2"}
+FAILURE_FLOOD_FIXTURE_ROOTS = {
+    v: REPO_ROOT / "rig/fixtures/failure-flood" / v
+    for v in sorted(set(FAILURE_FLOOD_FIXTURE_VERSIONS.values()))
+}
+FAILURE_FLOOD_RUNS_ROOT = REPO_ROOT / "rig/runs" / FAILURE_FLOOD_EXPERIMENT
+FAILURE_FLOOD_RESULTS_DIR = REPO_ROOT / "rig/results" / FAILURE_FLOOD_EXPERIMENT
+# ONE preimage for BOTH arms and every role (R-F6.2: "identical across both
+# arms and every role"; task 5.4) — unlike tool-surface-v1's per-arm broad/
+# scoped preimages, there is exactly one file, rig/surfaces/failure-flood.txt.
+FAILURE_FLOOD_SURFACE_ARM = "failure-flood"
+
+
+def load_failure_flood_answer_keys():
+    """Same shape and same disjoint-task_id safety argument as
+    load_answer_keys() above (s1 lives only in v1, s2 only in v2), pointed
+    at FAILURE_FLOOD_FIXTURE_ROOTS instead. These answer-key files carry no
+    `checker_self_test` key — run_self_tests() already tolerates that
+    (`.get("checker_self_test", {})` iterates zero cases), so nothing here
+    needs a parallel self-test runner."""
+    keys = {}
+    for root in FAILURE_FLOOD_FIXTURE_ROOTS.values():
+        ak_dir = root / "answer-key"
+        if ak_dir.is_dir():
+            for f in sorted(ak_dir.glob("*.json")):
+                data = json.loads(f.read_text())
+                # answer-key/ also carries prereg.json (Hard Ordering Gate
+                # layer 2's own config, task 4.4) — a real fixture file, not
+                # a task answer-key, and it has no task_id field. Skip it
+                # rather than assume a filename; the next non-answer-key
+                # *.json this directory gains should not need a new
+                # exclusion here.
+                if "task_id" not in data:
+                    continue
+                keys[data["task_id"]] = data
+    return keys
+
+
+def green_restore_verdict(observed_failures, f0_failures, ro_substrate_violation):
+    """R-F4.2: four values, never composited. The integrity guard MUST reuse
+    the runner's verified file-hash mutation check (spec's own words) —
+    that check is task 5.5's ro_substrate_violation, read back here rather
+    than reinvented as a second mechanism. observed_failures/f0_failures are
+    `collection/1`-shaped lists of {"test_id": ...} (99-verify's own
+    collection.json and the fixture's own F0 block share this schema).
+
+    Ordering matters: a regression (integrity guard fired, or a failure
+    appeared that was not in F0 — which, since C has zero failures by
+    construction, R-F1.3, must have been passing in C) is checked BEFORE
+    anything is called green or partial, per R-F4.2's own listed priority.
+    """
+    if ro_substrate_violation:
+        return "regressed", False
+    observed_ids = {f["test_id"] for f in observed_failures}
+    f0_ids = {f["test_id"] for f in f0_failures}
+    if observed_ids - f0_ids:
+        return "regressed", True
+    if not observed_ids:
+        return "green", True
+    if observed_ids < f0_ids:
+        return "partial", True
+    return "no-progress", True
+
+
+def build_row_failure_flood(run_dir: Path, surfaces, digests, answer_keys):
+    m = FAILURE_FLOOD_RUN_ID_RE.match(run_dir.name)
+    if not m:
+        return None
+    task_id, arm, iteration = m.groups()
+
+    arm_path = run_dir / "arm.json"
+    if arm_path.is_file():
+        arm_data = json.loads(arm_path.read_text())
+    else:
+        # run-pipeline.sh's own Amendment 1 flushes arm.json before every
+        # exit path reachable after the run directory is claimed; a
+        # directory with none never got that far.
+        arm_data = {}
+
+    # State/void_reason are read from the small per-run status.json, the
+    # SAME convention build_row (tool-surface-v1) already uses (`status_path
+    # = run_dir / "status.json"`) — never from arm.json's own copy of the
+    # same two fields, which is authoritative for everything ELSE
+    # (evidence/steps) but is a run-pipeline.sh addition this file predates
+    # for older run directories captured before task 5.5 landed. Falling
+    # back to arm.json's own state/void_reason keeps this row builder
+    # working against a run directory produced by either revision.
+    status_path = run_dir / "status.json"
+    if status_path.is_file():
+        run_status = json.loads(status_path.read_text())
+        state = run_status.get("state", arm_data.get("state", "void"))
+        void_reason = run_status.get("void_reason", arm_data.get("void_reason"))
+    else:
+        state = arm_data.get("state", "void")
+        void_reason = arm_data.get("void_reason")
+    shakedown_used = bool(arm_data.get("shakedown_used"))
+    prereg_digest = arm_data.get("prereg_digest")
+    ro_substrate_violation = bool(arm_data.get("ro_substrate_violation"))
+    diagnostician_src_violation = bool(arm_data.get("diagnostician_src_violation"))
+    steps_meta = arm_data.get("steps", [])
+    anomaly_classes = set()
+
+    # Hard Ordering Gate layer 3 (design.md sec 7, task 5.8's own scope):
+    # a row cannot be counted without a pre-registration digest unless it
+    # is a declared shakedown. run-pipeline.sh's own preflight (layer 2)
+    # already refuses to launch a non-shakedown run with no prereg file
+    # before any run directory is even claimed, so this backstop never
+    # fires against a run made through today's runner — it exists for a
+    # row this deriver cannot trust was produced that way (report.py
+    # already excludes voids and names them, per the same design section).
+    if state == "complete" and not shakedown_used and not prereg_digest:
+        state, void_reason = "void", "no-preregistration"
+        anomaly_classes.add("no-preregistration")
+
+    # Read-back downgrades (never upgrades — same discipline as build_row's
+    # own complete-only checks above): the surface/permission-mode
+    # comparison is explicitly THIS file's job, never run-pipeline.sh's own
+    # (task 5.2's done-note; run-pipeline.sh's read_back_init() comment:
+    # "every existing precedent puts that decision in derive.py").
+    ff_surface = surfaces.get(FAILURE_FLOOD_SURFACE_ARM) or []
+    ff_surface_digest = surface_digest(ff_surface) if ff_surface else None
+    if state == "complete":
+        for step in steps_meta:
+            if step.get("kind") != "model":
+                continue
+            step_surface = step.get("surface_sha256")
+            if ff_surface_digest is not None and step_surface != ff_surface_digest:
+                state, void_reason = "void", "surface-mismatch"
+                anomaly_classes.add("surface-mismatch")
+                break
+            if step.get("permission_mode_matches_declared") is False:
+                state, void_reason = "void", "permission-mode-mismatch"
+                anomaly_classes.add("permission-mode-mismatch")
+                break
+
+    # ---- per-step evidence: occupancy (reusing parse_stream/compute_occupancy
+    # unchanged — both are already experiment-agnostic) and bash_call_count.
+    steps_out = []
+    model_turns_total = 0
+    peak_occupancy_tokens = None
+    cumulative_occupancy_tokens = 0
+    occupancy_is_monotone = None
+    context_window_tokens = None
+    model = None
+    for step in steps_meta:
+        step_name = step.get("index")
+        step_out = dict(step)
+        if step.get("kind") == "model" and step_name:
+            stream_path = run_dir / "steps" / step_name / "stream.jsonl"
+            init_event, tool_calls, _hooks, result_event, stream_anomalies, turns = parse_stream(
+                stream_path, bool(step.get("timed_out"))
+            )
+            anomaly_classes.update(stream_anomalies)
+            if init_event and model is None:
+                model = init_event.get("model")
+            occ = compute_occupancy(turns, result_event, init_event.get("model") if init_event else None)
+            step_out["model_turns"] = occ["model_turns"]
+            step_out["occupancy_series"] = occ["occupancy_series"]
+            step_out["peak_occupancy_tokens"] = occ["peak_occupancy_tokens"]
+            step_out["cumulative_occupancy_tokens"] = occ["cumulative_occupancy_tokens"]
+            step_out["bash_call_count"] = sum(1 for tc in tool_calls if tc["name"] == "Bash")
+            model_turns_total += occ["model_turns"]
+            if occ["peak_occupancy_tokens"] is not None:
+                peak_occupancy_tokens = max(peak_occupancy_tokens or 0, occ["peak_occupancy_tokens"])
+            cumulative_occupancy_tokens += occ["cumulative_occupancy_tokens"] or 0
+            if occ["occupancy_is_monotone"] is not None:
+                occupancy_is_monotone = (occupancy_is_monotone is not False) and occ["occupancy_is_monotone"]
+            if occ["context_window_tokens"] is not None:
+                context_window_tokens = occ["context_window_tokens"]
+        steps_out.append(step_out)
+
+    # ---- green-restore (R-F4.2), from the LAST 99-verify step's real
+    # collection.json plus the fixture's own F0 — no capture gap here,
+    # unlike diagnostic attribution below.
+    suite_state = partial_reason = report_bytes = None
+    verdict = integrity_guard_pass = None
+    verify_path = run_dir / "steps" / "99-verify" / "collection.json"
+    ak = answer_keys.get(task_id)
+    if state == "complete" and verify_path.is_file() and ak:
+        collection = json.loads(verify_path.read_text())
+        suite_state = collection.get("suite_state")
+        partial_reason = collection.get("partial_reason")
+        report_bytes = collection.get("report_bytes")
+        if suite_state == "ran":
+            verdict, integrity_guard_pass = green_restore_verdict(
+                collection.get("failures", []), ak["F0"]["failures"], ro_substrate_violation
+            )
+
+    bash_call_count_total = sum(s.get("bash_call_count", 0) for s in steps_out)
+    fixture_version = FAILURE_FLOOD_FIXTURE_VERSIONS.get(task_id, "v1")
+
+    row = {
+        "schema_version": FAILURE_FLOOD_SCHEMA_VERSION,
+        "run_id": run_dir.name,
+        "experiment": FAILURE_FLOOD_EXPERIMENT,
+        "task_id": task_id,
+        "arm": arm,
+        "iteration": iteration,
+        "model": model,
+        "harness_version": arm_data.get("driver_version"),
+        "python": arm_data.get("python_version"),
+        "node_version": arm_data.get("node_version"),
+        "npm_version": arm_data.get("npm_version"),
+        "lockfile_sha256": arm_data.get("lockfile_sha256"),
+        "case_table_digest": arm_data.get("case_table_digest"),
+        "case_count": arm_data.get("case_count"),
+        "fixture_version": fixture_version,
+        "fixture_digest": digests["fixture"].get(fixture_version),
+        "checker_digest": digests["checker"],
+        "prereg_digest": prereg_digest,
+        "code_commit": arm_data.get("code_commit"),
+        "declared_permission_mode": arm_data.get("declared_permission_mode"),
+        "workspace_file_count": arm_data.get("workspace_file_count"),
+        "state": state,
+        "void_reason": void_reason,
+        # task 5.5's own classification, carried through raw (never
+        # recomputed here — run-pipeline.sh already re-hashed the real
+        # workspace; this file only reads that verdict back).
+        "ro_substrate_violation": ro_substrate_violation,
+        "diagnostician_src_violation": diagnostician_src_violation,
+        "model_turns": model_turns_total,
+        "peak_occupancy_tokens": peak_occupancy_tokens,
+        "cumulative_occupancy_tokens": cumulative_occupancy_tokens,
+        "occupancy_is_monotone": occupancy_is_monotone,
+        "context_window_tokens": context_window_tokens,
+        "bash_call_count": bash_call_count_total,
+        "suite_state": suite_state,
+        "partial_reason": partial_reason,
+        "report_bytes": report_bytes,
+        "verdict": verdict,
+        "integrity_guard_pass": integrity_guard_pass,
+        # Diagnostic attribution (R-F3.2) is DEFERRED, not invented: scoring
+        # needs the model-written root-cause-report.txt file, and no step in
+        # run-pipeline.sh threads that file out of the ephemeral workspace
+        # before it is discarded — the same class of gap task 5.4b found and
+        # closed for fix-plan.txt (which DOES get an explicit handoff copy,
+        # run-pipeline.sh's own comment above run_model_step()). Found live
+        # while building this row (the s1 shakedown transcript shows the
+        # model reporting causes only in prose, never matching the frozen
+        # `<path>:<line>`-only file format R-F3.1 requires), flagged here
+        # rather than scored against the wrong artifact. A future task must
+        # add a handoff copy analogous to fix-plan.txt's before these three
+        # fields can be populated honestly.
+        "causes_claimed": None,
+        "causes_correct": None,
+        "causes_present": len(ak["R0"]) if ak else None,
+        "steps": steps_out,
+        "anomaly_classes": sorted(anomaly_classes),
+    }
+    return row, None, None, []
+
+
+EXPERIMENTS = {
+    "tool-surface-v1": {
+        "runs_root": RUNS_ROOT,
+        "results_dir": RESULTS_DIR,
+        "fixture_roots": FIXTURE_ROOTS,
+        "run_id_re": RUN_ID_RE,
+        "row_builder": build_row,
+        "load_answer_keys": load_answer_keys,
+        "load_surfaces": lambda: {"broad": load_surface("broad"), "scoped": load_surface("scoped")},
+        "fixture_digest": lambda version, root: fixture_digest(version),
+        "apply_ambient_drift_pairing": True,
+    },
+    FAILURE_FLOOD_EXPERIMENT: {
+        "runs_root": FAILURE_FLOOD_RUNS_ROOT,
+        "results_dir": FAILURE_FLOOD_RESULTS_DIR,
+        "fixture_roots": FAILURE_FLOOD_FIXTURE_ROOTS,
+        "run_id_re": FAILURE_FLOOD_RUN_ID_RE,
+        "row_builder": build_row_failure_flood,
+        "load_answer_keys": load_failure_flood_answer_keys,
+        "load_surfaces": lambda: {FAILURE_FLOOD_SURFACE_ARM: load_surface(FAILURE_FLOOD_SURFACE_ARM)},
+        "fixture_digest": lambda version, root: fixture_digest_at(root),
+        "apply_ambient_drift_pairing": False,
+    },
+}
+
+
+def parse_args(argv):
+    """Manual parsing, stdlib only (decisions/0011) — one recognised flag."""
+    experiment = "tool-surface-v1"
+    i = 0
+    while i < len(argv):
+        if argv[i] == "--experiment":
+            if i + 1 >= len(argv):
+                print("--experiment requires a value", file=sys.stderr)
+                sys.exit(2)
+            experiment = argv[i + 1]
+            i += 2
+        else:
+            print(f"unknown argument: {argv[i]!r}", file=sys.stderr)
+            sys.exit(2)
+    return experiment
+
+
 def main():
-    answer_keys = load_answer_keys()
+    experiment = parse_args(sys.argv[1:])
+    if experiment not in EXPERIMENTS:
+        print(f"unknown --experiment {experiment!r}; known: {sorted(EXPERIMENTS)}", file=sys.stderr)
+        return 2
+    reg = EXPERIMENTS[experiment]
+
+    answer_keys = reg["load_answer_keys"]()
     if not run_self_tests(answer_keys):
         print("\nSelf-test FAILED — a detector cannot be proven to fire. Refusing to derive rows.", file=sys.stderr)
         return 1
 
-    surfaces = {"broad": load_surface("broad"), "scoped": load_surface("scoped")}
+    surfaces = reg["load_surfaces"]()
     digests = {
-        "fixture": {v: fixture_digest(v) for v in FIXTURE_ROOTS},
+        "fixture": {v: reg["fixture_digest"](v, root) for v, root in reg["fixture_roots"].items()},
         "checker": CHECKER_DIGEST,
     }
 
-    run_dirs = sorted(p for p in RUNS_ROOT.glob("*") if p.is_dir()) if RUNS_ROOT.is_dir() else []
+    runs_root = reg["runs_root"]
+    run_dirs = sorted(p for p in runs_root.glob("*") if p.is_dir()) if runs_root.is_dir() else []
     built = []
     for run_dir in run_dirs:
-        result = build_row(run_dir, surfaces, digests, answer_keys)
+        result = reg["row_builder"](run_dir, surfaces, digests, answer_keys)
         if result:
             built.append(result)
 
-    apply_ambient_drift_pairing(built)
+    # tool-surface-v1 ONLY (design.md Decision 7's own paired claim, unique to
+    # that experiment's broad/scoped cell shape) — untouched, unrenamed, same
+    # call as before the dispatcher existed.
+    if reg["apply_ambient_drift_pairing"]:
+        apply_ambient_drift_pairing(built)
 
     rows = sorted((b[0] for b in built), key=lambda r: r["run_id"])
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = RESULTS_DIR / "runs.jsonl"
+    results_dir = reg["results_dir"]
+    results_dir.mkdir(parents=True, exist_ok=True)
+    out_path = results_dir / "runs.jsonl"
     with out_path.open("w") as f:
         for row in rows:
             f.write(json.dumps(row, sort_keys=True))
@@ -622,7 +958,8 @@ def main():
     for row in rows:
         print(f"  {row['run_id']}: state={row['state']}"
               + (f" ({row['void_reason']})" if row["void_reason"] else "")
-              + (f" classification={row['classification']}" if row["classification"] else ""))
+              + (f" classification={row['classification']}" if row.get("classification") else "")
+              + (f" verdict={row['verdict']}" if row.get("verdict") else ""))
     return 0
 
 

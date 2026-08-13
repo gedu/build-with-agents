@@ -862,10 +862,38 @@ Depends on: PR2 (collector), PR4 (answer-key + `prereg.json` must exist for pref
       `BASELINE_DISALLOW="Bash"` (`rig/run.sh:330`) load-bearing for its own experiment, confirmed
       untouched (`git diff --stat rig/run.sh` empty). See apply-progress.md's "PR5b" section for the raw
       capture commands and both full tool lists.
-- [ ] 5.5 Detect the diagnostician-writes-to-`src/` violation (re-hash its workspace against its
+- [x] 5.5 Detect the diagnostician-writes-to-`src/` violation (re-hash its workspace against its
       materialised file list; any change to `src/` → arm state `failed`, never `void`).
       Verify (agent-executed shell, new threat-matrix row): a deliberate case editing a test file, and
       one editing `package.json`; both must reach `regressed`/`failed`, never `green`.
+      **Done.** **A real, previously-unexplained bug was found and fixed first, before 5.5 could be
+      built at all**: `hash_paths()`'s own `python3 - "$1" <<'PY' ... PY` invocation redirects the
+      python3 process's stdin to the heredoc (its own source text), silently discarding whatever the
+      caller piped in — `sys.stdin` inside the running script hit EOF immediately, so every call hashed
+      an EMPTY file list. Reproduced standalone (`READ_COUNT=0` regardless of what was piped) before
+      touching any fixture-facing code — this is the exact, previously-flagged cause of PR5b's own
+      anomaly (`substrate_changed: false` on the s1 monolith step despite its transcript showing three
+      real `Edit` calls under `src/` and `npm test` flipping from 4 failed to 36 passed). Fixed by
+      moving the piped path list off stdin into an env var (`HASH_PATHS_INPUT="$(cat)"` prefixed onto
+      the invocation); re-tested standalone (`READ_COUNT=1`, a real byte edit now flips the digest).
+      Classification built on top of the fixed instrument: `WORKSPACE_PATHS` split into `SRC_PATHS`
+      (writable — the applier's and MONOLITHIC's own job) and `RO_PATHS` (`tests/`/`runtime/` plus
+      generated `cases/` — read-only substrate for every role, design.md 9a). `RO_SUBSTRATE_VIOLATION`
+      fires for ANY role/step touching `RO_PATHS`; `DIAGNOSTICIAN_SRC_VIOLATION` fires only when the
+      `diagnose` role touches `SRC_PATHS` (legitimate for `apply`/`monolith`). Either sets arm state
+      `failed`, `void_reason` cleared, exit 1 — placed AFTER the unconditional `--shakedown` override so
+      "never void" holds literally even under a shakedown run (live-tested: `SHAKEDOWN=1` +
+      `DIAGNOSTICIAN_SRC_VIOLATION=1` → `ARM_STATE=failed`, not `void`). **Live verification (agent-
+      executed shell, real v1 fixture, the real fixed `hash_paths`/`compute_manifest`/
+      `manifest_workspace_paths` functions sourced verbatim, never re-implemented)**: (a) diagnose-role
+      `src/parseTransfers.ts` edit → `src_changed=1 ro_changed=0` → `DIAGNOSTICIAN_SRC_VIOLATION=1`,
+      `RO_SUBSTRATE_VIOLATION=0`; (a-control) the SAME edit under `role=apply` → no violation, confirming
+      the applier's own `src/` write stays legitimate; (b, new threat-matrix row) a deliberate edit to
+      `tests/parseTransfers.test.ts` → `ro_changed=1` → `RO_SUBSTRATE_VIOLATION=1`, reaching `failed`,
+      never `green`; (c, new threat-matrix row) a deliberate edit to `runtime/package.json` → same
+      result; (d, control) an untouched workspace → both flags stay 0. All five cases passed. See
+      apply-progress.md's "PR5c" section for the full transcript, both hash-bug reproductions, and the
+      exact classification snippets exercised.
 - [x] 5.6 Build the hashed file list from the manifest's own path set plus generated case paths,
       captured before the `node_modules` symlink exists.
       Verify (symlink traversal, new row): hashed file count equals manifest + case paths, with
@@ -888,12 +916,63 @@ Depends on: PR2 (collector), PR4 (answer-key + `prereg.json` must exist for pref
 - [ ] 5.7 Run the actual `--shakedown` shakedown on the now-clean, now-committed tree.
       Verify: row stamps `void_reason=shakedown` unconditionally — the Hard Ordering Gate's own proof —
       and is excluded from every count.
-- [ ] 5.8 Modify `rig/derive.py`: `--experiment` dispatcher, per-experiment registry (`runs root`,
+- [x] 5.8 Modify `rig/derive.py`: `--experiment` dispatcher, per-experiment registry (`runs root`,
       `fixture roots`, `run-id grammar`, `arm names`, row builder), `no-preregistration` void (Hard
       Ordering Gate layer 3).
       Verify: **re-run PR1's 42-row projection regression** — it must still pass unchanged after the
       dispatcher lands (design §6's stated reason for touching this file twice rather than duplicating
       it); `python3 -m py_compile rig/derive.py`; `./hooks/pre-commit --all`.
+      **Done.** `build_row` (tool-surface-v1's own row builder) is untouched — not restructured, not
+      renamed, not re-signatured. `EXPERIMENTS` registry holds, per experiment: `runs_root`,
+      `results_dir`, `fixture_roots`, `run_id_re`, `row_builder`, `load_answer_keys`, `load_surfaces`,
+      `fixture_digest`, and whether `apply_ambient_drift_pairing` applies (tool-surface-v1 only — its own
+      paired broad/scoped claim, design.md Decision 7, never invented for the new experiment). `--experiment`
+      is manually parsed (stdlib only, decisions/0011), defaulting to `tool-surface-v1` so a bare
+      invocation is unchanged. New `build_row_failure_flood` reads `arm.json` (evidence) plus the small
+      per-run `status.json` (state/void_reason — the SAME file `build_row` itself reads, so both
+      builders share one state-of-record convention), computes Hard Ordering Gate layer 3
+      (`state == "complete" and not shakedown_used and not prereg_digest` → `void:no-preregistration`,
+      downgrade-only, never fires against a run made through today's runner since `run-pipeline.sh`'s own
+      preflight already refuses that case before a run directory is claimed — this is the backstop for a
+      row this deriver cannot trust was produced that way), plus its own read-back downgrades (surface
+      digest and permission-mode-vs-declared per model step — explicitly this file's job, never
+      `run-pipeline.sh`'s, matching the split `read_back_init()`'s own comment names). Occupancy per model
+      step reuses `parse_stream`/`compute_occupancy` completely unchanged (already experiment-agnostic).
+      Green-restore (R-F4.2) is computed from 99-verify's real `collection.json` plus the fixture's own
+      `F0` — the integrity guard reuses task 5.5's `ro_substrate_violation` directly, per spec's own
+      words ("MUST reuse the runner's verified file-hash mutation check"), never reinvented.
+      **Found and disclosed, not invented**: diagnostic attribution (`causes_claimed`/`causes_correct`)
+      is left `null` — no step in `run-pipeline.sh` threads `root-cause-report.txt` out of the ephemeral
+      workspace before it is discarded (the same class of gap 5.4b found and closed for `fix-plan.txt`,
+      which DOES get an explicit handoff copy; `root-cause-report.txt` gets none). Confirmed live: the s1
+      shakedown transcript reports causes only in prose (bold code spans), never as bare `path:line`
+      lines matching R-F3.1's frozen file format — scoring against the chat response instead of the file
+      would silently score the wrong artifact. A future task must add a handoff copy analogous to
+      `fix-plan.txt`'s before these fields can be populated honestly. **Two real bugs found and fixed by
+      live-running the dispatcher against the real fixtures, not asserted from code review**: (1)
+      `load_failure_flood_answer_keys()` crashed on `answer-key/prereg.json` (no `task_id` key) — fixed to
+      skip any `*.json` lacking `task_id`. (2) `run_self_tests()` unconditionally read
+      `ak["tool_sets"]` — tool-surface-v1's own answer-key shape, absent from failure-flood's `C`/`F0`/
+      `S0`/`R0` shape — fixed to skip answer keys with no `tool_sets`, a pure generalisation that changes
+      nothing for tool-surface-v1 (every existing answer key there already has it).
+      **Verification, live and real**: `bash -n rig/run-pipeline.sh` → 0 (unaffected by this task, checked
+      again anyway). `python3 -m py_compile rig/derive.py` → 0. **42-row projection regression**: snapshot
+      of the committed `rig/results/tool-surface-v1/runs.jsonl` taken before this task's edits; re-derived
+      with the final dispatcher-bearing `derive.py` (bare `python3 rig/derive.py`, the default-experiment
+      path); diffed field-by-field against the snapshot. Result: **42/42 rows byte-identical after
+      excluding only `checker_digest`** (unavoidable — it is `sha256` of `derive.py`'s own bytes, changes
+      on any edit to this file, exactly as design.md's own correction states) — zero new keys needed
+      excluding this time, since the dispatcher adds no fields to tool-surface-v1 rows. `runs.jsonl`'s
+      checker_digest is therefore regenerated and committed alongside this change, matching PR1's own
+      precedent (a stale checker_digest would misrepresent the file's own current bytes). Then
+      `--experiment failure-flood-v1` was run against the two REAL `s1`/`s2` `--shakedown` run directories
+      left on disk from PR5b (gitignored, `rig/runs/failure-flood-v1/`): both correctly derive
+      `state: void, void_reason: shakedown`, with real per-step occupancy, `bash_call_count`, and
+      `ro_substrate_violation`/`diagnostician_src_violation: false` (matching 5.5's own live finding that
+      this run never violated). The generated `rig/results/failure-flood-v1/runs.jsonl` was deleted after
+      this check — committing failure-flood's own results file is task 5.7's shakedown-landing territory,
+      out of this task's scope. `./hooks/pre-commit --all` → "redaction check: clean across 163 tracked
+      files".
 
 ## PR6 — Hypotheses + `OPERATIONS.md` + `report.py` tables
 

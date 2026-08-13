@@ -7,10 +7,8 @@
 # it must (dirty-tree guard, manifest recompute-compare, the sha256-
 # combining hash convention, the mkdir-is-the-lock idempotence pattern).
 #
-# THIS UNIT'S SCOPE (tasks.md PR5, tasks 5.1/5.2/5.3/5.4/5.4b/5.6 ONLY).
+# THIS UNIT'S SCOPE (tasks.md PR5, tasks 5.1/5.2/5.3/5.4/5.4b/5.5/5.6 ONLY).
 # NOT built here, named so a gap is never mistaken for an oversight:
-#   - 5.5: the diagnostician-writes-to-src violation is NOT classified into
-#     arm state here; substrate_changed is recorded as raw data only.
 #   - 5.7: the real --shakedown shakedown run. Not performed by this apply.
 #   - 5.8: derive.py's --experiment dispatcher. This file writes raw
 #     per-run/per-step artifacts only, never a runs.jsonl row. No
@@ -19,22 +17,45 @@
 #     already-committed `rig/surfaces/failure-flood.txt` digest convention
 #     applied to the prompt file, but wiring that recording is 5.8's own
 #     row-builder concern, not this unit's.
-#   - 5.4 (DONE this unit): rig/surfaces/failure-flood.txt captured twice
+#   - 5.4 (DONE): rig/surfaces/failure-flood.txt captured twice
 #     from a real, non-nested `claude -p` invocation, compared byte-for-byte,
 #     committed. See apply-progress.md's "PR5b" section for both digests.
-#   - 5.4b (DONE this unit): prompts/s1.txt and prompts/s2.txt created under
+#   - 5.4b (DONE): prompts/s1.txt and prompts/s2.txt created under
 #     both fixtures — the design.md-vs-disk gap task 3.5 first found for
 #     v1's tools/ row (tasks.md:482-494) and this file's own prior revision
 #     flagged again for prompts/ is now closed. Both files are covered by
 #     compute_manifest()'s "prompts" subdirectory (added this unit) and are
 #     loaded per task_id, never per role — see run_model_step()'s own
 #     comment for why one file must serve every role in both arms.
+#   - 5.5 (DONE this unit): the diagnostician-writes-to-src violation now
+#     classifies arm state (see the "read-only substrate / diagnostician-
+#     writes-to-src" classification block near the bottom of this file).
+#     A REAL BUG WAS FOUND AND FIXED, live, before 5.5 could be built at
+#     all: `hash_paths()`'s own `python3 - "$1" <<'PY' ... PY` invocation
+#     redirects the python3 process's stdin to the heredoc (its own source
+#     text), which silently discards whatever the CALLER piped in
+#     (`printf '%s\n' "$paths" | hash_paths "$ws"`) — `sys.stdin` inside the
+#     running script hits EOF immediately, so every call hashed an EMPTY
+#     file list. This exactly explains PR5b's flagged anomaly
+#     (`substrate_changed: false` on the s1 monolith step despite the
+#     model's own transcript showing three real `Edit` calls under `src/`
+#     and `npm test` flipping from 4 failed to 36 passed). Reproduced
+#     standalone (`READ_COUNT=0` printed from inside the script) before
+#     touching any fixture-facing code, then fixed by moving the piped
+#     path list off stdin and into an env var (`HASH_PATHS_INPUT="$(cat)"`
+#     prefixed onto the python3 invocation), re-tested standalone
+#     (`READ_COUNT=1`, a real byte edit now flips the digest), see
+#     apply-progress.md's "PR5c" section for both raw transcripts.
 #
 # EXIT CODES (house convention, matching rig/run.sh's own comment block):
 #   0  the arm reached `complete` or `void` (a designed outcome, never a
 #      failure).
-#   1  the arm reached `failed` — an assertion fired (read-only substrate
-#      bytes changed; task 5.5's role-aware classification is not built here).
+#   1  the arm reached `failed` — an assertion fired: `tests/`/`runtime/`
+#      (the read-only substrate, plus generated `cases/`, design.md 9a)
+#      mutated by any step, or the diagnostician (the `diagnose` role) wrote
+#      to `src/` (task 5.5; design.md sec 2: "the violation is detected:
+#      the diagnostician's workspace is re-hashed against its materialised
+#      file list, and any change to src/ sets arm state failed, not void").
 #   2  could not run at all: bad arguments, a missing prerequisite (node,
 #      npm below floor, a missing prompt or surface preimage), a dirty tree,
 #      a MANIFEST mismatch, a case-table digest mismatch, a failed `npm ci`,
@@ -161,13 +182,28 @@ manifest_workspace_paths() {
 # case_table_digest (task 3.4's own done-note, tasks.md:427: "reused, not
 # invented, so a future consumer... has one digest-of-a-file-set convention
 # to implement, not two").
+#
+# REAL BUG FOUND AND FIXED (task 5.5): the path list MUST NOT be read via
+# `sys.stdin` inside a `python3 - <<'PY'` invocation — the heredoc IS that
+# process's stdin (it is how `-` receives the script source itself), so it
+# silently overrides whatever the caller piped in and `sys.stdin` inside the
+# running script hits EOF immediately, hashing an empty list every time.
+# Reproduced standalone before this fix (`READ_COUNT=0` regardless of what
+# was piped in) — this is the exact, previously-unexplained cause of PR5b's
+# flagged anomaly (`substrate_changed: false` on a step whose own transcript
+# shows three real `src/` edits and a suite flipping from 4 failed to 36
+# passed). Fixed by taking the path list off stdin entirely, into an env var
+# consumed by name (`os.environ["HASH_PATHS_INPUT"]`) — `python3`'s own
+# stdin stays bound to the heredoc, and the caller's pipe is read by `cat`
+# in the same command, never by the python process. See apply-progress.md's
+# "PR5c" section for both the broken and fixed standalone reproductions.
 hash_paths() {
-  python3 - "$1" <<'PY'
-import hashlib, pathlib, sys
+  HASH_PATHS_INPUT="$(cat)" python3 - "$1" <<'PY'
+import hashlib, os, pathlib, sys
 
 root = pathlib.Path(sys.argv[1])
 lines = []
-for rel in sorted(l.strip() for l in sys.stdin if l.strip()):
+for rel in sorted(l.strip() for l in os.environ["HASH_PATHS_INPUT"].splitlines() if l.strip()):
     p = root / rel
     try:
         content = p.read_bytes()
@@ -417,6 +453,15 @@ done
 WORKSPACE_PATHS="$(printf '%s\n' "$WORKSPACE_PATHS" | sed '/^$/d' | sort)"
 WORKSPACE_FILE_COUNT="$(printf '%s\n' "$WORKSPACE_PATHS" | wc -l | tr -d ' ')"
 
+# ---- the two zones the re-hash instrument classifies (task 5.5) ---------
+# design.md sec 2 / design.md 9a: `src/` is writable (the applier's and
+# MONOLITHIC's whole job); `tests/`, `runtime/` and generated `cases/` are
+# read-only substrate for every role, in every step. Split from the same
+# WORKSPACE_PATHS list above — never a second directory walk — so a change
+# can be classified by WHERE it landed, not just THAT something changed.
+SRC_PATHS="$(printf '%s\n' "$WORKSPACE_PATHS" | grep -E '^src/' || true)"
+RO_PATHS="$(printf '%s\n' "$WORKSPACE_PATHS" | grep -vE '^src/' || true)"
+
 # ---- claim the run directory (mkdir is the lock, rig/run.sh's Decision 6) -
 
 mkdir -p "$RUNS_ROOT"
@@ -469,8 +514,12 @@ materialize_step() {
 write_step_status() {
   # $1 dir  $2 role  $3 kind  $4 exit_code  $5 wall_ms  $6 substrate_changed
   # $7 surface_sha256  $8 permission_mode_actual  $9 timed_out
+  # $10 src_changed  $11 ro_changed (task 5.5 — the two zones the arm-level
+  # classification reads; substrate_changed stays the OR of both, unchanged
+  # shape, for anything already reading that one field)
   ROLE="$2" KIND="$3" EXIT_CODE="$4" WALL_MS="$5" SUBSTRATE_CHANGED="$6" \
   SURFACE_SHA256="$7" PERMISSION_MODE_ACTUAL="$8" TIMED_OUT="${9:-0}" \
+  SRC_CHANGED="${10:-0}" RO_CHANGED="${11:-0}" \
   DECLARED_PERMISSION_MODE="$PERMISSION_MODE" STATUS_FILE="$1/status.json" \
   python3 <<'PY'
 import json, os
@@ -483,9 +532,14 @@ data = {
     "exit_code": int(env["EXIT_CODE"]),
     "wall_ms": int(env["WALL_MS"]),
     "timed_out": env["TIMED_OUT"] == "1",
-    # Raw signal only — task 5.5 (out of this unit's scope) classifies this
-    # by role into failed/void; recorded here so 5.5 has real data to read.
+    # substrate_changed is the OR of the two zones below — kept for anything
+    # already reading this one field. Role-aware classification (task 5.5)
+    # reads src_changed/ro_changed, never this combined bit, because src/
+    # changing is legitimate for the applier and MONOLITHIC and illegitimate
+    # only for the diagnostician.
     "substrate_changed": env["SUBSTRATE_CHANGED"] == "1",
+    "src_changed": env["SRC_CHANGED"] == "1",
+    "ro_changed": env["RO_CHANGED"] == "1",
     "surface_sha256": env["SURFACE_SHA256"] or None,
     "declared_permission_mode": env["DECLARED_PERMISSION_MODE"],
     "permission_mode_actual": actual,
@@ -498,6 +552,13 @@ PY
 }
 
 ABORT_REASON=""
+# task 5.5 — set by either step runner below; read by arm-level classification
+# after the step loop. Two separate flags because they mean different things:
+# RO_SUBSTRATE_VIOLATION fires for ANY role/step that touches tests/runtime/
+# cases (illegitimate for everyone); DIAGNOSTICIAN_SRC_VIOLATION fires only
+# when the diagnose role touches src/ (legitimate for monolith/apply).
+RO_SUBSTRATE_VIOLATION=0
+DIAGNOSTICIAN_SRC_VIOLATION=0
 
 run_model_step() {
   local name="$1" dir="$2" ws="$3"
@@ -533,8 +594,13 @@ run_model_step() {
     cp "$RUN_DIR/steps/02-diagnose/handoff/fix-plan.txt" "$ws/fix-plan.txt"
   fi
 
-  local pre_hash post_hash
-  pre_hash="$(printf '%s\n' "$WORKSPACE_PATHS" | hash_paths "$ws")"
+  # task 5.5: pre-hashed separately by zone, never as one combined list — a
+  # legitimate src/ write by monolith/apply must not be conflated with the
+  # illegitimate one (the diagnostician), and a tests/runtime/cases write is
+  # illegitimate for every role.
+  local src_pre src_post ro_pre ro_post
+  src_pre="$(printf '%s\n' "$SRC_PATHS" | hash_paths "$ws")"
+  ro_pre="$(printf '%s\n' "$RO_PATHS" | hash_paths "$ws")"
 
   local start_ms end_ms exit_code timed_out=0
   start_ms="$(now_ms)"
@@ -558,8 +624,18 @@ run_model_step() {
   end_ms="$(now_ms)"
   [ "$exit_code" -eq 124 ] && timed_out=1
 
-  post_hash="$(printf '%s\n' "$WORKSPACE_PATHS" | hash_paths "$ws")"
-  local substrate=0; [ "$pre_hash" != "$post_hash" ] && substrate=1
+  src_post="$(printf '%s\n' "$SRC_PATHS" | hash_paths "$ws")"
+  ro_post="$(printf '%s\n' "$RO_PATHS" | hash_paths "$ws")"
+  local src_changed=0 ro_changed=0
+  [ "$src_pre" != "$src_post" ] && src_changed=1
+  [ "$ro_pre" != "$ro_post" ] && ro_changed=1
+  local substrate=0; { [ "$src_changed" -eq 1 ] || [ "$ro_changed" -eq 1 ]; } && substrate=1
+
+  # task 5.5 classification: tests/runtime/cases (RO_PATHS) is illegitimate
+  # for EVERY role; src/ is illegitimate ONLY for the diagnostician — the
+  # applier and MONOLITHIC are supposed to write src/, that is their job.
+  [ "$ro_changed" -eq 1 ] && RO_SUBSTRATE_VIOLATION=1
+  [ "$role" = "diagnose" ] && [ "$src_changed" -eq 1 ] && DIAGNOSTICIAN_SRC_VIOLATION=1
 
   local read_back surf perm
   read_back="$(read_back_init "$dir/stream.jsonl")"
@@ -574,7 +650,7 @@ run_model_step() {
     cp "$ws/fix-plan.txt" "$dir/handoff/fix-plan.txt"
   fi
 
-  write_step_status "$dir" "$role" model "$exit_code" $((end_ms - start_ms)) "$substrate" "$surf" "$perm" "$timed_out"
+  write_step_status "$dir" "$role" model "$exit_code" $((end_ms - start_ms)) "$substrate" "$surf" "$perm" "$timed_out" "$src_changed" "$ro_changed"
   [ "$timed_out" -eq 1 ] && { ABORT_REASON="timeout"; return 0; }
   return 0
 }
@@ -585,8 +661,12 @@ run_code_step() {
   local expected_suites=3
   [ "$FIXTURE_VERSION" = "v2" ] && expected_suites=6
 
-  local pre_hash post_hash
-  pre_hash="$(printf '%s\n' "$WORKSPACE_PATHS" | hash_paths "$ws")"
+  # task 5.5: same zone split as run_model_step. A code step's role is never
+  # "diagnose", so only the RO_PATHS (tests/runtime/cases) zone can flag a
+  # violation here — a code step legitimately touches nothing under src/.
+  local src_pre src_post ro_pre ro_post
+  src_pre="$(printf '%s\n' "$SRC_PATHS" | hash_paths "$ws")"
+  ro_pre="$(printf '%s\n' "$RO_PATHS" | hash_paths "$ws")"
 
   local start_ms end_ms exit_code
   start_ms="$(now_ms)"
@@ -603,12 +683,17 @@ run_code_step() {
   set -e
   end_ms="$(now_ms)"
 
-  post_hash="$(printf '%s\n' "$WORKSPACE_PATHS" | hash_paths "$ws")"
-  local substrate=0; [ "$pre_hash" != "$post_hash" ] && substrate=1
+  src_post="$(printf '%s\n' "$SRC_PATHS" | hash_paths "$ws")"
+  ro_post="$(printf '%s\n' "$RO_PATHS" | hash_paths "$ws")"
+  local src_changed=0 ro_changed=0
+  [ "$src_pre" != "$src_post" ] && src_changed=1
+  [ "$ro_pre" != "$ro_post" ] && ro_changed=1
+  local substrate=0; { [ "$src_changed" -eq 1 ] || [ "$ro_changed" -eq 1 ]; } && substrate=1
+  [ "$ro_changed" -eq 1 ] && RO_SUBSTRATE_VIOLATION=1
 
   # Tokens are recorded 0, not absent (design.md sec 2: "keeps the 'zero
   # model tokens' claim read back rather than asserted").
-  write_step_status "$dir" "$role" code "$exit_code" $((end_ms - start_ms)) "$substrate" "" "" 0
+  write_step_status "$dir" "$role" code "$exit_code" $((end_ms - start_ms)) "$substrate" "" "" 0 "$src_changed" "$ro_changed"
   # collector-error (design.md Decision 3: run-axis void, never a suite
   # state) is collect.py's own exit 2.
   [ "$exit_code" -eq 2 ] && { ABORT_REASON="collector-error"; return 0; }
@@ -662,6 +747,25 @@ if [ "$SHAKEDOWN" -eq 1 ]; then
   ARM_VOID_REASON="shakedown"
 fi
 
+# ---- read-only substrate / diagnostician-writes-to-src (task 5.5) -------
+# Runs LAST, after every other classification above INCLUDING the
+# unconditional shakedown stamp — the task's own wording is "any change to
+# src/ [by the diagnostician] sets arm state failed, never void", and
+# design.md sec 2 / the exit-code table (this file's header) name both
+# violations as the same assertion-fired outcome, exit 1. Placing this check
+# after shakedown is what makes "never void" literally true: even a
+# --shakedown run that caught a real violation is reported as failed, not
+# silently absorbed into void_reason=shakedown. This does not weaken layer 1
+# (R-F8.2) as a COUNTABILITY guard — a failed row is exactly as excluded from
+# any hypothesis test as a void one; it changes only which of the two named
+# outcomes the row is stamped with, which is the visible signal a real
+# defect happened.
+if [ "$RO_SUBSTRATE_VIOLATION" -eq 1 ] || [ "$DIAGNOSTICIAN_SRC_VIOLATION" -eq 1 ]; then
+  ARM_STATE="failed"
+  ARM_VOID_REASON=""
+  ARM_EXIT=1
+fi
+
 STEP_NAMES_CSV="$(printf '%s\n' "${STEPS[@]%%:*}" | paste -sd, -)"
 RUN_ID="$RUN_ID" TASK_ID="$TASK_ID" ARM="$ARM" ITERATION="$ITERATION" EXPERIMENT="$EXPERIMENT" \
 FIXTURE_VERSION="$FIXTURE_VERSION" STEP_NAMES="$STEP_NAMES_CSV" RUN_DIR="$RUN_DIR" \
@@ -671,6 +775,7 @@ CASE_TABLE_DIGEST="$CASE_TABLE_DIGEST" CASE_COUNT="$CASE_COUNT" PREREG_DIGEST="$
 CODE_COMMIT="$CODE_COMMIT" DECLARED_PERMISSION_MODE="$PERMISSION_MODE" \
 STATE="$ARM_STATE" VOID_REASON="$ARM_VOID_REASON" ABORT_REASON="$ABORT_REASON" DIRTY_OK_USED="$DIRTY_OK" \
 SHAKEDOWN_USED="$SHAKEDOWN" WORKSPACE_FILE_COUNT="$WORKSPACE_FILE_COUNT" \
+RO_SUBSTRATE_VIOLATION="$RO_SUBSTRATE_VIOLATION" DIAGNOSTICIAN_SRC_VIOLATION="$DIAGNOSTICIAN_SRC_VIOLATION" \
 python3 <<'PY'
 import json, os
 
@@ -696,6 +801,12 @@ arm = {
     "dirty_ok_used": env["DIRTY_OK_USED"] == "1",
     "shakedown_used": env["SHAKEDOWN_USED"] == "1",
     "abort_reason": env["ABORT_REASON"] or None,
+    # task 5.5's own classification, at the arm level (each step's status.json
+    # already carries the same per-step src_changed/ro_changed evidence).
+    "ro_substrate_violation": env["RO_SUBSTRATE_VIOLATION"] == "1",
+    "diagnostician_src_violation": env["DIAGNOSTICIAN_SRC_VIOLATION"] == "1",
+    "state": env["STATE"],
+    "void_reason": env["VOID_REASON"] or None,
     "steps": steps,
 }
 with open(os.path.join(env["RUN_DIR"], "arm.json"), "w") as f:
@@ -716,5 +827,10 @@ if [ "$ARM_EXIT" -eq 2 ]; then
   die_cannot_run "arm aborted after the run directory was claimed ($ABORT_REASON); arm.json is written under $RUN_DIR for inspection"
 fi
 
+if [ "$ARM_EXIT" -eq 1 ]; then
+  printf '\n  ASSERTION FIRED: arm %s -> failed (ro_substrate_violation=%s diagnostician_src_violation=%s). This is exit 1, not exit 2 — the run directory was already claimed and status.json/arm.json are flushed under %s.\n' \
+    "$RUN_ID" "$RO_SUBSTRATE_VIOLATION" "$DIAGNOSTICIAN_SRC_VIOLATION" "$RUN_DIR" >&2
+fi
+
 printf '  run %s: state=%s%s -> %s\n' "$RUN_ID" "$ARM_STATE" "${ARM_VOID_REASON:+ ($ARM_VOID_REASON)}" "$RUN_DIR"
-exit 0
+exit "$ARM_EXIT"
