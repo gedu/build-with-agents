@@ -7,23 +7,28 @@
 # it must (dirty-tree guard, manifest recompute-compare, the sha256-
 # combining hash convention, the mkdir-is-the-lock idempotence pattern).
 #
-# THIS UNIT'S SCOPE (tasks.md PR5, tasks 5.1/5.2/5.3/5.6 ONLY). NOT built
-# here, named so a gap is never mistaken for an oversight:
-#   - 5.4: rig/surfaces/failure-flood.txt does not exist. Every invocation
-#     refuses (exit 2) until it is captured and committed.
+# THIS UNIT'S SCOPE (tasks.md PR5, tasks 5.1/5.2/5.3/5.4/5.4b/5.6 ONLY).
+# NOT built here, named so a gap is never mistaken for an oversight:
 #   - 5.5: the diagnostician-writes-to-src violation is NOT classified into
 #     arm state here; substrate_changed is recorded as raw data only.
 #   - 5.7: the real --shakedown shakedown run. Not performed by this apply.
 #   - 5.8: derive.py's --experiment dispatcher. This file writes raw
-#     per-run/per-step artifacts only, never a runs.jsonl row.
-#   - prompts/ under rig/fixtures/failure-flood/{v1,v2}/ do not exist on
-#     disk at all. No PR3/PR4 task created them, despite design.md's own
-#     File-changes table naming "…/{src,tests,runtime,prompts,answer-key}/**"
-#     as created, and despite neither fixture's real MANIFEST path set
-#     (task 3.5) including one — the same class of design.md-vs-disk
-#     discrepancy task 3.5 already found for v1's tools/ row
-#     (tasks.md:482-494). Flagged, not fixed — fixture content is not this
-#     file's job.
+#     per-run/per-step artifacts only, never a runs.jsonl row. No
+#     `prompt_sha256` field is written to status.json either — R-F7.1's
+#     "hash of each role's exact prompt bytes" is satisfiable from the
+#     already-committed `rig/surfaces/failure-flood.txt` digest convention
+#     applied to the prompt file, but wiring that recording is 5.8's own
+#     row-builder concern, not this unit's.
+#   - 5.4 (DONE this unit): rig/surfaces/failure-flood.txt captured twice
+#     from a real, non-nested `claude -p` invocation, compared byte-for-byte,
+#     committed. See apply-progress.md's "PR5b" section for both digests.
+#   - 5.4b (DONE this unit): prompts/s1.txt and prompts/s2.txt created under
+#     both fixtures — the design.md-vs-disk gap task 3.5 first found for
+#     v1's tools/ row (tasks.md:482-494) and this file's own prior revision
+#     flagged again for prompts/ is now closed. Both files are covered by
+#     compute_manifest()'s "prompts" subdirectory (added this unit) and are
+#     loaded per task_id, never per role — see run_model_step()'s own
+#     comment for why one file must serve every role in both arms.
 #
 # EXIT CODES (house convention, matching rig/run.sh's own comment block):
 #   0  the arm reached `complete` or `void` (a designed outcome, never a
@@ -98,7 +103,8 @@ die_cannot_run() { printf '\n  COULD NOT RUN: %s\n  This is exit 2, not a pass.\
 now_ms() { python3 -c 'import time; print(int(time.time() * 1000))'; }
 
 # compute_manifest <fixture-root> — sorted "sha256  relpath" over src/,
-# tests/, runtime/, tools/, answer-key/. Adapted from rig/run.sh:154-171.
+# tests/, runtime/, tools/, answer-key/, prompts/. Adapted from
+# rig/run.sh:154-171.
 # CORRECTED BY LIVE MEASUREMENT: task 3.5's done-note (tasks.md:448-450)
 # describes the path set as "…, answer-key/case-table.sha256" (one file) —
 # true only at THAT task's own moment, before 4.2/4.4 added
@@ -108,13 +114,22 @@ now_ms() { python3 -c 'import time; print(int(time.time() * 1000))'; }
 # Walking the whole answer-key/ directory (like src/tests/runtime/tools)
 # matches the actual committed manifests for both v1 and v2 — verified live.
 # Skips __pycache__/*.pyc under tools/ (task 3.5's hazard finding).
+# SECOND CORRECTION (task 5.4b): "prompts" added to this tuple. Design.md 9a
+# groups prompts/ with tools/ and answer-key/ as "never-materialised" but
+# manifest-covered — the generator/checker/prompt bytes must all be frozen
+# and tamper-detected the same way, even though only prompts/ is excluded
+# from manifest_workspace_paths() below (never copied into a step's
+# workspace). Omitting it here would leave prompts/s1.txt and
+# prompts/s2.txt uncovered by the MANIFEST.sha256 recompute-compare gate —
+# exactly the class of hole design.md 9a exists to close for tools/ and
+# answer-key/.
 compute_manifest() {
   python3 - "$1" <<'PY'
 import hashlib, pathlib, sys
 
 root = pathlib.Path(sys.argv[1])
 lines = []
-for sub in ("src", "tests", "runtime", "tools", "answer-key"):
+for sub in ("src", "tests", "runtime", "tools", "answer-key", "prompts"):
     d = root / sub
     if not d.is_dir():
         continue
@@ -487,7 +502,19 @@ ABORT_REASON=""
 run_model_step() {
   local name="$1" dir="$2" ws="$3"
   local role="${name#*-}"
-  local prompt_file="$FIXTURE_ROOT/prompts/${role}.txt"
+  # ONE prompt file PER task_id, never per role (task 5.4b; tasks.md:794
+  # "one `.txt` per `task_id` (`s1`, `s2`)" — exactly two files, not three).
+  # This is the same naming convention rig/run.sh:306 already uses
+  # (`PROMPT_FILE="$FIXTURE_ROOT/prompts/${TASK_ID}.txt"`), and it is what
+  # makes ADR 0010's "harness shape is the only variable" provable at the
+  # byte level: MONOLITHIC's one model step and PIPELINE's `diagnose` and
+  # `apply` steps all load the identical committed file for a given
+  # task_id, so no role or arm can be handed a differently-worded task.
+  # What differs between roles is never the prompt text — it is the
+  # workspace state each role's invocation is composed with (a bounded
+  # clusters view, or a copied-in fix-plan.txt), which is harness shape,
+  # the one dimension ADR 0010 permits to vary.
+  local prompt_file="$FIXTURE_ROOT/prompts/${TASK_ID}.txt"
   # Checked here, per-invocation, immediately before invoking — not as a
   # global up-front gate, so a PIPELINE arm's earlier code step (01-collect)
   # can still run and persist real artifacts even while a later step's

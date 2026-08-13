@@ -1409,3 +1409,212 @@ non-shakedown invocations by construction, not merely by the `prereg.json` file'
 dependency (5.4 on nothing but its own capture work; 5.5 on nothing but its own classification logic; 5.7
 on 5.4 landing first per the Hard Ordering Gate's own structural-impossibility design; 5.8 on `derive.py`
 work not started here). PR6 remains blocked on PR5 closing in full.
+
+## PR5b — tasks 5.4 and 5.4b ONLY (not 5.5, not 5.7, not 5.8)
+
+**Scope discipline.** This batch touched exactly six paths:
+`rig/fixtures/failure-flood/{v1,v2}/MANIFEST.sha256` (modified, +1 line each), `rig/run-pipeline.sh`
+(modified), `rig/fixtures/failure-flood/{v1,v2}/prompts/{s1,s2}.txt` (created), and
+`rig/surfaces/failure-flood.txt` (created). `rig/run.sh`, every fixture's `src/`, `tests/`, `runtime/`,
+`s1.json`/`s2.json`/`prereg.json` are untouched — `git diff --stat rig/run.sh` and
+`git diff --stat -- rig/fixtures/*/{src,tests,runtime,answer-key}` both empty, `git diff` on
+`s1.json`/`s2.json`/`prereg.json` individually also empty. Two other sessions' uncommitted files
+(`MAP.md`, `gaps/README.md`, `skills/project-gap-analysis/SKILL.md`, `gaps/0002-*.md`) were left alone —
+staged by exact path (`git add <path> <path> ...`), never `git add -A`/`git add .`.
+
+### Task 5.4 — the surface preimage, captured twice and compared
+
+**Constraint honoured, not moved.** `rig/run.sh:330`: `BASELINE_DISALLOW="Bash"` — quoted verbatim,
+confirmed unchanged by the empty `rig/run.sh` diff above. That baseline stays local to `run.sh`'s own
+scoped-vs-broad comparison; `run-pipeline.sh` carries its own, separate preimage exactly as design.md's
+"The new surface preimage" paragraph requires.
+
+**Why a real invocation, not a derivation from `broad.txt`/`scoped.txt`.** `broad.txt` was captured with
+`Bash` disallowed; failure-flood's both arms need `Bash` present. Computing "`broad.txt` ∪ {Bash}" would
+have been arithmetic on a related file, not a read-back — exactly the "asserting the list you intended"
+`run.sh:172`'s own design.md citation and this task's instructions both warn against. `rig/run.sh:315`'s
+own comment is explicit that a guessed value here "would silently break every future void-classification"
+— so a real subprocess was launched instead.
+
+**Two real, independent captures, compared before either byte reached the repo.** `claude --version` on
+this machine: `2.1.229 (Claude Code)`. Capture command (twice, each from a fresh scratch cwd outside
+`<repo>`, never a nested nested-fixture path):
+```
+claude -p "Reply with exactly the single word OK and take no other action. Do not read, write, list, or execute anything." \
+  --output-format stream-json --verbose --strict-mcp-config --permission-mode bypassPermissions
+```
+Both exited 0. Each `stream.jsonl`'s `system`/`init` event's `tools` list, read back exactly the way
+`read_back_init()` (`run-pipeline.sh`) and `surface_digest()` (`rig/derive.py:87-91`) already do —
+`sha256("\n".join(sorted(set(tools))))` — produced:
+- capture 1: 31 tools, digest `d8693e27d5f8e406a465def75101c4eaa85b23b685e78c2d5d07754d0f7e8daa`
+- capture 2: 31 tools, digest `d8693e27d5f8e406a465def75101c4eaa85b23b685e78c2d5d07754d0f7e8daa`
+
+Identical sorted sets, identical digest, compared with a Python set-equality check before either was
+written anywhere — **not** "captured once and assumed stable". The 31 tools: `Bash`, `CronCreate`,
+`CronDelete`, `CronList`, `DesignSync`, `Edit`, `EnterWorktree`, `ExitWorktree`, `ListAgents`, `Monitor`,
+`NotebookEdit`, `PushNotification`, `Read`, `RemoteTrigger`, `ReportFindings`, `ScheduleWakeup`,
+`SendMessage`, `ShareOnboardingGuide`, `Skill`, `Task`, `TaskCreate`, `TaskGet`, `TaskList`, `TaskOutput`,
+`TaskStop`, `TaskUpdate`, `ToolSearch`, `WebFetch`, `WebSearch`, `Workflow`, `Write`. Notably absent:
+`Glob`, `Grep` — confirming `run.sh:321-323`'s "Bash subsumes Glob and Grep... while it is available the
+surface presents Bash alone and hides them" empirically for this invocation shape too, not just
+`run.sh`'s own scoped/broad pair. Committed to `rig/surfaces/failure-flood.txt` in the exact
+`broad.txt`/`scoped.txt` format (`# harness: <version> (Claude Code)` header, one tool name per line,
+`load_surface()`'s comment-stripping convention).
+
+**Verify bullet, live: subprocess argument composition.** A third real invocation, cwd
+`.../scratchpad/adversarial capture 3` (a path containing spaces), prompt text containing spaces, a
+double quote, a single quote, a backtick, and non-ASCII (café / 中文 / 🎯), run through the identical
+composition `run-pipeline.sh:521` uses for real steps (`claude -p "$PROMPT_TEXT" --strict-mcp-config
+--permission-mode bypassPermissions ...`, prompt as one quoted argument, never interpolated into a larger
+string) — exit 0, `stderr.log` empty, and the read-back digest was again exactly
+`d8693e27d5f8e406a465def75101c4eaa85b23b685e78c2d5d07754d0f7e8daa`. Composition survives adversarial
+content; `init.tools` matches the committed preimage regardless.
+
+### Task 5.4b — the missing `prompts/`, and the topology question resolved with quotes
+
+**The literal instruction that decides the naming scheme.** `tasks.md:794` (this task's own text): "one
+`.txt` per `task_id` (`s1`, `s2`)" — exactly two files, not three, not one per role.
+
+**The real conflict this task named, found on disk, not assumed.** PR5a's own `run_model_step()`
+resolved the prompt path as `local prompt_file="$FIXTURE_ROOT/prompts/${role}.txt"` — `role` being
+`monolith`, `diagnose`, or `apply` (derived from the step name), which would need **three** files per
+fixture, directly contradicting the two-file instruction above. Corrected to
+`local prompt_file="$FIXTURE_ROOT/prompts/${TASK_ID}.txt"` — the exact naming `rig/run.sh:306` already
+uses (`PROMPT_FILE="$FIXTURE_ROOT/prompts/${TASK_ID}.txt"`), so `run-pipeline.sh` now follows the same
+convention as its sibling rather than inventing a second one.
+
+**Why one file can serve MONOLITHIC's one step and PIPELINE's two model steps, per ADR 0010.** The
+constraint is that the same task must be posed to both arms; one committed file, loaded byte-identical
+for `monolith`, `diagnose`, and `apply` alike, is a *stronger* guarantee of that than three separately
+authored (even if intentionally similar) files could ever prove — the prompt hash cannot silently drift
+per role because there is only one set of bytes to hash. What legitimately differs between roles is
+never prompt text — it is workspace state (a diagnostician's fresh workspace has no prior `fix-plan.txt`;
+an applier's does, copied in by `run-pipeline.sh` itself before invocation) — and workspace composition
+is harness shape, the one dimension ADR 0010 permits to vary. The prompt text itself is written to be
+agnostic to which role reads it: it states the overall task (investigate failing tests, find root
+causes, fix them), an *optional* branch for a role that produces a plan without applying it
+(`fix-plan.txt`) and an *optional* branch for a role that finds one already present — both branches are
+simply inert for `monolith`, which never encounters either file. Content, not asserted from design intent
+alone but checked against `spec.md`'s own hard obligation: `R-F3.1` — "Both arms MUST write a file
+`root-cause-report.txt` to the run workspace root before completion, in this exact format... Line 1 is
+the literal sentinel [`ROOT-CAUSE-REPORT v1`]. Every following non-blank line MUST match
+`^[\w/.\-]+:\d+$`" — quoted into the prompt body verbatim rather than paraphrased, so the deliverable
+format the prompt asks for and the format the (future, task 5.8) scorer will parse are provably the same
+text.
+
+**A design.md staleness flagged, not silently followed.** `design.md`'s own "Data flow" section (and its
+"Decision 4 revised" paragraph) describes the frozen format as `CAUSE <path>:<line> <cluster_ids>` lines
+inside the final assistant message, parsed from `result.result` — but `spec.md` (`rg -n "CAUSE"
+sdd/failure-flood-triage/spec.md` → zero matches) contains no such format anywhere; `R-F3.1` is the only
+current, normative deliverable-format requirement, and it names a **file** (`root-cause-report.txt`), not
+a final-message line format. Since `spec.md` was accepted gate-clean and amended in place after
+`design.md`'s own revision (per the spec artifact's own Engram note), `spec.md` is treated here as
+authoritative and `design.md`'s "Data flow" diagram is flagged as stale — same class of finding as the
+`tools/`-under-v1 and `prompts/`-never-created gaps already caught twice in this PR. Not fixed here
+(`design.md` is out of this unit's scope); recorded so it does not evaporate, for whichever PR next
+touches `design.md`.
+
+**Redaction, ADR 0009.** No donor/client/employer/person name anywhere in `s1.txt`/`s2.txt` — checked by
+inspection (the prompt speaks only of "this project's automated test suite") and by
+`./hooks/pre-commit --all`'s redaction gate passing over the newly-added files. No specific root-cause
+count is disclosed to the agent (the prompt says "root causes", plural, open-ended) — avoiding exactly
+the closed-vocabulary ground-truth leak `design.md`'s "Decision 4 revised" already warned against.
+
+**`prompts/` stays never-materialised — confirmed by reading the code, not asserted.**
+`materialize_step()` (`run-pipeline.sh`) copies only `src/`, `tests/`, `runtime/` into a step's workspace;
+`manifest_workspace_paths()` filters `compute_manifest()`'s own output to `^(src|tests|runtime)/`,
+explicitly excluding `prompts/` (and `tools/`, `answer-key/`) from ever being hashed as workspace content
+or copied anywhere the agent's tools can see it. `run_model_step()` reads `prompt_file`'s bytes into a
+shell variable and passes them as `claude -p`'s own argument — the file's path is never inside the
+workspace directory tree at all. Unchanged by this batch; confirmed, not altered.
+
+**Manifest coverage gap found and closed.** `compute_manifest()`'s subdirectory tuple was
+`("src", "tests", "runtime", "tools", "answer-key")` — it never included `prompts`, even though
+design.md 9a groups `prompts/` with the already-covered `tools/`/`answer-key/` as "never-materialised"
+but manifest-covered. Left as-is, the new `prompts/s{1,2}.txt` files would have been invisible to the
+MANIFEST.sha256 recompute-compare gate entirely — a tamper to either prompt file would go undetected.
+Added `"prompts"` to the tuple. Verified two ways: (1) extracted the exact function body from the edited
+file and ran it standalone against both fixture roots — `diff` against each committed `MANIFEST.sha256`
+showed exactly one new line each (`prompts/s1.txt` / `prompts/s2.txt`, correct digest, correct sort
+position between `answer-key/` and `runtime/`), nothing else changed; (2) after appending those lines,
+re-ran the same extracted function and diffed again — **clean, both fixtures**.
+
+**`prompts/s1.txt` and `prompts/s2.txt`.** Identical content by design (see the topology section above —
+nothing in `spec.md`/`design.md` requires stage-1 and stage-2 wording to differ, and identical wording
+avoids introducing an uncontrolled third variable between stages); `diff` between the two files: empty.
+Both sha256 `f6d2d9abf4d0dfa4eda049a32fea2826ea164d1a52a6adad810a0c9c54474c99`.
+
+**Answer-key-before-prompt ordering, confirmed already satisfied, not re-ordered.** `v1/answer-key/s1.json`
+and `v2/answer-key/{s2.json,prereg.json,case-table.sha256}` were committed in PR4 (tasks 4.1-4.4), long
+before this PR5b commit exists. `git log --diff-filter=A -- rig/fixtures/failure-flood/v1/answer-key/s1.json`
+and the `v2/answer-key/*` equivalents all predate this working tree's HEAD by multiple commits (PR4's own
+commits); this batch's prompt files are staged, not yet committed, and will land in a commit strictly
+after those. "Checker-first" stays provable from commit order without any action needed here.
+
+**Live proof the two aborts no longer fire — real exit codes, not code-reading.**
+```
+$ bash rig/run-pipeline.sh s1 monolithic 9054 --permission-mode bypassPermissions --shakedown --dirty-ok
+  run s1-monolithic-9054: state=void (shakedown) -> .../rig/runs/failure-flood-v1/s1-monolithic-9054
+EXIT=0
+```
+`arm.json`: `"abort_reason": null`, `"workspace_file_count": 10` (matches task 3.5's own v1 count).
+Step `01-monolith`: `"exit_code": 0`, `"kind": "model"`, `"surface_sha256":
+"d8693e27d5f8e406a465def75101c4eaa85b23b685e78c2d5d07754d0f7e8daa"` (matches the committed preimage
+exactly), `"wall_ms": 89539` — an 89.5-second REAL invocation, not an instant abort (an early
+`missing-prompt`/`missing-surface-preimage` return happens before `write_step_status` is ever called, so
+no step-level `status.json` would exist at all if either had fired). The model's own final message: "Fixed
+all three bugs and all 36 tests now pass" — it genuinely found and fixed all three of v1's injected root
+causes (`parseTransfers.ts:34`, `confirmSeed.ts:15`, `applyKeypadInput.ts:28`) in 19 turns.
+```
+$ bash rig/run-pipeline.sh s2 pipeline 9054 --permission-mode bypassPermissions --shakedown --dirty-ok
+  run s2-pipeline-9054: state=void (shakedown) -> .../rig/runs/failure-flood-v1/s2-pipeline-9054
+EXIT=0
+```
+`arm.json`: `"abort_reason": null`, `"workspace_file_count": 23` (matches task 5.6's own v2 count).
+Steps `02-diagnose` and `03-apply`: both `"exit_code": 0`, `"kind": "model"`, both reading back the same
+`d8693e27...` surface digest — proving the SAME `prompts/s2.txt` file served both PIPELINE model roles
+without incident, exactly as task 5.4b's own topology decision above requires.
+
+**Regression check, explicit, per this batch's own instruction — a non-shakedown invocation must still
+exit 2.**
+```
+$ bash rig/run-pipeline.sh s2 pipeline 9055 --permission-mode bypassPermissions --dirty-ok
+  COULD NOT RUN: pre-registration guard failed (Hard Ordering Gate layer 2): zero_matches: hypotheses/0002-*.md
+  This is exit 2, not a pass.
+EXIT=2
+```
+Unchanged from PR4/PR5a's own recorded behaviour — this batch never touched `check_prereg()` or the
+`hypotheses/` directory. No countable run is any closer to proceeding than before this PR5b landed.
+
+**An anomaly this same live testing surfaced, flagged not fixed — task 5.5's territory.** `01-monolith`'s
+step `status.json` records `"substrate_changed": false` even though the model's own final message
+describes editing three files under `src/`. `substrate_changed` is computed by `hash_paths()` over
+`WORKSPACE_PATHS` (the manifest's `src`/`tests`/`runtime` paths) taken before and after the invocation;
+either that pre/post capture has a real defect, or the observed edits landed somewhere `hash_paths()`
+does not cover. Not investigated further — task 5.5 owns "Detect the diagnostician-writes-to-`src/`
+violation (re-hash its workspace against its materialised file list...)" and this batch's own instruction
+was explicitly tasks 5.4/5.4b only, not 5.5.
+
+**Verification, all real exit codes.**
+- `bash -n rig/run-pipeline.sh` → exit 0.
+- Both `MANIFEST.sha256` recompute-compare clean (shown above, both directions).
+- `./hooks/pre-commit` (staged only) → exit 0.
+- `./hooks/pre-commit --all` → exit 0, "redaction check: clean across 163 tracked files".
+- `git diff --stat rig/run.sh` → empty. `git diff --stat` on each fixture's `src/`/`tests/`/`runtime/`/
+  `answer-key/`/`tools/` → empty. `git diff` on `s1.json`/`s2.json`/`prereg.json` individually → empty.
+- Non-shakedown regression check → exit 2 at the pre-registration gate (shown above), unchanged.
+
+**Line counts, ceiling.** `git diff --cached --shortstat` (the six touched files):
+**6 files changed, 91 insertions(+), 16 deletions(-)** = 107 raw. Journal/task-file diffs (this
+`apply-progress.md` append plus the `tasks.md` 5.4/5.4b done-notes) are counted in the return summary
+alongside this file's own final line count, for the same "measuring the diff from inside itself" reason
+PR5a's own entry already named. Well under the 700-line ceiling either way.
+
+**Scope not expanded beyond 5.4/5.4b.** No `derive.py` change (task 5.8's `prompt_sha256`/row-builder
+territory — `R-F7.1`'s "hash of each role's exact prompt bytes" is satisfiable from the same
+`surface_digest()`-style convention applied to the prompt file, but wiring it into `status.json` is 5.8's
+own concern, not touched here). No `clusters.json`-into-diagnose-workspace wiring (not named by any task
+in this batch; the diagnose role's live run above therefore had the same full `src/`/`tests/`/`runtime/`
+copy MONOLITHIC gets, not the bounded clusters view design.md describes — a pre-existing gap, not
+introduced or expanded here, flagged for whichever task owns that wiring). Tasks 5.5, 5.7, 5.8 remain
+`[ ]`, each blocked exactly as PR5a's own entry already described.

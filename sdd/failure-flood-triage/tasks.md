@@ -791,7 +791,7 @@ Depends on: PR2 (collector), PR4 (answer-key + `prereg.json` must exist for pref
       class as the v1 `tools/` finding at task 3.5) and `rig/surfaces/failure-flood.txt` is task 5.4's own
       deliverable. Live testing reaches exactly this boundary and dies with `missing-prompt`/
       `missing-surface-preimage` (exit 2), both traced to their real, named cause.
-- [ ] 5.4b Create `prompts/` under both `failure-flood` fixtures, one `.txt` per `task_id` (`s1`, `s2`),
+- [x] 5.4b Create `prompts/` under both `failure-flood` fixtures, one `.txt` per `task_id` (`s1`, `s2`),
       and add those paths to each MANIFEST. **A planning gap, found live at PR5a and recorded so it does
       not evaporate:** `design.md`'s file-changes table names `prompts/` among the paths each fixture
       creates, but no PR3 or PR4 task ever created it, and `fd -t d prompts rig/fixtures` returns only
@@ -805,6 +805,30 @@ Depends on: PR2 (collector), PR4 (answer-key + `prereg.json` must exist for pref
       already follows.
       Verify: `./hooks/pre-commit --all`; both manifests recompute-compare clean; `run-pipeline.sh`'s
       `missing-prompt` abort no longer fires for `s1`/`s2`.
+      **Done.** Real topology conflict resolved, not assumed: `run_model_step()` (PR5a) resolved the
+      prompt path by **role** (`prompts/${role}.txt`, i.e. `monolith.txt`/`diagnose.txt`/`apply.txt`),
+      contradicting this task's own "(`s1`, `s2`)" instruction — corrected to
+      `prompts/${TASK_ID}.txt`, the exact naming `rig/run.sh:306` already uses. One task_id, one file,
+      loaded byte-identical for every role in both arms — the strongest form of ADR 0010's "harness
+      shape is the only variable": the prompt hash cannot differ across roles because the bytes are the
+      single committed file, never composed per role. `prompts/s1.txt`/`prompts/s2.txt` written
+      (identical content, verified `diff` empty, same sha256) describing the generic triage task and
+      `spec.md` R-F3.1's exact `root-cause-report.txt` deliverable format (quoted verbatim in the prompt
+      body), plus an optional `fix-plan.txt` handoff clause that serves PIPELINE's `diagnose`/`apply`
+      roles without needing role-specific prompt text. `compute_manifest()`'s subdirectory tuple gained
+      `prompts` (it omitted it even though design.md 9a groups `prompts/` with the already-covered
+      `tools/`/`answer-key/`) — without this, the new files would be invisible to the manifest gate
+      entirely. Both MANIFEST.sha256 files gained exactly the one expected line each (`diff` against a
+      fresh `compute_manifest()` recompute showed only the new `prompts/s{1,2}.txt` line; both recompute
+      clean after). Live, real proof, not code-reading: `s1 monolithic --shakedown --dirty-ok` and
+      `s2 pipeline --shakedown --dirty-ok` both ran to completion (`arm.json`: `"abort_reason": null` for
+      both), each model step's `surface_sha256` reading back the exact committed preimage digest
+      (`d8693e27...`), `01-monolith` actually diagnosing and fixing all three v1 injected bugs in 19
+      turns/89.5s, `02-diagnose`/`03-apply` both exiting 0 against the real v2 fixture
+      (`workspace_file_count: 23`, matching task 5.6's own count). See apply-progress.md's "PR5b" section
+      for full detail, both run directories, and the honest anomaly this run also surfaced
+      (`substrate_changed: false` on a step that visibly rewrote `src/` — task 5.5's territory, flagged
+      not fixed).
 - [x] 5.3 `--shakedown` flag: stamps `void_reason=shakedown` **unconditionally**, regardless of tree
       state (Hard Ordering Gate layer 1). `permission_mode` explicitly declared as a named argument,
       never inherited; recorded on the row; a run with no permission-mode argument refuses to start.
@@ -818,10 +842,26 @@ Depends on: PR2 (collector), PR4 (answer-key + `prereg.json` must exist for pref
       `status.json` reads `"state": "void", "void_reason": "shakedown"` — the override line reads no
       `DIRTY`/`DIRTY_OK`/prior-state variable, matching R-F8.2 exactly. Commit-state test (stage a fixture
       edit, no `--dirty-ok`) → **exit 2** at the dirty-tree guard, same code path `run.sh:277-289` reuses.
-- [ ] 5.4 Capture `rig/surfaces/failure-flood.txt` (both arms need `Bash` + a write tool,
+- [x] 5.4 Capture `rig/surfaces/failure-flood.txt` (both arms need `Bash` + a write tool,
       `--strict-mcp-config` required) — captured **twice**, compared, then committed.
       Verify (subprocess argument composition): fixture path and prompt containing spaces, quotes, and
       non-ASCII run unchanged; `init.tools` still matches the preimage.
+      **Done.** Captured from a real, non-nested `claude -p` session on this machine (`claude --version`:
+      `2.1.229 (Claude Code)`) — never derived from `broad.txt`/`scoped.txt` by set arithmetic, which
+      would have been "asserting the list you intended" rather than reading it back. Two independent
+      invocations (`--strict-mcp-config --permission-mode bypassPermissions`, no `--disallowedTools`, a
+      fresh scratch cwd each time), each read back from its own `stream.jsonl`'s `init` event: **31 tools
+      each time, byte-identical sorted sets, identical digest
+      `d8693e27d5f8e406a465def75101c4eaa85b23b685e78c2d5d07754d0f7e8daa`** — compared before either was
+      written to `rig/surfaces/failure-flood.txt`. Confirms the existing "Bash subsumes Glob/Grep" rule
+      empirically for this invocation shape too: `Glob`/`Grep` are absent (hidden by `Bash`), matching
+      `broad.txt`'s own comment. Subsequent verify bullet, live: a third invocation from a cwd containing
+      spaces, with a prompt containing spaces, a double quote, a single quote, a backtick, and non-ASCII
+      (café / 中文 / 🎯) — same composition `run-pipeline.sh:521` uses (`claude -p "$prompt_text" ...`,
+      never interpolated) — reads back the **identical** digest. `rig/run.sh`'s own
+      `BASELINE_DISALLOW="Bash"` (`rig/run.sh:330`) load-bearing for its own experiment, confirmed
+      untouched (`git diff --stat rig/run.sh` empty). See apply-progress.md's "PR5b" section for the raw
+      capture commands and both full tool lists.
 - [ ] 5.5 Detect the diagnostician-writes-to-`src/` violation (re-hash its workspace against its
       materialised file list; any change to `src/` → arm state `failed`, never `void`).
       Verify (agent-executed shell, new threat-matrix row): a deliberate case editing a test file, and
