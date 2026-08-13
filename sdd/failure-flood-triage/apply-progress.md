@@ -1188,3 +1188,90 @@ further git command.
 
 **Task 4.4 (`answer-key/prereg.json`) remains `[ ]`, out of this work unit's scope** — the coordinator's
 brief was explicit that this batch is task 4.3 only.
+
+## Task 4.4 — `answer-key/prereg.json` (Hard Ordering Gate, layer 1) — this batch, closes PR4
+
+`sdd-apply` completed task 4.4 for `failure-flood-triage`: committed (staged)
+`rig/fixtures/failure-flood/v2/answer-key/prereg.json`, recomputed `v2/MANIFEST.sha256` to cover it, and
+marked task 4.4 `[x]` in `tasks.md` with a full addendum (scope decision, file shape, tamper verification,
+line counts). Nothing committed or pushed. This closes PR4 (tasks 4.1–4.4 all `[x]`).
+
+**Scope decision — v2 only, not v1, resolved with quotes:** design.md section 8 — "Stage 2 (50 cases, 6
+causes, the comparison) is `task_id: s2` on `failure-flood/v2`" — is the only run type the Hard Ordering
+Gate's layer 2 non-shakedown check ever gates. R-F9.1 ("Stage 1 = 10 failing cases / 3 root causes,
+shakedown, excluded from the stage-2 test") plus task 5.7 ("Run the actual `--shakedown` shakedown on the
+now-clean, now-committed tree") establish `task_id: s1` (v1) as structurally always invoked with
+`--shakedown`. The Hard Ordering Gate's own wording (tasks.md) makes the non-applicability explicit:
+layer 2 "separately refuses (`exit 2`) any **non**-shakedown invocation unless `hypotheses/0002-*.md` and
+`hypotheses/0003-*.md` exist... (frozen list in `answer-key/prereg.json`, inside the MANIFEST)" — the
+non-shakedown branch never executes against v1's fixture root, so placing the file there too would be
+dead weight with zero functional purpose. Task 3.5's earlier parenthetical listing `prereg.json` alongside
+`answer-key/` F0/R0/S0 as landing "in PR4... for both v1 and v2" was read closely: that clause modifies
+what is *excluded from PR3's manifest* for both fixtures (i.e., neither fixture's PR3 manifest covered
+these paths), not a claim every named path duplicates onto both fixtures at PR4 — `F0`/`R0`/`S0` already
+landed as `s1.json` (v1 only) and `s2.json` (v2 only), never duplicated, and `prereg.json` follows the
+same per-fixture-as-needed pattern.
+
+**`prereg.json`'s shape, designed and justified** (36 lines, `rig/fixtures/failure-flood/v2/answer-key/`):
+`schema: "prereg/1"`; a `scope` block recording the v1/v2 decision above inline (so a later reader/PR5
+author does not re-derive it from this journal); `required_hypotheses` — one `{id, path_root, path_glob,
+topic_hint}` entry per hypothesis (`0002`, `0003`) — using the **glob** form (`hypotheses/0002-*.md`,
+`hypotheses/0003-*.md`) copied verbatim from the Hard Ordering Gate's own wording and R-F8.1's citation,
+deliberately NOT the exact literal filenames PR6 (tasks 6.1/6.2) already commits to (`topic_hint` carries
+those as non-binding documentation only). Reasoning: hardcoding the literal final filename would force
+re-touching this already-manifest-frozen file if PR6 ever refines its topic slug; the glob freezes the
+*count and numeric-prefix requirement*, which is what design.md section 7's table row ("the list of
+required hypothesis files cannot be quietly shortened") actually protects. A `check` block spells out the
+exact preflight semantics PR5 must implement without re-deriving them from prose: `must_exist`,
+`must_match_exactly_one_file_per_entry`, `must_be_git_tracked`, `must_be_clean`, each with its own named
+`exit 2` reason (`zero_matches`, `more_than_one_match`, `tracked_but_dirty`, `untracked`).
+
+**Layer 1 demonstrated as refusing TODAY, without executing PR5's not-yet-written preflight**: `git
+ls-files hypotheses/` on the real repository lists only `hypotheses/README.md` and
+`hypotheses/0001-broad-surface-degrades-output-not-selection.md` — no file matching `hypotheses/0002-*.md`
+or `hypotheses/0003-*.md` exists yet, tracked or otherwise. A correct preflight implementing `prereg.json`'s
+`check` block against this real tree would evaluate `required_hypotheses[0]`'s glob to **zero matches**
+and, per the file's own `zero_matches: "exit 2"` rule, refuse before any run directory is claimed — the
+structurally-impossible-until-PR6 state the Hard Ordering Gate exists to produce. Stated as what a correct
+implementation returns and why, never claimed as executed — `run-pipeline.sh` (PR5) does not exist yet.
+
+**MANIFEST verification, real exit codes, both fixtures, both tamper directions**, using the unchanged
+recompute algorithm task 3.5 established (`rig/run.sh:154-171`'s adapted `compute_manifest()`, walking
+`src/, tests/, runtime/, tools/, answer-key/`, skipping `__pycache__`/`.pyc`):
+- **Accept-before**: v1 recompute vs committed `MANIFEST.sha256` → **exit 0**. v2 recompute vs staged
+  `MANIFEST.sha256` (now including the new `answer-key/prereg.json` line) → **exit 0**.
+- **Direction 1 — tamper a covered file, recompute mismatch**: v1 — appended a line to
+  `src/applyKeypadInput.ts` → **exit 2**; reverted (`git checkout --`) → **exit 0**. v2 — appended a line
+  to `answer-key/prereg.json` → **exit 2**; reverted (`git checkout --`, restoring the staged blob) →
+  **exit 0**, digest confirmed byte-identical to the pre-tamper file (`ef0a578a...`).
+- **Direction 2 — tamper the MANIFEST's own expected digest**: v1 — flipped one hex character in
+  `MANIFEST.sha256`'s `src/applyKeypadInput.ts` line → **exit 2**; restored from backup → **exit 0**. v2 —
+  flipped one hex character in `MANIFEST.sha256`'s new `answer-key/prereg.json` line → **exit 2**;
+  restored from backup → **exit 0**.
+- Real tree never left dirty: `git diff` (worktree vs index) empty on both fixtures after every revert;
+  `git diff --cached --stat` shows exactly `v2/MANIFEST.sha256` (+1) and `v2/answer-key/prereg.json`
+  (+36); explicit confirmation `v1/src`, `v1/tests`, `v1/runtime`, `v2/src`, `v2/tests`, `v2/runtime`,
+  `v1/answer-key/s1.json`, `v2/answer-key/s2.json` carry **zero** staged diff.
+
+**`./hooks/pre-commit` (staged) and `./hooks/pre-commit --all`**: real exit codes recorded in the return
+summary below (both run after this section was written and staged).
+
+**Line counts, both stated with their command.** Fixture-only subtotal (`git diff --cached --numstat`,
+stable — these two files are not further edited after this point): `v2/MANIFEST.sha256` 1+0;
+`v2/answer-key/prereg.json` 36+0. Generated-golden exclusion (`sdd-phase-common.md:104`): `MANIFEST.sha256`'s
+single inserted digest line — `-1`. Fixture-authored subtotal = (1+36) − 1 = **36**. Journal/task-file
+diffs (`sdd/failure-flood-triage/tasks.md`, `sdd/failure-flood-triage/apply-progress.md` itself), counted
+per this unit's own instruction that only generated goldens are excluded — reported with the exact final
+`git diff --cached --numstat` command and output in the return summary to the orchestrator, since this
+sentence is itself inside that diff and any number frozen here would be stale by the time the command is
+actually run.
+
+**Not committed or pushed** — staged only, per instruction.
+
+**PR4 closes with this task. Nothing left inconsistent inside PR4 by it** — tasks 4.1–4.4 all `[x]`,
+`s1.json`/`s2.json`/`prereg.json` all committed (staged) and manifest-covered for their respective
+fixtures. One pre-existing note carried forward, not introduced here: task 3.5's own apply-time finding
+that `design.md:584-585`'s "File changes" table row still claims v1 gets a `tools/generate-cases.py`
+(contradicted by R-F9.1, confirmed stale on disk) remains unfixed — out of this phase's scope, flagged
+again for whichever PR next touches `design.md`. **PR5 depends on this task's `answer-key/prereg.json`
+existing and being correct** for its own preflight (task 5.1) to check against; PR6 depends on PR5.

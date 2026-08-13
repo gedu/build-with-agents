@@ -1,4 +1,5 @@
 54f5b39a383f9334ed7f310b00b94a7dbcc8763ca9a76c2d2adad0a38fb1c8c8  answer-key/case-table.sha256
+ef0a578a50e8625779c18a6f4e7df52bc0a6c3ebf051e09517d0a94b45757edb  answer-key/prereg.json
 e2bc8f49860eb4dab42fe65e74c536c0ed7313eb7da44094d12e8722c1ce6672  answer-key/s2.json
 f415b4fc9eae47816ed860dbad07d5c69aefabc535e811e9b1c7fb5c754f6ad9  runtime/jest.config.js
 6836b5abeec5120212dff2732c3b1509690de08e2aede40a51636c852f49f2fd  runtime/package-lock.json

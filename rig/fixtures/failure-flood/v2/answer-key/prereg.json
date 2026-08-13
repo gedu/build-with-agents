@@ -1,0 +1,36 @@
+{
+  "schema": "prereg/1",
+  "_purpose": "Hard Ordering Gate layer 1 (tasks.md 'Hard Ordering Gate - no countable run before the hypotheses land', design.md section 7): freezes the required hypothesis-file list so it 'cannot be quietly shortened without an exit-2 manifest mismatch' (design.md section 7 table, row 1). Committed inside this MANIFEST so tampering either direction (this file, or the files it names) is caught by the existing accept-before/reject-tampered manifest check, not by a separate mechanism.",
+  "scope": {
+    "applies_to_task_id": "s2",
+    "applies_to_fixture": "failure-flood/v2",
+    "reason": "task_id s2 is the stage-2 comparison run (design.md section 8: 'Stage 2 (50 cases, 6 causes, the comparison) is task_id: s2 on failure-flood/v2') - the only run type layer 2's non-shakedown check ever gates. task_id s1 (failure-flood/v1) is structurally always invoked with --shakedown (R-F9.1: 'Stage 1 = 10 failing cases / 3 root causes, shakedown, excluded from the stage-2 test'; task 5.7 runs v1's own shakedown explicitly with --shakedown), so the non-shakedown branch below never executes against v1's fixture root and this file is intentionally not duplicated there."
+  },
+  "applies_to": "non-shakedown invocation only",
+  "not_applicable_to": "invocations passing --shakedown (Hard Ordering Gate layer 1: those rows stamp void_reason=shakedown unconditionally and skip this check entirely - tasks.md 'Hard Ordering Gate', point 1)",
+  "required_hypotheses": [
+    {
+      "id": "0002",
+      "path_root": "repo-root",
+      "path_glob": "hypotheses/0002-*.md",
+      "topic_hint": "pipeline-shape-lowers-peak-occupancy (tasks.md task 6.1) - hint only, NOT part of the match rule; the glob is the frozen requirement"
+    },
+    {
+      "id": "0003",
+      "path_root": "repo-root",
+      "path_glob": "hypotheses/0003-*.md",
+      "topic_hint": "serial-triage-compounds-cumulative-tokens (tasks.md task 6.2) - hint only, NOT part of the match rule; the glob is the frozen requirement"
+    }
+  ],
+  "check": {
+    "must_match_exactly_one_file_per_entry": true,
+    "must_exist": true,
+    "must_be_git_tracked": true,
+    "must_be_clean": true,
+    "zero_matches": "exit 2 (hypothesis file does not exist yet)",
+    "more_than_one_match": "exit 2 (ambiguous - the glob must resolve to exactly one file)",
+    "tracked_but_dirty": "exit 2 (uncommitted edits to a hypothesis file are not frozen support/refute conditions, ADR 0012)",
+    "untracked": "exit 2 (a file on disk that git does not know about is not a committed pre-registration)"
+  },
+  "on_violation": "exit 2 - Hard Ordering Gate layer 2 (run-pipeline.sh preflight, PR5). derive.py's independent layer 3 (prereg_digest: null -> void: no-preregistration) does not depend on this preflight having enforced the check correctly."
+}
