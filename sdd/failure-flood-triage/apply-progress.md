@@ -1687,3 +1687,208 @@ Sum check: 346+42+139=527, 9+42+23=74, 527+74=601 — matches shortstat exactly.
 
 **Scope not expanded beyond 5.5/5.8.** Task 5.7 untouched, reserved for the orchestrator after this
 commit. No PR6 task touched. Tasks 5.5 and 5.8 marked `[x]`; task 5.7 remains `[ ]`.
+
+## PR5-close — task 5.7 (real shakedown) + registration of the 5.9 gap (this batch)
+
+Two items, per explicit instruction. Nothing else touched. **PR5 closes with this batch: tasks
+5.1–5.8 all `[x]`.**
+
+### Item 1 — Task 5.7: the real `--shakedown` shakedown
+
+**Precondition verified, not assumed**: `git status --porcelain` empty before starting; `git rev-parse
+HEAD` = `cd79ff7cc7022d62e9efd876dc09351a01507b5c` — matches the SHA the orchestrator's launch brief
+named as the clean, committed starting point.
+
+**Exact command run, no `--dirty-ok`** (the entire point of this task — the dirty-tree guard had to
+pass on its own):
+
+```
+./rig/run-pipeline.sh s1 monolithic 01 --permission-mode bypassPermissions --shakedown
+```
+
+Output: `run s1-monolithic-01: state=void (shakedown) -> .../rig/runs/failure-flood-v1/s1-monolithic-01`,
+exit code **0**.
+
+**Scope decision — one arm only, not a full matrix, per instruction to run the minimum sufficient to
+prove the requirement**: `s1`/`monolithic` was chosen because (1) it is the cheapest real invocation —
+one model step (`01-monolith`) vs. `pipeline`'s two (`02-diagnose` + `03-apply`) — and (2) `s1` is
+spec.md R-F9.1's own designated shakedown-stage fixture, so it is the structurally correct arm for a
+task literally named "run the shakedown," not an arbitrary cost-saving substitution.
+
+**Real model invocation, not a stub**: `arm.json`'s `driver_version: "2.1.231 (Claude Code)"`, step
+`01-monolith`: `kind: model`, `wall_ms: 101475`, real per-turn `occupancy_series` (19 model turns,
+peak 55,448 tokens), `src_changed: true` (the model edited `src/`, legitimate for the `monolith` role),
+`bash_call_count: 8`. `99-verify` ran real Jest scoring afterward (`kind: code`, `wall_ms: 951`).
+
+**The Hard Ordering Gate's own proof, read directly from the persisted files**:
+
+`rig/runs/failure-flood-v1/s1-monolithic-01/status.json`:
+```json
+{
+    "code_commit": "cd79ff7cc7022d62e9efd876dc09351a01507b5c",
+    "experiment": "failure-flood-v1",
+    "run_id": "s1-monolithic-01",
+    "state": "void",
+    "void_reason": "shakedown"
+}
+```
+
+`arm.json`'s relevant fields: `state: "void"`, `void_reason: "shakedown"`, `dirty_ok_used: false`,
+`shakedown_used: true`, `abort_reason: null`, `ro_substrate_violation: false`,
+`diagnostician_src_violation: false`, `prereg_digest: null` (expected — layer 2's pre-registration
+check is skipped entirely under `--shakedown`, per `run-pipeline.sh`'s own layer-1-before-layer-2
+ordering), `case_table_digest: null` / `case_count: 0` (expected — v1 has no generator, R-F9.1).
+`dirty_ok_used: false` is the direct, file-level proof that `--dirty-ok` was never passed — the layer-1
+unconditional stamp (`ARM_STATE="void"; ARM_VOID_REASON="shakedown"` in `run-pipeline.sh`, which reads
+no `DIRTY`/`DIRTY_OK`/prior-state variable) fired on a genuinely clean tree, not merely on a
+dirty-but-overridden one — the first time this stack has produced that exact condition live.
+
+**`derive.py`'s `--experiment` dispatcher, run over the resulting run directory**:
+
+```
+python3 rig/derive.py --experiment failure-flood-v1
+```
+
+Output:
+```
+derived 3 row(s) from 3 run dir(s) -> rig/results/failure-flood-v1/runs.jsonl
+  s1-monolithic-01: state=void (shakedown)
+  s1-monolithic-9054: state=void (shakedown)
+  s2-pipeline-9054: state=void (shakedown)
+```
+
+Three run directories were present under `rig/runs/failure-flood-v1/`, not one: this batch's own
+`s1-monolithic-01`, plus `s1-monolithic-9054` and `s2-pipeline-9054` — two real, complete runs left on
+disk (gitignored) from PR5c's own live testing under task 5.8, whose done-note explicitly states
+"committing failure-flood's own results file is task 5.7's shakedown-landing territory, out of this
+task's scope" and deleted its own generated `runs.jsonl` rather than commit it early. Picking them up
+here is that deferred commit, not scope creep — the dispatcher processes every run directory it finds,
+the same way the existing `tool-surface-v1` dispatcher does, and all three rows independently confirm
+the same `void_reason=shakedown` result.
+
+Row-level confirmation, read directly from the generated `runs.jsonl`:
+
+| run_id | state | void_reason | model |
+|---|---|---|---|
+| s1-monolithic-01 | void | shakedown | claude-opus-5[1m] |
+| s1-monolithic-9054 | void | shakedown | claude-sonnet-5 |
+| s2-pipeline-9054 | void | shakedown | claude-sonnet-5 |
+
+**Excluded from every count — proven, not asserted.** `rig/report.py` (the only committed consumer of
+a `runs.jsonl` file today) already implements the exclusion rule this stack uses everywhere:
+`report.py:39` ("counted... only when `state=="complete"`") and `report.py:47`
+(`arms_complete = {r["arm"] for r in slot_rows if r["state"] == "complete"}`). `rig/report.py` has no
+`--experiment` dispatcher yet (task 6.4, not started this batch), so there is no literal `report.py
+--experiment failure-flood-v1` command to run — this proof instead applies that exact, already-committed
+filter directly to the three rows just derived:
+
+```python
+rows = [json.loads(l) for l in open('rig/results/failure-flood-v1/runs.jsonl')]
+counted = [r for r in rows if r['state'] == 'complete']
+excluded = [r for r in rows if r['state'] != 'complete']
+```
+
+Result: `total rows: 3`, `counted (state==complete): 0`, `excluded: [('s1-monolithic-01', 'void',
+'shakedown'), ('s1-monolithic-9054', 'void', 'shakedown'), ('s2-pipeline-9054', 'void', 'shakedown')]`.
+**0 of 3 rows counted; all 3 excluded with `void_reason=shakedown` named** — reusing the stack's own
+already-committed exclusion rule rather than inventing a new one or waiting on task 6.4 to exist.
+
+**Committed (staged)**: `rig/results/failure-flood-v1/runs.jsonl` — did not exist before this task;
+3 lines, `git diff --cached --numstat` reads `3	0	rig/results/failure-flood-v1/runs.jsonl`. This is
+the file the prior batch (PR5c, task 5.8's done-note) explicitly reserved for this task rather than
+committing itself.
+
+**Verification, real exit codes**:
+- `python3 -m py_compile rig/derive.py` → exit 0 (file unedited by this task; checked anyway since the
+  committed row depends on it).
+- `bash -n rig/run-pipeline.sh` → exit 0 (file unedited by this task; checked anyway).
+- `git status --porcelain` after staging → only `A  rig/results/failure-flood-v1/runs.jsonl`; no other
+  file touched by this item.
+- `./hooks/pre-commit --all` → exit 0, `"redaction check: clean across 164 tracked files"`.
+- `./hooks/pre-commit` (staged only) → exit 0.
+
+**No absolute-path leak checked directly**: `run-pipeline.sh`'s internal `runs_root`/`results_dir` are
+absolute at runtime (per `derive.py`'s `EXPERIMENTS` registry, built from `REPO_ROOT`), but the
+committed `runs.jsonl` row itself carries no host filesystem path — confirmed both by the redaction
+gate's clean pass and by direct inspection of the row's field values (`code_commit`, `run_id`,
+`surface_sha256`, etc. — all either git SHAs, run IDs, or content hashes, none carrying an absolute
+home-directory path).
+
+### Item 2 — Registering the `root-cause-report.txt` threading gap (task 5.9, NOT implemented)
+
+**What was done**: added a new, numbered, checkboxed task — **5.9** — to `sdd/failure-flood-triage/tasks.md`,
+inside PR5's own task list (immediately after 5.8), plus a cross-reference paragraph appended to the
+existing `## Blocked tasks` section. Mirrored into the Engram `sdd/failure-flood-triage/tasks` topic
+(condensed form — see note below).
+
+**Why PR5's list, not the two "near the end" sections named in the brief**: the brief pointed at
+`## No-implementation, verification-only tasks` and `## Blocked tasks` as the file's existing
+near-the-end conventions and asked for a placement decision with reasoning. Neither section is the
+right *host* for the task's own checkbox line: `## No-implementation, verification-only tasks` is a
+bare list of task numbers whose entire content IS verification (1.3, 1.4, 3.1/3.2's Jest-run halves,
+5.7, 6.6) — task 5.9 requires a real code change to `rig/run-pipeline.sh` (a `cp` into a new
+`handoff/root-cause-report.txt` path, mirroring the existing `fix-plan.txt` handoff), so listing it
+there would misclassify it. `## Blocked tasks` documents PR-level and task-level dependency
+relationships in prose, not individual checkbox tasks with their own verify bullets — and task 5.9
+itself is **not blocked on anything** (it can be implemented immediately; only task 6.4 is blocked ON
+it). The precedent already in the file for "a real gap found live mid-stream, given its own numbered
+checkbox task rather than folded into a comment" is task **5.4b** (`prompts/` under both fixtures,
+found live at PR5a) — task 5.9 follows that exact precedent: a new full checkbox task inside the PR
+section whose file it touches (PR5, `run-pipeline.sh`), written in the same "planning gap, found live
+at <task>, recorded so it does not evaporate" voice 5.4b itself uses. The two named "near the end"
+sections are then used for what they actually host: `## Blocked tasks` gets the cross-reference noting
+that task 6.4 is now additionally blocked on 5.9 (a real dependency relationship, exactly what that
+section already tracks for PR3/PR4/PR5/PR6); `## No-implementation, verification-only tasks` is left
+untouched, since 5.9 is not one.
+
+**Content required by the brief, present in the task text**: (1) the artifact that is discarded —
+`root-cause-report.txt`, R-F3.1's frozen sentinel-plus-`path:line` format; (2) why the fields are
+null — no step in `run-pipeline.sh` copies it out of the ephemeral per-step workspace before that
+workspace is discarded, the same unclosed class already found and fixed for `fix-plan.txt` at 5.4b, but
+for the scoring artifact rather than the handoff artifact; (3) that it blocks 6.4 — stated explicitly,
+with the reason (`report.py`'s diagnostic precision/recall table cannot be built honestly against an
+all-`null` column).
+
+**Verified this is a real gap, not a stale claim**: `rg -n "root-cause-report|fix-plan|handoff"
+rig/run-pipeline.sh` shows the existing `fix-plan.txt` handoff at two call sites (copy IN for the
+applier at line ~593-594, copy OUT for the diagnostician at line ~648-650) and zero matches for
+`root-cause-report` anywhere in the file — confirming no handoff exists for it today.
+`rg -n "causes_claimed|causes_correct|causes_present" rig/derive.py` confirms the exact hardcoded
+`None`/`None` (line 864-865) the task's own text describes, with the deferral already documented in
+that file's own inline comment (lines 852-863, quoted verbatim in the new task text).
+
+**Not implemented in this batch** — registered only, per explicit instruction. `rig/run-pipeline.sh`
+and `rig/derive.py` were read for verification purposes only; `git diff --stat -- rig/run-pipeline.sh
+rig/derive.py` is empty, confirming neither file was touched by this item.
+
+### Files changed, this batch, combined
+
+| File | Action | What |
+|---|---|---|
+| `rig/results/failure-flood-v1/runs.jsonl` | Created | 3 rows, all `state=void, void_reason=shakedown` |
+| `sdd/failure-flood-triage/tasks.md` | Modified | Task 5.7 marked `[x]` with full done-note; new task 5.9 added (unchecked); `## Blocked tasks` addendum |
+| `sdd/failure-flood-triage/apply-progress.md` | Modified | This section |
+| Engram `sdd/failure-flood-triage/tasks` | Updated | Condensed status mirror (full verbatim mirror exceeded the backend's 50,000-char cap and was replaced with a condensed, accurate version rather than left silently truncated) |
+| Engram `sdd/failure-flood-triage/apply-progress` | Updated | This section appended |
+
+### Line counts, with the command
+
+`git diff --cached --numstat` (fixture/results + tasks.md only, before this journal's own diff is
+taken):
+```
+3	0	rig/results/failure-flood-v1/runs.jsonl
+60	1	sdd/failure-flood-triage/tasks.md
+```
+Raw subtotal: 3+0+60+1 = **64**. No generated-golden exclusion applies (the `runs.jsonl` row is
+measured, real collector/derive output describing a real run, the same class already treated as
+authored in this stack's own convention for `s1.json`/`s2.json`, not a machine-boilerplate golden like
+a `.sha256` digest file). This journal's own diff adds further insertions on top of the 64 above; the
+combined total is reported in the return envelope from the final `git diff --cached --numstat`, taken
+after this section is written, per this stack's own established convention (the number cannot be known
+before the text producing it is complete).
+
+### Not committed or pushed — staged only, per instruction; the commit remains the orchestrator's.
+
+**PR5 closes with this batch.** Task 5.9 is now real, numbered, and cannot be lost — it sits in PR5's
+own task list with a full verify bullet, and `## Blocked tasks` names the exact downstream task (6.4)
+it blocks. PR6 (tasks 6.1–6.8) remains entirely `[ ]`, unaffected by and not attempted in this batch.
