@@ -29,6 +29,39 @@ git rev-parse --git-common-dir           # shared state lives here
 Record the branch and HEAD. **Re-check both immediately before writing and again before
 committing.** If either moved and you did not move it, stop: another writer holds this checkout.
 
+### Then check which gate actually guards this tree
+
+The hazard below is silent, so it has to announce itself rather than be remembered. Run this
+wherever you are about to commit:
+
+```sh
+hook=$(git rev-parse --git-path hooks/pre-commit)
+top=$(git rev-parse --show-toplevel)
+if [ ! -e "$hook" ]; then
+  printf '  NO GATE — %s does not resolve. git skips a missing hook in silence.\n' "$hook"
+else
+  real=$(readlink -f "$hook" 2>/dev/null || realpath "$hook")
+  case "$real" in
+    "$top"/*) printf '  ok — gated by this tree: %s\n' "$real" ;;
+    *)        printf '  WRONG TREE — commits here are gated by %s\n              which is outside %s\n' "$real" "$top" ;;
+  esac
+fi
+```
+
+Three outcomes, each verified against a real instance of its condition:
+
+| Output | Meaning | What to do |
+|---|---|---|
+| `ok` | The gate that runs is this tree's own copy | Proceed |
+| `WRONG TREE` | Another checkout's script will scan your files | Run `./hooks/pre-commit --all` yourself before committing. Do not rely on the hook firing |
+| `NO GATE` | The symlink dangles; git will skip it without a word | **Stop.** Nothing is guarding this commit. Fix the install before writing anything to a public repository |
+
+**When this prints `ok` from inside a worktree, the shim below has landed and this section can go.**
+Until then it is the only thing that reports the hazard without someone already knowing about it.
+
+`readlink -f` is not POSIX; the `realpath` fallback covers macOS, and on a system with neither,
+resolve the symlink by hand rather than skipping the check.
+
 `/list-agents` (or the `ListAgents` tool) shows sessions on this machine and whether they are busy.
 A session whose working directory is this repository is a writer until proven otherwise.
 
@@ -77,8 +110,13 @@ that reports nothing. Another session changing branch in their checkout can disa
 gate of a public repository for every worktree, and no surface says so.
 
 **Until `setup.sh` installs a shim that resolves per-worktree** — `exec "$(git rev-parse
---show-toplevel)/hooks/pre-commit" "$@"` would — run the gate explicitly from your own worktree
-before committing, and never rely on it firing:
+--show-toplevel)/hooks/pre-commit" "$@"` would — the preflight check above is what reports this, and
+it reports it every session rather than waiting to be remembered. The shim is written down, agreed
+and **not yet tested**; applying it also means re-running `setup.sh --hooks`, which rewrites
+`.git/hooks/` for every checkout at once and so needs the other sessions idle.
+
+Meanwhile, run the gate explicitly from your own worktree before committing, and never rely on it
+firing:
 
 ```sh
 ./hooks/pre-commit --all        # from the worktree, not from the original checkout
@@ -156,3 +194,13 @@ something a worktree fixes.
 Run 1 is also where every corner case above was found. The hook hazard was **not** predicted — it
 was found by checking, and its second half only exists because a botched first test was rerun
 instead of reported. Promotion needs more runs, not a better rationale.
+
+**Two tests were botched during run 1, in the same way, and it is worth knowing the shape.** The
+first hid `git worktree add`'s failure behind `2>/dev/null`, so the test ran in the wrong directory
+and printed a plausible result. The second chained `cd … && …` and let the directory persist into the
+next case, so a check that should have printed `ok` printed `WRONG TREE` — from the previous
+directory. Both were caught only by printing the working directory alongside the result.
+
+So: **when a check is about where you are, print where you are.** A diagnostic that does not say
+which tree it inspected cannot be distinguished from one that inspected the wrong one, which is the
+same failure this whole skill is about.
