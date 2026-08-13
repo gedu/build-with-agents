@@ -3,7 +3,7 @@ id: map
 type: index
 targets: [any]
 status: validated
-verified: 2026-08-12
+verified: 2026-08-13
 sources: ["decisions/0001-agents-md-as-single-source-of-truth.md", "decisions/0004-mandatory-frontmatter-as-query-interface.md", "decisions/0009-redaction-is-a-repo-wide-rule.md", "decisions/0010-measurements-vary-the-harness-not-the-model.md", "decisions/0011-rig-produces-evidence-not-truth.md", "journal/2026-08-04-repo-skeleton-design.md"]
 ---
 
@@ -30,7 +30,7 @@ where to look and what you are allowed to trust.
 | `OPERATIONS.md` | What to run and when — gates, rig, review lifecycle. Points at `--help` rather than duplicating flags | Yes | active |
 | `setup.sh` | Generates per-tool symlinks and installs git hooks; committed, output is not | Yes | active |
 | `hooks/` | Committed git hooks. `pre-commit` is the ADR 0009 redaction gate | Yes | 1 hook (`pre-commit`) |
-| `skills/` | Tool-neutral skills, one dir per skill (`SKILL.md` + optional `assets/`, `references/`) | Yes, when `validated` | 4 skills (`context-checkpoint` draft, `hypothesis-cycle` draft, `project-gap-analysis` draft, `source-verdict` validated) |
+| `skills/` | Tool-neutral skills, one dir per skill (`SKILL.md` + optional `assets/`, `references/`) | Yes, when `validated` | 5 skills (`checkout-isolation` draft, `context-checkpoint` draft, `hypothesis-cycle` draft, `project-gap-analysis` draft, `source-verdict` validated) |
 | `theory/llm/` | How models behave: context, tokens, sampling, failure modes | Yes, when `validated` | 1 doc (`context-degradation-at-length`, validated) |
 | `theory/agents/` | Single-agent design: tools, memory, context isolation | Yes, when `validated` | 3 docs (`capability-load-cost`, `instruction-provenance`, `tool-surface-design`) |
 | `theory/orchestration/` | Multi-agent coordination, delegation, handoffs | Yes, when `validated` | 1 doc (`delegation-and-context-boundaries`, validated) |
@@ -39,7 +39,7 @@ where to look and what you are allowed to trust.
 | `decisions/` | Numbered ADRs (`NNNN-slug.md`) — the WHY | Yes | `0001`–`0013` ratified |
 | `hypotheses/` | Falsifiable claims with a declared test, registered before the run that could settle them | **No — zero citability** (ADR 0012). Not even as evidence | 1 open |
 | `gaps/` | Gap analyses of other projects against validated practice — goal (c), and the demand signal for `blocks/` | **Evidence only, and only in aggregate.** One record is one project, never a general claim | 2 records; private projects de-identified, public sources named |
-| `journal/` | Dated conversations and brainstorms | **Never as authority**; valid as provenance (ADR 0007) | 10 entries (2026-08-04, 2026-08-05 ×7, 2026-08-10 ×2) |
+| `journal/` | Dated conversations and brainstorms | **Never as authority**; valid as provenance (ADR 0007) | 11 entries (2026-08-04, 2026-08-05 ×7, 2026-08-10 ×2, 2026-08-13) |
 | `blocks/_shared/` | Target-agnostic minimal blocks with a contract | Yes, when `validated` | empty |
 | `blocks/react/` | React-specific blocks | Yes, when `validated` | empty |
 | `blocks/react-native/` | React Native-specific blocks | Yes, when `validated` | empty |
