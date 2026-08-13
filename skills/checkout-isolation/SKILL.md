@@ -12,6 +12,15 @@ sources: ["AGENTS.md", "OPERATIONS.md", "decisions/0009-redaction-is-a-repo-wide
 Run before writing anything to a repository. Decides whether this session may work in the checkout
 it was started in, or must take a worktree first.
 
+**This file is the source of record.** The knowledge is about git and concurrent sessions rather than
+about this repository, so it is also installed at the executor's user level to reach every project.
+The installed copy carries the executor's own frontmatter and the body below **verbatim**, so drift
+between them is a plain diff of the body and nothing else.
+
+It is deliberately a copy, not a symlink into this working tree: a symlinked skill would resolve to
+whatever branch this checkout happens to have — the exact defect documented below, reproduced in the
+mechanism meant to distribute the warning about it.
+
 **A checkout is single-writer.** Two agents sharing one working tree is not a merge problem — it is
 a problem with no merge, because the second writer's branch, index and hooks change underneath the
 first without any error.
