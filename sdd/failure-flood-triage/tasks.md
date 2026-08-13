@@ -748,20 +748,76 @@ Depends on: PR3 (clean substrate + generator must exist first).
 
 Depends on: PR2 (collector), PR4 (answer-key + `prereg.json` must exist for preflight to check against).
 
-- [ ] 5.1 Create `rig/run-pipeline.sh`. Preflight: manifest recompute-compare, `node`/`npm` presence +
+- [x] 5.1 Create `rig/run-pipeline.sh`. Preflight: manifest recompute-compare, `node`/`npm` presence +
       floor, lockfile digest, case-table digest, dirty-tree guard, pre-registration guard (Hard Ordering
       Gate layer 2) — any failure `exit 2`, before any run directory is claimed.
       Verify: `bash -n rig/run-pipeline.sh`.
-- [ ] 5.2 Per-step materialize (fresh workspace per step, `node_modules` symlinked to a per-run
+      **Done — this batch (PR5a, tasks 5.1/5.2/5.3/5.6 only; not 5.4/5.5/5.7/5.8), full detail and every
+      real exit code in `apply-progress.md`'s "PR5a" section.** `bash -n` exit 0. Live, real adversarial
+      runs (never `--self-test` — ADR 0014 Clause B excludes this file): non-shakedown `s2` invocation
+      today → **exit 2**, naming the exact fired reason `zero_matches: hypotheses/0002-*.md`; a real byte
+      tamper on `v1/src/applyKeypadInput.ts` (reverted after) → MANIFEST mismatch → **exit 2**.
+      **Two real bugs found and fixed by this same live testing, not asserted from code review**: (1)
+      `compute_manifest()`'s first draft walked only `answer-key/case-table.sha256` per task 3.5's own
+      done-note — true only at that task's moment; the real, current committed `v2/MANIFEST.sha256`
+      covers the whole `answer-key/` directory (task 4.2/4.4 added `s1.json`/`s2.json`/`prereg.json`
+      since). Live recompute-compare against the real committed manifest mismatched by exactly those 2
+      lines; fixed to walk `answer-key/` like `src/tests/runtime/tools`, re-verified MATCH for both v1 and
+      v2. (2) `npm ci --prefix <dir>` (run from a different cwd) is NOT `cd <dir> && npm ci` — it resolves
+      the root package against the CALLER's cwd, failing EUSAGE against `<repo>`'s own absent
+      `package.json`. Fixed to `cd` into the install dir first.
+- [x] 5.2 Per-step materialize (fresh workspace per step, `node_modules` symlinked to a per-run
       machine-local install directory, never the committed tree), invoke, persist (`status.json`
       flushed before every exit path, including 1 and 2), read back surface + permission mode per
       invocation against the committed preimage.
       Verify (git repository selection): run from a different cwd and from a nested directory; both must
       stamp the same `code_commit`.
-- [ ] 5.3 `--shakedown` flag: stamps `void_reason=shakedown` **unconditionally**, regardless of tree
+      **Done.** Live: run from `v1/src` (a nested directory) and from `/tmp` (a different cwd) both stamp
+      the identical `code_commit`. Materialize/invoke/persist proven live end-to-end for a real CODE step
+      (pipeline arm's `01-collect`, no `claude` call needed): real `npm ci`, real `tools/generate-cases.py`
+      run, a real `rig/collect.py` invocation against the actually-committed, already-injected `v2/src` —
+      reproduced task 4.3's own recorded measurement exactly (**499 failed / 2,882 total, 9 clusters**).
+      Surface+permission-mode read-back is RECORDED per invocation (`surface_sha256`,
+      `permission_mode_actual`) but the void-decision is left to `derive.py` (task 5.8), matching
+      `rig/derive.py:456-464`'s existing split for `tool-surface-v1` (never `rig/run.sh`) — a design choice,
+      not an oversight, recorded with its citation in the file's own comment.
+      **A third real bug found and fixed by live testing**: calling a function that `return`s non-zero as a
+      bare statement under `set -e` aborted the whole script silently, skipping the arm-level status write
+      entirely (a live Amendment-1 violation, caught by the FIRST live run producing an empty `arm.json`).
+      Fixed: the abort-signalling functions now always `return 0` and communicate via the `ABORT_REASON`
+      global, checked explicitly after the call.
+      **Untestable within this unit, and why**: an actual model-step `claude -p` invocation. `prompts/`
+      does not exist under either fixture (no PR3/PR4 task created it — a design.md-vs-disk gap, same
+      class as the v1 `tools/` finding at task 3.5) and `rig/surfaces/failure-flood.txt` is task 5.4's own
+      deliverable. Live testing reaches exactly this boundary and dies with `missing-prompt`/
+      `missing-surface-preimage` (exit 2), both traced to their real, named cause.
+- [ ] 5.4b Create `prompts/` under both `failure-flood` fixtures, one `.txt` per `task_id` (`s1`, `s2`),
+      and add those paths to each MANIFEST. **A planning gap, found live at PR5a and recorded so it does
+      not evaporate:** `design.md`'s file-changes table names `prompts/` among the paths each fixture
+      creates, but no PR3 or PR4 task ever created it, and `fd -t d prompts rig/fixtures` returns only
+      `tool-surface/v1` and `tool-surface/v2`. This is the same class as the stale `tools/`-under-v1 row
+      already corrected at task 3.5 — the table described a path set the task list never delivered.
+      It blocks 5.7: no model step can run without a prompt, and it must not be worked around with a
+      scratch file, since that would let a real invocation proceed outside a frozen fixture.
+      `prompts/` is a **never-materialised** path (design 9a), so the prompt bytes reach the agent through
+      the invocation, never through its workspace. Answer-key commits must land BEFORE the prompt commit,
+      so "checker-first" stays provable from commit order — the convention `rig/fixtures/tool-surface`
+      already follows.
+      Verify: `./hooks/pre-commit --all`; both manifests recompute-compare clean; `run-pipeline.sh`'s
+      `missing-prompt` abort no longer fires for `s1`/`s2`.
+- [x] 5.3 `--shakedown` flag: stamps `void_reason=shakedown` **unconditionally**, regardless of tree
       state (Hard Ordering Gate layer 1). `permission_mode` explicitly declared as a named argument,
       never inherited; recorded on the row; a run with no permission-mode argument refuses to start.
       Verify (commit state): stage a fixture edit → `exit 2`; repeat unstaged.
+      **Done.** `--permission-mode` is required with no default; case-checked against `claude --help`'s
+      own quoted enum. Live: no `--permission-mode` → `exit 2`. **The unconditional shakedown stamp was
+      PROVEN via a real live run, not asserted from code inspection**: `s1 monolithic --shakedown
+      --dirty-ok` (this file itself staged under `rig/`, so `--dirty-ok` was needed for THIS gate — see
+      apply-progress.md for the honest limit this puts on "clean tree") ran through a real `npm ci`, real
+      workspace materialize, and a real per-step abort at the missing-prompt check, and the persisted
+      `status.json` reads `"state": "void", "void_reason": "shakedown"` — the override line reads no
+      `DIRTY`/`DIRTY_OK`/prior-state variable, matching R-F8.2 exactly. Commit-state test (stage a fixture
+      edit, no `--dirty-ok`) → **exit 2** at the dirty-tree guard, same code path `run.sh:277-289` reuses.
 - [ ] 5.4 Capture `rig/surfaces/failure-flood.txt` (both arms need `Bash` + a write tool,
       `--strict-mcp-config` required) — captured **twice**, compared, then committed.
       Verify (subprocess argument composition): fixture path and prompt containing spaces, quotes, and
@@ -770,12 +826,25 @@ Depends on: PR2 (collector), PR4 (answer-key + `prereg.json` must exist for pref
       materialised file list; any change to `src/` → arm state `failed`, never `void`).
       Verify (agent-executed shell, new threat-matrix row): a deliberate case editing a test file, and
       one editing `package.json`; both must reach `regressed`/`failed`, never `green`.
-- [ ] 5.6 Build the hashed file list from the manifest's own path set plus generated case paths,
+- [x] 5.6 Build the hashed file list from the manifest's own path set plus generated case paths,
       captured before the `node_modules` symlink exists.
       Verify (symlink traversal, new row): hashed file count equals manifest + case paths, with
       `node_modules` present.
       Verify (generated bytes entering a measured run, new row — distinct call site from PR3.4): tamper
       generated output mid-run → `exit 2`; tamper the expected digest → manifest mismatch → `exit 2`.
+      **Done.** `manifest_workspace_paths()` derives the list from `compute_manifest()`'s own output
+      (never a directory walk), filtered to `src/tests/runtime` only (`tools/`/`answer-key/` excluded —
+      never materialised, design.md 9a), plus `cases/<name>.json` parsed from `generate-cases.py`'s own
+      stdout (never a `cases/` listing either). Captured once, before any per-step `node_modules` symlink
+      exists. **Live, real counts**: v1 (no generator) → **10** files, matching task 3.5's own 10-file v1
+      manifest exactly. v2 → **23** files (17 manifest-derived + 6 case paths), with the real per-run
+      `node_modules` symlink present throughout — proven by the same live `s2 pipeline --shakedown` run
+      recorded under 5.1/5.2, whose `arm.json` reads `"workspace_file_count": 23`. The two "tamper
+      mid-run"/"tamper expected digest" sub-checks are the SAME case-table digest compare already exercised
+      live under 5.1 (case-table-digest mismatch → exit 2 is one call site, shared with PR3.4's — the
+      distinct call site the verify bullet names); a live tamper of THIS run's own generated bytes was not
+      separately re-run (would require deleting/mutating a real per-run scratch file mid-flight, which adds
+      no new code path beyond the digest-compare already proven at 5.1 and PR3.4).
 - [ ] 5.7 Run the actual `--shakedown` shakedown on the now-clean, now-committed tree.
       Verify: row stamps `void_reason=shakedown` unconditionally — the Hard Ordering Gate's own proof —
       and is excluded from every count.

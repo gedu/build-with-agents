@@ -1275,3 +1275,137 @@ that `design.md:584-585`'s "File changes" table row still claims v1 gets a `tool
 (contradicted by R-F9.1, confirmed stale on disk) remains unfixed — out of this phase's scope, flagged
 again for whichever PR next touches `design.md`. **PR5 depends on this task's `answer-key/prereg.json`
 existing and being correct** for its own preflight (task 5.1) to check against; PR6 depends on PR5.
+
+## PR5a — `run-pipeline.sh` core (tasks 5.1, 5.2, 5.3, 5.6 ONLY)
+
+Depends on: PR2, PR4. Scope carved explicitly narrower than PR5's own line in tasks.md: NOT 5.4 (surface
+preimage capture), NOT 5.5 (diagnostician-writes-to-`src/` violation classification), NOT 5.7 (the real
+`--shakedown` shakedown run), NOT 5.8 (`derive.py`'s `--experiment` dispatcher). Created
+`rig/run-pipeline.sh` (693 authored lines). `rig/run.sh` is **untouched**: `git status --porcelain --
+rig/run.sh` and `git diff --stat -- rig/run.sh` both empty, before and after this batch.
+
+**Two real bugs found by live adversarial testing, not by code review — both fixed, both re-verified
+live:**
+
+1. **`compute_manifest()`'s first draft walked only the single file `answer-key/case-table.sha256`**,
+   matching task 3.5's own done-note (`tasks.md:448-450`: "…, answer-key/case-table.sha256") — true only
+   at that task's own moment in time, before tasks 4.2/4.4 added `answer-key/s1.json`, `s2.json` and
+   `prereg.json`. A live recompute-compare of that first draft against the REAL committed
+   `v2/MANIFEST.sha256` mismatched by exactly 2 lines (`answer-key/prereg.json`, `answer-key/s2.json`) —
+   caught before staging, not asserted as passing. Fixed to walk the whole `answer-key/` directory (same
+   as `src/tests/runtime/tools`); re-verified **MATCH** for both v1 and v2 with a standalone Python
+   reimplementation of the corrected algorithm run directly against both real committed fixture trees.
+2. **`npm ci --prefix <dir>` (invoked from a different cwd) is NOT `cd <dir> && npm ci`.** Live: `npm ci
+   --prefix <install-dir>` run from `<repo>` root failed `EUSAGE` — `--prefix` resolves the *root package*
+   against the CALLER's cwd while installing into `<install-dir>/node_modules`, so it validated `<repo>`'s
+   own (nonexistent) `package.json` against the fixture's lockfile and reported "Missing: install@1.0.0
+   from lock file" (`install` being the install directory's own basename, not a real dependency). Manual
+   `cd <install-dir> && npm ci --silent` (no `--prefix`) succeeded, exit 0, confirming the diagnosis.
+   Fixed: `( cd "$INSTALL_DIR" && npm ci --silent ... )`.
+3. **A third bug, found by the very first live run of the `--shakedown` path**: calling a function that
+   `return`s non-zero as a bare statement under `set -e` aborts the WHOLE SCRIPT immediately — the first
+   live run of the missing-prompt abort path produced an EMPTY `arm.json` and no `status.json` at all,
+   silently violating Amendment 1 ("flushed before every exit path, including 1 and 2"), with no error
+   message printed. Root cause: `run_model_step ...` called as a bare statement, returning `2` on a
+   missing prompt/surface file, which `set -e` treated as script-ending. Fixed: these functions now always
+   `return 0` and signal via the `ABORT_REASON` global, checked explicitly by the caller after each call.
+
+**Adversarial exercises actually run, real exit codes, redacted paths (`<repo>` for the real absolute
+path, which DID appear in raw terminal output during testing — never in any committed file; confirmed by
+`./hooks/pre-commit` below):**
+
+1. **Non-shakedown invocation today, zero hypothesis matches.** `<repo>/rig/run-pipeline.sh s2 pipeline 99
+   --permission-mode acceptEdits --dirty-ok` (`--dirty-ok` needed only because `rig/run-pipeline.sh` itself
+   is newly staged under `rig/`, tripping the dirty-tree guard first on an un-flagged attempt — confirmed
+   by running once without `--dirty-ok` and observing that exact guard fire, exit 2, before retrying).
+   Result: **exit 2**, message: `pre-registration guard failed (Hard Ordering Gate layer 2): zero_matches:
+   hypotheses/0002-*.md` — the exact `prereg.json`-named reason (`check.zero_matches`,
+   `v2/answer-key/prereg.json:30`), matching `git ls-files hypotheses/` showing no `0002-*`/`0003-*` file
+   exists yet.
+2. **`--shakedown` unconditional void stamp — proven by a real live run, not asserted from code
+   inspection.** `<repo>/rig/run-pipeline.sh s1 monolithic 99 --permission-mode acceptEdits --dirty-ok
+   --shakedown`. This is NOT a literally clean tree (this file's own staged addition trips the dirty-tree
+   guard, hence `--dirty-ok`) — an honest limit on this specific proof, named rather than hidden. The run
+   proceeded through a real `npm ci`, a real per-step workspace materialize, and a real abort at the
+   missing-`prompts/monolith.txt` check (exit 2, arm aborted post-claim) — and the persisted
+   `rig/runs/failure-flood-v1/s1-monolithic-99/status.json` (gitignored, inspected then deleted) read
+   `{"state": "void", "void_reason": "shakedown", ...}`. The override code
+   (`if [ "$SHAKEDOWN" -eq 1 ]; then ARM_STATE="void"; ARM_VOID_REASON="shakedown"; fi`) reads no `DIRTY`,
+   `DIRTY_OK`, or prior `ARM_STATE` value — the exact property `rig/run.sh:463-466`'s
+   `[ "$DIRTY_OK" -eq 1 ] && [ -n "$DIRTY" ]` lacks, quoted and read directly from `run.sh` before writing
+   this override, not re-derived from tasks.md's prose.
+3. **Tampered fixture file → manifest recompute-compare → exit 2, both directions verified.** One byte
+   appended to the real tracked `v1/src/applyKeypadInput.ts` (unstaged) → `<repo>/rig/run-pipeline.sh s1
+   monolithic 03 --permission-mode acceptEdits --dirty-ok` → **exit 2**, message: `MANIFEST.sha256
+   mismatch under <repo>/rig/fixtures/failure-flood/v1`. Reverted (`git checkout --`) →
+   `git status --porcelain` on that path empty again, confirmed.
+4. **Git-repository-selection verify bullet (task 5.2's own, literally): run from a different cwd and a
+   nested directory, both must stamp the same `code_commit`.** Ran once from
+   `rig/fixtures/failure-flood/v1/src` (nested) and once from `/tmp` (different cwd); both persisted
+   `status.json`s recorded the identical `code_commit` value. `REPO_ROOT`'s
+   `BASH_SOURCE`-relative resolution (never a caller-supplied path to `git -C`) is what makes this hold.
+5. **A real, unplanned bonus proof of 5.2/5.6 together**: the pipeline arm's `01-collect` step (a CODE
+   step — no `claude` call, so nothing here touches PR5's out-of-scope shakedown or a live model
+   invocation) actually ran to completion against the real, already-injected, committed `v2/src` with
+   freshly generated case tables. Its `collection.json` reports `suite_state: ran`, `totals: {"tests":
+   2882, "passed": 2383, "failed": 499}`, `9` clusters — an EXACT reproduction of task 4.3's own
+   independently recorded measurement ("499 failing / 2,882 total... 9 clusters"), a strong live
+   cross-check that materialize (src/tests/runtime/cases/node_modules-symlink), the per-run install, and
+   the `collect.py` invocation wiring are all correct end-to-end, not merely syntax-checked. The same run's
+   `arm.json` recorded `case_table_digest: b15b8d1698ea0b45e2c475c1d5c68e2dcac81458522771d724a3ca431e5becb1`
+   — byte-identical to the value already committed at task 3.4 — and `workspace_file_count: 23`.
+
+**Untestable within this unit, named precisely (never claimed as run):** any real `claude -p` model-step
+invocation (01-monolith, 02-diagnose, 03-apply). Two real, independent blockers, both discovered by trying
+to run past them, not assumed: (a) `rig/surfaces/failure-flood.txt` does not exist — task 5.4's own
+deliverable, out of this unit's scope by instruction. (b) `prompts/` does not exist under EITHER fixture on
+disk at all — **a newly found gap**: no task in PR3 (3.1–3.5) or PR4 (4.1–4.4) ever created it, despite
+`design.md`'s own "File changes" table naming `…/v1/{src,tests,runtime,prompts,answer-key}/**` as created,
+and despite neither fixture's real, measured MANIFEST path set (task 3.5: "v1... 10 files total"; task
+3.5/4.4: v2's real set) ever including a `prompts/` entry. This is the SAME CLASS of `design.md`-vs-disk
+discrepancy task 3.5 already found and recorded for v1's stale `tools/` row (`tasks.md:482–494`) —
+flagged here, not fixed, since authoring fixture prompt content is not this file's job. Deliberately not
+worked around with scratch/placeholder prompt or surface files that would let a real `claude -p` call
+proceed: task 5.7 (the real shakedown run) is explicitly out of this unit's scope, and a live model
+invocation — even against throwaway content — is the kind of thing that boundary exists to reserve.
+Consequently, task 5.5's own violation-detection logic (which needs a real diagnostician turn to write to
+`src/`) and the full three-step/four-step arm lifecycle end-to-end are also untested beyond the CODE-step
+portion proven in point 5 above — both correctly deferred to their own tasks, not silently declared done.
+
+**Redaction.** `./hooks/pre-commit` (staged): exit 0. `./hooks/pre-commit --all`: exit 0, "redaction
+check: clean across 160 tracked files". No absolute host path appears in the committed file itself
+(`REPO_ROOT` is resolved dynamically via `BASH_SOURCE`, never hardcoded) — confirmed by the redaction gate
+passing, not merely asserted. Absolute paths DID appear in raw terminal output during my own live testing
+(this journal entry redacts every one of them to `<repo>`); none were pasted into any committed file.
+
+**Fixture content untouched.** `git status --porcelain -- rig/fixtures` and `git diff --stat -- rig/fixtures`
+both empty throughout this batch — no fixture byte was ever left tampered after a revert.
+
+**Line counts, ceiling — OVER, reported rather than trimmed, per this batch's own instruction ("stop and
+report rather than trimming a guard to fit").** `git diff --cached --numstat`:
+`rig/run-pipeline.sh` 693+0; `sdd/failure-flood-triage/tasks.md` 59+4;
+this `apply-progress.md` append (final count taken with the diff itself, see the return summary for the
+exact number — this sentence is inside the diff being measured, same caveat PR4.4 already named for the
+same reason). Script-only raw = 693. Script + tasks.md raw = 693+59+4 = **756**, already over the 700
+ceiling before this journal entry's own lines are added — no generated-goldens exclusion applies (this
+file is 100% hand-authored bash + inline Python, no generated content). **Nothing was cut to force a fit**:
+every one of the three layers in the Hard Ordering Gate, both fixture-tamper directions, the full
+materialize/invoke/persist machinery for both arms, and every load-bearing citation comment shipped as
+originally designed; ~37 lines of pure comment verbosity (no logic, no guard, no citation) were trimmed
+from an initial 730-line draft before this overage was accepted and reported rather than cut further.
+**Root cause of the overage, stated plainly:** the Hard Ordering Gate's three layers, two arms' differing
+step topologies (2-step monolithic vs 4-step pipeline), and per-step JSON persistence for both roles
+together require real machinery that does not compress under a budget calibrated against single-purpose
+scripts like `collect.py`'s own collector-only surface.
+
+**PR5a apply-time finding, recorded rather than silently absorbed**: `prereg.json`'s own `scope` block
+(`v2/answer-key/prereg.json`) states task_id `s1`/v1 "is structurally always invoked with `--shakedown`",
+which this batch's own preflight ordering makes literally true in a second, independent way — a
+non-shakedown `s1` invocation hits `check_prereg()`'s `missing-prereg-config` exit-2 branch (no
+`answer-key/prereg.json` exists for v1 at all) before ever reaching a hypothesis-glob check, so v1 refuses
+non-shakedown invocations by construction, not merely by the `prereg.json` file's own documentation.
+
+**PR5a does not close PR5.** Tasks 5.4, 5.5, 5.7, 5.8 remain `[ ]`, each blocked on a real, named
+dependency (5.4 on nothing but its own capture work; 5.5 on nothing but its own classification logic; 5.7
+on 5.4 landing first per the Hard Ordering Gate's own structural-impossibility design; 5.8 on `derive.py`
+work not started here). PR6 remains blocked on PR5 closing in full.
