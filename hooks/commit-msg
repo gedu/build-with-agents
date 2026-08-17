@@ -1,0 +1,325 @@
+#!/bin/sh
+#
+# hooks/commit-msg — the redaction gate over the proposed commit message.
+#
+# AGENTS.md forbids a home-directory path, a token or a hostname "in prose, in frontmatter,
+# or in a commit message". `hooks/pre-commit` covers the first two: it scans files. Nothing
+# covered the third, and a commit message is published exactly as irreversibly as a file.
+# The reasoning is in decisions/0009-redaction-is-a-repo-wide-rule.md and
+# decisions/0014-a-public-guarantee-cannot-be-opt-in.md.
+#
+# USAGE
+#   commit-msg <file>          scan one proposed commit message. This is what git calls
+#   commit-msg --range <A> <B> scan every commit message in A..B. `-` for A means
+#                              "no lower bound": every commit reachable from B
+#   commit-msg --self-test     build throwaway fixtures and assert one exit code per case
+#   commit-msg --help          this header
+#
+#   Install it with `./setup.sh --hooks`. Git then calls it with the message file on every
+#   commit, before the message enters history — which is the whole point: a message caught
+#   here is edited, a message caught after a push is published.
+#
+# WHERE THE PATTERNS LIVE
+#   `hooks/redaction-patterns.sh`, beside this file, sourced at run time. `hooks/pre-commit`
+#   sources the same file. Two gates enforcing one rule from two pattern lists would drift,
+#   and the weaker copy is the one that fires. If the file is missing or defines no patterns
+#   this exits 2 rather than scanning every line against an empty list.
+#
+# WHAT IS SCANNED, AND WHAT IS CUT OFF
+#   The whole message file, comment lines included — git strips them before storing, but a
+#   comment is free to be scanned and reading `core.commentChar` to decide would add a way
+#   to be wrong. The one exception is `git commit -v`: it appends the staged diff below a
+#   scissors line, and that diff is `hooks/pre-commit`'s subject, not this one's. Scanning
+#   it would report pre-existing context lines as commit-message findings on every commit.
+#   Everything from the scissors line onward is therefore cut off.
+#
+# WHAT THIS DELIBERATELY DOES NOT CATCH
+#   Exactly what pre-commit does not catch, because the pattern list is the same one: a
+#   private project or client name written as a bare word. No pattern separates a public
+#   repository name from a client's. A clean run is not evidence about that class.
+#
+# EXIT CODES
+#   0  clean
+#   1  a finding — something forbidden is present
+#   2  the check could not run. NOT a pass. Never conflate with 0.
+#
+# SELF-TEST
+#   `--self-test` asserts: a clean message passes; an assembled home path is reported; a
+#   missing message file escalates; a leak below a `commit -v` scissors line is out of
+#   scope; a copy of this script with no pattern file beside it escalates; and, over a
+#   throwaway repository, that `--range` reports a leaked commit message, passes a clean
+#   range, and escalates on an unresolvable revision. ADR 0013 — a committed executable
+#   carries its own test. Run it whenever this file or the pattern list changes.
+#
+# PORTABILITY
+#   POSIX `sh`, `grep -E` and `awk`, not `rg`. A committed hook must run on a machine that
+#   has not installed anything.
+
+set -eu
+
+# Byte semantics, not locale semantics. A commit message can carry bytes that are not valid
+# in the ambient encoding, and under a UTF-8 locale awk aborts on them. C locale also makes
+# [A-Za-z] mean exactly ASCII, which is what every shared pattern intends.
+LC_ALL=C
+export LC_ALL
+
+show_help() {
+  awk 'NR>1 && /^#/ { sub(/^# ?/, ""); print; next } NR>1 { exit }' "$0"
+}
+
+die_cannot_run() {
+  printf '\n  COMMIT MESSAGE CHECK COULD NOT RUN: %s\n  This is exit 2, not a pass.\n' "$1" >&2
+  exit 2
+}
+
+# Resolves the directory this script really lives in, following the symlink chain that
+# `setup.sh --hooks` installs (.git/hooks/commit-msg -> ../../hooks/commit-msg). `readlink -f`
+# is not portable — BSD readlink has no -f — so the chain is walked by hand, with a bound so
+# a symlink cycle terminates instead of hanging.
+script_dir() {
+  _p="$1"
+  _hops=0
+  while [ -L "$_p" ]; do
+    _hops=$((_hops + 1))
+    [ "$_hops" -le 32 ] || return 1
+    _t="$(readlink "$_p")" || return 1
+    case "$_t" in
+      /*) _p="$_t" ;;
+      *)  _p="$(dirname "$_p")/$_t" ;;
+    esac
+  done
+  (cd "$(dirname "$_p")" && pwd)
+}
+
+load_patterns() {
+  HOOK_DIR="$(script_dir "$0")" \
+    || die_cannot_run "could not resolve this script's own directory in order to find its pattern list"
+  PATTERN_FILE="$HOOK_DIR/redaction-patterns.sh"
+  [ -r "$PATTERN_FILE" ] \
+    || die_cannot_run "the shared pattern list '$PATTERN_FILE' is missing or unreadable"
+  # shellcheck source=hooks/redaction-patterns.sh
+  . "$PATTERN_FILE" \
+    || die_cannot_run "the shared pattern list '$PATTERN_FILE' could not be sourced"
+  command -v redaction_patterns >/dev/null 2>&1 \
+    || die_cannot_run "'$PATTERN_FILE' defines no redaction_patterns function"
+}
+
+# message_lines <label> <file> -> `label:line:content` for every scanned line.
+# The scissors test matches one leading comment character followed by dashes and spaces
+# around `>8`, so it holds whatever `core.commentChar` is set to.
+message_lines() {
+  awk -v label="$1" '
+    /^.[-[:space:]]*>8[-[:space:]]*$/ { exit }
+    { printf "%s:%d:%s\n", label, NR, $0 }
+  ' "$2"
+}
+
+# Applies every shared pattern to $HAYSTACK. Sets FOUND=1 and prints the findings.
+scan_haystack() {
+  FOUND=0
+  APPLIED=0
+  # The here-doc keeps this loop in the current shell, so FOUND survives it. A pipe from
+  # redaction_patterns would run the body in a subshell and every finding would be lost.
+  while IFS= read -r entry; do
+    case "$entry" in ''|'#'*) continue ;; esac
+    label="${entry%%|*}"
+    regex="${entry#*|}"
+    [ "$label" != "$entry" ] || die_cannot_run "malformed pattern entry, no '|' separator: '$entry'"
+    APPLIED=$((APPLIED + 1))
+    # grep exits 0 on match, 1 on no match, and >1 on error. Collapsing all three with
+    # `|| :` would read a broken pattern as "nothing found" and pass the commit, so the
+    # error case is separated and escalated instead.
+    set +e
+    hits="$(printf '%s\n' "$HAYSTACK" | grep -E -- "$regex")"
+    rc=$?
+    set -e
+    [ "$rc" -le 1 ] || die_cannot_run "grep exited $rc on the '$label' pattern"
+    [ -n "$hits" ] || continue
+    if [ "$FOUND" -eq 0 ]; then
+      printf '\n  REDACTION CHECK FAILED on the commit message — this repo is public.\n' >&2
+      FOUND=1
+    fi
+    printf '\n  %s:\n' "$label" >&2
+    printf '%s\n' "$hits" | sed 's/^/    /' >&2
+  done <<PATTERN_LIST
+$(redaction_patterns)
+PATTERN_LIST
+
+  # Zero applied patterns means every line was compared against nothing. Reporting that as
+  # clean is the exact fail-open this gate exists to refuse.
+  [ "$APPLIED" -gt 0 ] || die_cannot_run "no usable patterns in '$PATTERN_FILE'"
+}
+
+report_and_exit() {
+  if [ "$FOUND" -eq 1 ]; then
+    cat >&2 <<'MSG'
+
+  Fix the message, per AGENTS.md:
+    * inside this project   -> a repo-relative path
+    * outside, public       -> the canonical name (owner/repo), never a path
+    * outside, private      -> describe its role
+    * a secret              -> remove it, then rotate it. It is already on disk.
+
+  Not covered by this check: a private project or client name as a bare word.
+  Ask how to refer to a shared source before writing it. See AGENTS.md.
+
+  A message rejected here has not entered history. Rewrite it and commit again.
+MSG
+    exit 1
+  fi
+  exit 0
+}
+
+scan_file() {
+  [ -f "$1" ] || die_cannot_run "no commit message file at '$1'"
+  [ -r "$1" ] || die_cannot_run "the commit message file '$1' is unreadable"
+  load_patterns
+  HAYSTACK="$(message_lines "$1" "$1")" \
+    || die_cannot_run "could not read the commit message file '$1'"
+  scan_haystack
+  report_and_exit
+}
+
+scan_range() {
+  _from="$1"
+  _to="$2"
+  git rev-parse --git-dir >/dev/null 2>&1 \
+    || die_cannot_run "--range needs a git repository and this is not one"
+  git rev-parse --verify -q "$_to^{commit}" >/dev/null 2>&1 \
+    || die_cannot_run "the range end '$_to' does not resolve to a commit here"
+  if [ "$_from" = "-" ]; then
+    REVS="$(git rev-list "$_to")" || die_cannot_run "could not list the commits reachable from '$_to'"
+  else
+    git rev-parse --verify -q "$_from^{commit}" >/dev/null 2>&1 \
+      || die_cannot_run "the range start '$_from' does not resolve to a commit here. Pass '-' for no lower bound rather than an unresolvable revision — an unresolvable one would silently scan nothing"
+    REVS="$(git rev-list "$_from..$_to")" || die_cannot_run "could not list the commits in '$_from..$_to'"
+  fi
+
+  load_patterns
+
+  # Built into one haystack so a single pass over the pattern list covers every message,
+  # and so the count printed below is the count actually scanned rather than an intention.
+  HAYSTACK=""
+  COUNT=0
+  TMPMSG="$(mktemp)" || die_cannot_run "could not create a temporary file for a commit message"
+  trap 'rm -f "$TMPMSG"' EXIT
+  for _rev in $REVS; do
+    git log -1 --format=%B "$_rev" > "$TMPMSG" \
+      || die_cannot_run "could not read the commit message of $_rev"
+    _short="$(git rev-parse --short "$_rev")" || die_cannot_run "could not shorten $_rev"
+    HAYSTACK="$HAYSTACK$(message_lines "$_short" "$TMPMSG")
+"
+    COUNT=$((COUNT + 1))
+  done
+
+  scan_haystack
+  # Printed unconditionally, including the zero case. A range that turns out to be empty is
+  # a legitimate outcome — a tag push, a force-push backwards — but it must be visible in
+  # the log rather than indistinguishable from a scan that found nothing.
+  if [ "$FOUND" -eq 0 ]; then
+    printf '  commit-message check: clean across %s commit message(s)\n' "$COUNT"
+  fi
+  report_and_exit
+}
+
+self_test() {
+  SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+  [ -x "$SELF" ] || die_cannot_run "could not locate this script in order to re-invoke it"
+
+  TMP="$(mktemp -d)" || die_cannot_run "could not create a temporary directory"
+  # The copy used to test a missing pattern list cannot live in TMP: TMP becomes a git
+  # repository and the copy would be committed into the fixture it is meant to scan.
+  ORPHAN="$(mktemp -d)" || die_cannot_run "could not create a second temporary directory"
+  trap 'rm -rf "$TMP" "$ORPHAN"' EXIT
+
+  FAILED=0
+
+  # expect <wanted-exit-code> <label> <command...>
+  expect() {
+    _want="$1"
+    _label="$2"
+    shift 2
+    set +e
+    ( cd "$TMP" && "$@" ) >/dev/null 2>&1
+    _got=$?
+    set -e
+    if [ "$_got" -eq "$_want" ]; then
+      printf '  ok    %s\n' "$_label"
+    else
+      printf '  FAIL  %s — expected exit %s, got %s\n' "$_label" "$_want" "$_got" >&2
+      FAILED=1
+    fi
+  }
+
+  # The forbidden string is assembled at runtime from two fragments that match nothing on
+  # their own, because a literal home path written here would make the gate correctly block
+  # its own commit. That constraint doubles as a test that the fragments really are inert.
+  LEAK="$(printf '%s/%s/project' '/Users' 'someone')"
+
+  printf 'docs(hooks): add the commit message gate\n\nNo forbidden shape here.\n' > "$TMP/clean.msg"
+  expect 0 "a clean message passes" "$SELF" "$TMP/clean.msg"
+
+  printf 'fix: repair the path\n\nseen at %s\n' "$LEAK" > "$TMP/leak.msg"
+  expect 1 "an absolute home path in the message is reported" "$SELF" "$TMP/leak.msg"
+
+  expect 2 "a missing message file escalates instead of scanning nothing" \
+    "$SELF" "$TMP/does-not-exist.msg"
+
+  # `git commit -v` appends the staged diff below a scissors line. That content is
+  # hooks/pre-commit's subject; scanning it here would report every pre-existing context
+  # line as a commit-message finding.
+  {
+    printf 'chore: a clean subject\n'
+    printf '# ------------------------ >8 ------------------------\n'
+    printf '# Do not modify or remove the line above.\n'
+    printf 'diff --git a/x b/x\n'
+    printf '+see %s\n' "$LEAK"
+  } > "$TMP/verbose.msg"
+  expect 0 "the commit -v diff below the scissors line is out of scope" "$SELF" "$TMP/verbose.msg"
+
+  cp "$SELF" "$ORPHAN/commit-msg" && chmod +x "$ORPHAN/commit-msg" \
+    || die_cannot_run "could not copy this script in order to test a missing pattern list"
+  expect 2 "a missing pattern list escalates instead of scanning nothing" \
+    "$ORPHAN/commit-msg" "$TMP/clean.msg"
+
+  # --range is the CI path, and CI is where nobody watches a check that quietly stops
+  # working. It gets the same treatment as the hook path.
+  ( cd "$TMP" && git init -q . \
+      && git config user.email selftest@example.invalid \
+      && git config user.name selftest ) >/dev/null 2>&1 \
+    || die_cannot_run "could not create the temporary repository"
+  ( cd "$TMP" && git add -A && git commit -qm "chore: first clean commit" ) >/dev/null 2>&1 \
+    || die_cannot_run "could not create the first fixture commit"
+  BASE="$( cd "$TMP" && git rev-parse HEAD )" || die_cannot_run "could not read the fixture base revision"
+  printf 'second\n' > "$TMP/second.txt"
+  ( cd "$TMP" && git add -A && git commit -q -m "fix: seen at $LEAK" ) >/dev/null 2>&1 \
+    || die_cannot_run "could not create the leaking fixture commit"
+
+  expect 0 "--range over clean history passes" "$SELF" --range - "$BASE"
+  expect 1 "--range reports a leak in a commit message already in history" \
+    "$SELF" --range "$BASE" HEAD
+  expect 2 "--range escalates on an unresolvable revision instead of scanning nothing" \
+    "$SELF" --range "not-a-revision" HEAD
+
+  [ "$FAILED" -eq 0 ] || {
+    printf '\n  SELF-TEST FAILED — this gate is not behaving as specified.\n' >&2
+    exit 1
+  }
+  printf '  self-test: all cases passed\n'
+  exit 0
+}
+
+case "${1:-}" in
+  --help)      show_help; exit 0 ;;
+  --self-test) self_test ;;
+  --range)
+    [ "$#" -eq 3 ] || die_cannot_run "--range takes exactly two revisions: --range <A|-> <B>"
+    scan_range "$2" "$3"
+    ;;
+  "")          die_cannot_run "no commit message file given. Git passes one; see --help" ;;
+  --*)         die_cannot_run "unknown argument '$1'. Use a message file, --range, --self-test, or --help." ;;
+  *)
+    [ "$#" -eq 1 ] || die_cannot_run "expected exactly one commit message file, got $# arguments"
+    scan_file "$1"
+    ;;
+esac

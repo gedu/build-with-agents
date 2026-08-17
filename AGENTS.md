@@ -58,10 +58,14 @@ Every committed file is published the moment it is pushed, and pushing is not re
 way that matters. Applies repo-wide, to every directory and every `status`. ADR 0009 carries the
 reasoning.
 
-Half of this is enforced. `hooks/pre-commit` blocks a commit containing an absolute home path or a
-known secret shape — install it with `./setup.sh --hooks`, audit the whole tree with
-`./hooks/pre-commit --all`. The other half, a private name written as a bare word, **cannot** be
-pattern-matched and stays a judgment call. A clean check is not evidence about that half.
+Half of this is enforced. `hooks/pre-commit` blocks a commit whose staged files contain an absolute
+home path or a known secret shape, and `hooks/commit-msg` blocks the same shapes in the commit
+message — install both with `./setup.sh --hooks`, audit the whole tree with `./hooks/pre-commit --all`.
+Both are local and opt-in, and **there is no server-side copy yet** — ADR 0014 decided there should be
+one and records why it is deferred. So a clone that never runs `./setup.sh --hooks` has no gate at
+all: assume nothing about a checkout you did not install into. The other half, a private name written
+as a bare word, **cannot** be pattern-matched and stays a judgment call. A clean check is not
+evidence about that half.
 
 | Never commit | Write instead |
 |---|---|

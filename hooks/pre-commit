@@ -17,6 +17,12 @@
 #     previous audit; a pass here is not evidence about it.
 #   * hostnames. Every URL contains one, so a generic pattern is all false positives.
 #
+# WHERE THE PATTERNS LIVE
+#   `hooks/redaction-patterns.sh`, beside this file, sourced at run time. `hooks/commit-msg`
+#   sources the same file, so the two gates cannot forbid different things. If it is missing
+#   or defines no patterns this exits 2 — a gate with an empty pattern list reports "clean"
+#   about nothing, which is the failure mode theory/loops/verifier-availability.md is about.
+#
 # WHY THIS FILE CAN NAME WHAT IT FORBIDS
 #   Every pattern requires a real path segment or a real token body, so the documented
 #   placeholder forms (angle-bracketed) never match, and no pattern matches its own
@@ -36,8 +42,9 @@
 # SELF-TEST
 #   `--self-test` builds a throwaway repository and runs this script against it, asserting
 #   one exit code per case: a clean tree containing an empty file and a placeholder path,
-#   a real home-path finding, and an unreadable tracked file. Exit 0 every case passed,
-#   1 a case failed, 2 the test could not run. Run it whenever this file changes.
+#   a real home-path finding, an unreadable tracked file, and a copy of this script with no
+#   pattern file beside it. Exit 0 every case passed, 1 a case failed, 2 the test could not
+#   run. Run it whenever this file OR hooks/redaction-patterns.sh changes.
 #   ADR 0013 — a committed executable carries its own test, so it needs no runner and no
 #   framework, both of which the portability rule below forbids anyway.
 #
@@ -70,6 +77,42 @@ die_cannot_run() {
   exit 2
 }
 
+# Resolves the directory this script really lives in, following the symlink chain that
+# `setup.sh --hooks` installs (.git/hooks/pre-commit -> ../../hooks/pre-commit). Without
+# this, git invokes the hook through .git/hooks and the pattern file beside the real
+# script is not there. `readlink -f` is not portable — BSD readlink has no -f — so the
+# chain is walked by hand, with a bound so a symlink cycle terminates instead of hanging.
+script_dir() {
+  _p="$1"
+  _hops=0
+  while [ -L "$_p" ]; do
+    _hops=$((_hops + 1))
+    [ "$_hops" -le 32 ] || return 1
+    _t="$(readlink "$_p")" || return 1
+    case "$_t" in
+      /*) _p="$_t" ;;
+      *)  _p="$(dirname "$_p")/$_t" ;;
+    esac
+  done
+  (cd "$(dirname "$_p")" && pwd)
+}
+
+# The pattern list is shared with hooks/commit-msg so the two gates cannot diverge. Every
+# failure to load it is exit 2: an empty pattern list would scan every line against nothing
+# and report a clean tree, which is the one outcome this gate must never produce.
+load_patterns() {
+  HOOK_DIR="$(script_dir "$0")" \
+    || die_cannot_run "could not resolve this script's own directory in order to find its pattern list"
+  PATTERN_FILE="$HOOK_DIR/redaction-patterns.sh"
+  [ -r "$PATTERN_FILE" ] \
+    || die_cannot_run "the shared pattern list '$PATTERN_FILE' is missing or unreadable"
+  # shellcheck source=hooks/redaction-patterns.sh
+  . "$PATTERN_FILE" \
+    || die_cannot_run "the shared pattern list '$PATTERN_FILE' could not be sourced"
+  command -v redaction_patterns >/dev/null 2>&1 \
+    || die_cannot_run "'$PATTERN_FILE' defines no redaction_patterns function"
+}
+
 # Builds a throwaway repository and re-invokes this script against it, asserting one exit
 # code per case. It is not run from the commit path: putting mktemp, git init and chmod
 # into every commit would make the gate slower and more failure-prone in exchange for
@@ -79,8 +122,12 @@ self_test() {
   [ -x "$SELF" ] || die_cannot_run "could not locate this script in order to re-invoke it"
 
   TMP="$(mktemp -d)" || die_cannot_run "could not create a temporary directory"
+  # Case 4 needs a copy of this script with NO pattern file beside it, so it cannot live
+  # inside TMP — that directory becomes a git repository and the copy would be committed
+  # into the fixture it is meant to scan.
+  ORPHAN="$(mktemp -d)" || die_cannot_run "could not create a second temporary directory"
   # Restore permissions before removing: case 3 leaves a file at mode 000.
-  trap 'chmod -R u+rwX "$TMP" 2>/dev/null || :; rm -rf "$TMP"' EXIT
+  trap 'chmod -R u+rwX "$TMP" 2>/dev/null || :; rm -rf "$TMP" "$ORPHAN"' EXIT
 
   ( cd "$TMP" && git init -q . \
       && git config user.email selftest@example.invalid \
@@ -135,6 +182,23 @@ self_test() {
   expect 2 "an unreadable tracked file escalates instead of being skipped"
   chmod 644 "$TMP/plain.txt"
 
+  # Case 4 — the pattern list is a separate file now, so it is also a way for this gate to
+  # go quiet. A copy of this script with no redaction-patterns.sh beside it must refuse to
+  # run rather than scan every line against an empty list and report a clean tree.
+  cp "$SELF" "$ORPHAN/pre-commit" && chmod +x "$ORPHAN/pre-commit" \
+    || die_cannot_run "could not copy this script in order to test a missing pattern list"
+  set +e
+  ( cd "$TMP" && "$ORPHAN/pre-commit" --all ) >/dev/null 2>&1
+  _got=$?
+  set -e
+  if [ "$_got" -eq 2 ]; then
+    printf '  ok    %s\n' "a missing pattern list escalates instead of scanning nothing"
+  else
+    printf '  FAIL  %s — expected exit 2, got %s\n' \
+      "a missing pattern list escalates instead of scanning nothing" "$_got" >&2
+    FAILED=1
+  fi
+
   [ "$FAILED" -eq 0 ] || {
     printf '\n  SELF-TEST FAILED — this gate is not behaving as specified.\n' >&2
     exit 1
@@ -151,18 +215,7 @@ case "${1:-}" in
   *)            die_cannot_run "unknown argument '${1}'. Use no argument, --all, --self-test, or --help." ;;
 esac
 
-# Each entry: <label>|<extended regex>
-# Home-path patterns require at least one character from a real path-segment class
-# after the separator, which is what exempts the angle-bracketed placeholders.
-PATTERNS=(
-  'absolute home path (POSIX)|(/Users|/home)/[A-Za-z0-9._-]'
-  'absolute home path (Windows)|[A-Za-z]:\\Users\\[A-Za-z0-9._-]'
-  'GitHub token|(ghp_|gho_|ghs_|github_pat_)[A-Za-z0-9_]{16,}'
-  'Slack token|xox[baprs]-[A-Za-z0-9-]{10,}'
-  'OpenAI-style key|sk-[A-Za-z0-9_-]{20,}'
-  'AWS access key id|AKIA[0-9A-Z]{16}'
-  'PEM private key|-----BEGIN [A-Z ]*PRIVATE KEY-----'
-)
+load_patterns
 
 # Emits `path:line:content` for every added line in the staged diff.
 # Filter letters: Added, Copied, Modified, Renamed, and Typechange. `T` matters because
@@ -243,9 +296,15 @@ case "$MODE" in
 esac
 
 FOUND=0
-for entry in "${PATTERNS[@]}"; do
+APPLIED=0
+# The here-doc keeps this loop in the current shell, so FOUND survives it. A pipe from
+# redaction_patterns would run the body in a subshell and every finding would be lost.
+while IFS= read -r entry; do
+  case "$entry" in ''|'#'*) continue ;; esac
   label="${entry%%|*}"
   regex="${entry#*|}"
+  [ "$label" != "$entry" ] || die_cannot_run "malformed pattern entry, no '|' separator: '$entry'"
+  APPLIED=$((APPLIED + 1))
   # grep exits 0 on match, 1 on no match, and >1 on error. Collapsing all three with
   # `|| :` would read a broken pattern as "nothing found" and pass the commit, so the
   # error case is separated and escalated instead.
@@ -261,7 +320,13 @@ for entry in "${PATTERNS[@]}"; do
   fi
   printf '\n  %s:\n' "$label" >&2
   printf '%s\n' "$hits" | sed 's/^/    /' >&2
-done
+done <<PATTERN_LIST
+$(redaction_patterns)
+PATTERN_LIST
+
+# Zero applied patterns means every line was compared against nothing. Reporting that as
+# clean is the exact fail-open this gate exists to refuse.
+[ "$APPLIED" -gt 0 ] || die_cannot_run "no usable patterns in '$PATTERN_FILE'"
 
 if [ "$FOUND" -eq 1 ]; then
   cat >&2 <<'MSG'
