@@ -15,6 +15,10 @@ are **generated symlinks** produced by `./setup.sh`. Never commit them, never ed
 
 Start at `MAP.md`. It is the index of what exists, where it lives, and whether it is truth.
 
+**Before writing anything, run `skills/checkout-isolation`.** A checkout is single-writer: if another
+session may hold this one, or the work is long-running, take a worktree first — every failure here is
+silent, including a redaction gate that stops firing without saying so.
+
 ## Purpose
 
 A laboratory for AI/agent practices:

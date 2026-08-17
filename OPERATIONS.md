@@ -47,6 +47,21 @@ only some sessions need belongs behind a read-on-demand pointer rather than in a
 
 The redaction gate (ADR 0009). Runs automatically on commit once `./setup.sh --hooks` has linked it.
 
+**In a worktree it does not run your copy, and it may not run at all.** `setup.sh --hooks` installs
+`.git/hooks/pre-commit -> ../../hooks/pre-commit`, and worktrees share the common directory, so that
+symlink resolves to the **original checkout's** working tree. Verified 2026-08-13: a commit made in a
+worktree is scanned by whatever version of the script the original checkout has on its current
+branch — and if that branch has no `hooks/` at all, the symlink dangles, git skips the hook in
+silence, and the commit lands **with no gate**, exit 0, no warning.
+
+So from a worktree, run it explicitly before committing and do not rely on it firing:
+
+```sh
+./hooks/pre-commit --all      # from your worktree, not from the original checkout
+```
+
+`skills/checkout-isolation` carries the reproduction and the rest of the shared-checkout hazards.
+
 | Exit | Meaning | What you must do |
 |---|---|---|
 | 0 | Clean | Proceed |

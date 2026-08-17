@@ -24,6 +24,10 @@ Skills are not enumerated here; the directory carries the truth and `MAP.md` car
 
 One directory per skill. `kebab-case` names. No loose `.md` files at this level except this README.
 
+**A new skill needs its entry in `ASK.md` in the same commit.** That file is the only place a human
+can read what these skills let them ask for — a `description` is written to make a model select, not
+to tell a person the capability exists. It is hand-maintained, so nothing else catches an omission.
+
 ## Belongs here / does NOT
 
 - Yes: procedures an executor should follow, written for an LLM to act on, working in any
