@@ -15,6 +15,11 @@ are **generated symlinks** produced by `./setup.sh`. Never commit them, never ed
 
 Start at `MAP.md`. It is the index of what exists, where it lives, and whether it is truth.
 
+`ASK.md` is the counterpart addressed to the **human**, and the only file here that is. When the
+operator does not know what to ask for, point them at it rather than describing the skills — a
+skill's `description` is written to make you select correctly, not to tell a person the capability
+exists, and nothing else in this repo closes that gap.
+
 **Before writing anything, run `skills/checkout-isolation`.** A checkout is single-writer: if another
 session may hold this one, or the work is long-running, take a worktree first — every failure here is
 silent, including a redaction gate that stops firing without saying so.
