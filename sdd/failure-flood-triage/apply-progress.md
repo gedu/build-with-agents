@@ -795,7 +795,10 @@ recompute-compare otherwise.
 - `./hooks/pre-commit --all` → exit **0**, `"redaction check: clean across 157 tracked files"`.
   `./hooks/pre-commit` (staged only) → exit **0**. `./hooks/pre-commit --self-test` → exit **0**, all 3
   cases PASS.
-- Manual redaction grep (`rg -n -i "eduardo|graciano|callstack|/Users/"` and the donor-identifier check)
+  - Manual redaction grep over the new/changed files, using the maintainer-identity term
+    list ADR 0009 governs. The terms are deliberately NOT instantiated here: writing the
+    search pattern out is itself the documentation trap the ADR states as a rule, and this
+    line previously fell into it. Result: no matches.
   over the new/changed files → no matches.
 
 **Process note, recorded rather than hidden.** Mid-verification, `git checkout --
