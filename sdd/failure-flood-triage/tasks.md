@@ -1029,32 +1029,179 @@ Depends on: PR2 (collector), PR4 (answer-key + `prereg.json` must exist for pref
 Depends on: PR5 (the runner and its void machinery must exist for the hypotheses to be testable at
 all). This is the PR that makes a countable run possible — see the Hard Ordering Gate above.
 
-- [ ] 6.1 Create `hypotheses/0002-pipeline-shape-lowers-peak-occupancy.md` — statistical claim, exact
+- [x] 6.1 Create `hypotheses/0002-pipeline-shape-lowers-peak-occupancy.md` — statistical claim, exact
       support (median PIPELINE peak ≤ 0.5× median MONOLITHIC, non-overlapping ranges) **and** exact
       refute (ranges overlap, or PIPELINE's median ≥ MONOLITHIC's) conditions, per ADR 0012.
       Verify: structural readback — both conditions present, neither vague.
-- [ ] 6.2 Create `hypotheses/0003-serial-triage-compounds-cumulative-tokens.md` — support (median
+      **Done.** File written with `Logical form: STATISTICAL` declared per `skills/hypothesis-cycle`
+      step 0 (matching `hypotheses/0001`'s own precedent), a mechanism-based "Why it is plausible"
+      section citing `rig/run-pipeline.sh:346` (the `STEPS` arrays) and `run-pipeline.sh:614` (each
+      model step is its own fresh `claude -p` invocation, no `--resume`) — a design fact, not a
+      measured number, since none exists yet. The support/refute table matches the task text verbatim
+      (0.5×, non-overlapping) plus a third row for the honest "not testable at this budget" outcome so
+      a result is never forced into one of the two boxes. `status: draft`, nothing cited from it.
+- [x] 6.2 Create `hypotheses/0003-serial-triage-compounds-cumulative-tokens.md` — support (median
       PIPELINE cumulative ≤ 0.6× MONOLITHIC, non-overlapping) and refute (PIPELINE's median ≥
       MONOLITHIC's — a live possibility, stated as such) conditions.
       Verify: same structural readback.
-- [ ] 6.3 Modify `OPERATIONS.md`: add the Node/npm/Jest prerequisites row (rig-only, fixture-only,
+      **Done.** The filename names the *risk* being tested, not the predicted direction — made explicit
+      in its own section so the file cannot be read backwards: the registered claim is the optimistic
+      reading (serial triage does NOT compound cumulative tokens past one continuous conversation); the
+      refute condition (PIPELINE's median ≥ MONOLITHIC's) is the observation that would confirm the
+      named risk, called a live possibility rather than assumed away, exactly as the task text
+      requires. Cites `hypotheses/0002` as the companion channel it must never be composited with
+      (R-F5.4), which is testing it, not citing it (ADR 0012's own "naming the target of a test is not
+      citing it" rule).
+- [x] 6.3 Modify `OPERATIONS.md`: add the Node/npm/Jest prerequisites row (rig-only, fixture-only,
       `node_modules/` on demand, no `.gitignore` change needed), the missing GNU-compatible `timeout`
       row the table has been missing all along, and `collect.py --self-test` in the decision table.
       Verify: `./hooks/pre-commit --all`.
-- [ ] 6.4 Modify `rig/report.py`: `--experiment` dispatcher, per-experiment arm names, four new
+      **Done.** Three rows added: (1) decision table — `python3 rig/collect.py --self-test`, same
+      flag-gated shape as `hooks/pre-commit --self-test` (ADR 0013); (2) prerequisites table — GNU
+      `timeout` for both `rig/run.sh` and `rig/run-pipeline.sh` (macOS needs `brew install coreutils`);
+      (3) prerequisites table — `node`(≥18)/`npm`/Jest, explicitly rig-only AND fixture-only, installed
+      on demand into a per-run `mktemp` dir outside the repo (`run-pipeline.sh`'s own `INSTALL_DIR`),
+      so no `.gitignore` change is needed. `verified` bumped to 2026-08-13.
+      `./hooks/pre-commit --all` → exit 0, "redaction check: clean across 172 tracked files" (run after
+      every task in this PR was staged, not in isolation — see the PR-level gate run at the end of this
+      section).
+- [x] 6.4 Modify `rig/report.py`: `--experiment` dispatcher, per-experiment arm names, four new
       **uncombined** tables — diagnostic precision/recall pair, green-restore verdict distribution, peak
       occupancy, cumulative occupancy. No composite score anywhere in the file (R-A1.3/R-F4.3).
       Verify: `python3 -m py_compile rig/report.py`; manual read of the file confirms no summed/ANDed
       field.
-- [ ] 6.5 Modify `rig/README.md` (experiment axis becomes real; the two-schema rule; the fixture-runtime
+      **Done.** `tool-surface-v1`'s own report body was extracted verbatim into `report_tool_surface()`
+      with NO logic change — verified by diffing this task's output against the pre-task version of the
+      file with `REPO_ROOT` patched to the real repo (the two-line diff needed to make the pre-task copy
+      runnable from a scratch path): `diff old_out.txt new_out.txt` → **byte-identical**, confirming the
+      refactor did not change tool-surface-v1's already-verified output.
+      `--experiment` dispatcher mirrors `rig/derive.py`'s own flag exactly (task 5.8's convention).
+      `failure-flood-v1`'s arm names (`monolithic`, `pipeline`) are a module-level constant, distinct
+      from `tool-surface-v1`'s `broad`/`scoped`. The four new tables are separate functions
+      (`diagnostic_precision_recall_table`, `green_restore_distribution`, `occupancy_table` called once
+      per channel) — none of them sum, weight or AND a field from another table; `occupancy_table` is
+      deliberately the SAME function called twice (once per channel) rather than one function computing
+      both, so there is no code path that could combine them.
+      **Diagnostic precision/recall is explicitly reported as NOT YET POPULATED**, not silently empty:
+      every row's `causes_claimed`/`causes_correct` are structurally `None` (task 5.9 not implemented,
+      registered at PR5 close) — the table prints `"causes_claimed/causes_correct are null on every row
+      (task 5.9 not implemented; R-F3.2 cannot be honestly computed yet)"` per (task_id, arm) rather than
+      a fabricated 0/n-a. This is a deliberate, explicit gap, not an oversight — 5.9 is out of this
+      batch's scope per instruction.
+      Real run against the current `runs.jsonl` (3 shakedown-void rows, 0 complete):
+      `python3 rig/report.py --experiment failure-flood-v1` → excluded list correctly names all 3 rows
+      (`void_reason=shakedown`).
+      **A defect was found here at gatekeeping and fixed, and the first version of this note claimed
+      the opposite — recorded rather than quietly amended.** That claim read "all four new tables print
+      header only... honest, not an empty-but-silent table". Only **three** printed. Green-restore was
+      emitted by a `for key, counts in sorted(green_restore_distribution(complete).items())` loop that
+      printed one table PER key, so with zero complete rows the loop body never ran and the channel
+      vanished from the output entirely — no header, no "none", no trace. The other three build a line
+      list and print one table unconditionally, so they showed their headers and looked correct by
+      comparison. R-F4.2 requires green-restore to be "published as a mandatory companion", and a table
+      that disappears when empty is not published; it is also precisely the silent drop this same
+      function's own `"Excluded rows (named, never a silent drop)"` contract forbids. Nothing in R-F4.2
+      requires a separate table per `(task_id, arm)` — that was presentation choice, and the other three
+      channels already group per-key INSIDE one table. Fixed by extracting `green_restore_table(rows)`,
+      mirroring `occupancy_table`'s shape, so the header prints unconditionally and each `(task_id, arm)`
+      is one line with the four verdicts plus `unscored` listed side by side, still never summed
+      (R-F4.3). Re-verified: `python3 rig/report.py --experiment failure-flood-v1` now emits **four**
+      table headers plus the excluded list; `python3 rig/report.py` (default) still exits 0 unchanged.
+      `python3 -m py_compile rig/report.py` → exit 0. `python3 rig/report.py` (default, no flag) → output
+      unchanged from before this task (see byte-identical diff above).
+- [x] 6.5 Modify `rig/README.md` (experiment axis becomes real; the two-schema rule; the fixture-runtime
       boundary, citing PR1's ADR) and `MAP.md` (experiment count).
       Verify: `./hooks/pre-commit --all` across the full tracked tree.
-- [ ] 6.6 Confirm the Hard Ordering Gate closes: with `hypotheses/0002-*` absent (pre-PR6 state,
+      **Done.** `rig/README.md`: new "The experiment axis is real, and it is dispatched, not forked"
+      section names both experiments and their arm sets, states the two-schema rule explicitly (each
+      experiment owns its own row shape; a field for one is never padded into the other), and a new
+      "fixture-runtime boundary" paragraph under Prerequisites cites `decisions/0014` (PR1's ADR, ratified
+      as "a fixture's runtime is substrate, not this repo's runner") without reversing `decisions/0013`.
+      `verified` bumped to 2026-08-13; `sources` gained both ADRs plus this cycle's `design.md`.
+      `MAP.md`: `rig/` row's experiment count updated from "1 experiment (`tool-surface`), in progress"
+      to "2 experiments (`tool-surface-v1`, `failure-flood-v1`), both in progress" — the task's own scope.
+      **Beyond the task's literal wording, noted rather than silent**: the `hypotheses/` row's count
+      ("1 open") was also updated to "3 open" and a new `BACKLOG.md` row was added (task 6.7's own verify
+      condition) — both are direct consequences of tasks 6.1/6.2/6.7 landing in this same PR, and leaving
+      them stale in the one hand-maintained index this repo has would violate `AGENTS.md`'s own "stale
+      hand-written indexes are worse than no index" rule. Not touched: `decisions/` row still reads
+      "0001–0013 ratified" even though ADR 0014 already exists on disk (added in PR1, before this batch)
+      — this is a PRE-EXISTING gap this batch found, not one it caused, and is flagged here rather than
+      silently fixed or silently left unmentioned, matching this stack's own precedent (`design.md:584-585`'s
+      `tools/generate-cases.py` misdescription, flagged at task 3.5, still open).
+      `./hooks/pre-commit --all` → exit 0, "redaction check: clean across 172 tracked files" (full-tree
+      run, all of PR6 staged together).
+- [x] 6.6 Confirm the Hard Ordering Gate closes: with `hypotheses/0002-*` absent (pre-PR6 state,
       re-checked against a throwaway copy), `run-pipeline.sh` must `exit 2` on any non-`--shakedown`
       invocation.
       Verify: this is the structural-impossibility proof named in the design's own verification
       strategy table — re-run once more after 6.1–6.2 land, confirming the same invocation now proceeds.
-- [ ] 6.8 Register the **claim discipline** in `BACKLOG.md` as a candidate practice, blocked on
+      **Done, in two parts — real-repo pre-state, and an isolated scratch-repo pre/post transition. No
+      countable run was spent; the guardrail explicitly requires proving the gate, not the experiment.**
+
+      **Part A — real repo, real unmodified `rig/run-pipeline.sh`, BEFORE any hypothesis file existed**
+      (run first, before touching any file in this PR):
+      ```
+      $ ./rig/run-pipeline.sh s2 pipeline 99 --permission-mode bypassPermissions
+        COULD NOT RUN: pre-registration guard failed (Hard Ordering Gate layer 2): zero_matches: hypotheses/0002-*.md
+        This is exit 2, not a pass.
+      EXIT CODE: 2
+      ```
+      Confirmed no side effect: `git status --porcelain` empty before and after; `rig/runs/failure-flood-v1/`
+      unchanged (still exactly the 3 directories left from PR5) — matching design.md's own claim that a
+      pre-flight refusal, before the run directory is claimed, writes nothing. This matches the design's
+      verification-strategy table row verbatim: "Pre-registration guard | Structurally impossible, not
+      forbidden | With `hypotheses/0002` absent, `run-pipeline.sh` must exit 2".
+
+      **Why the real invocation was NOT re-run post-6.1/6.2 to prove "proceeds"**: after task 6.1/6.2,
+      `hypotheses/0002-*`/`0003-*` exist on disk and are `git add`-staged, but this apply batch was
+      instructed to leave the commit to the operator. `check_prereg()`'s own clean-check
+      (`run-pipeline.sh:255-261`, `git status --porcelain -- rel`) treats a staged-but-uncommitted file
+      as dirty, not clean — confirmed live, real invocation, current repo state:
+      ```
+      $ ./rig/run-pipeline.sh s2 pipeline 99 --permission-mode bypassPermissions --dirty-ok
+        COULD NOT RUN: pre-registration guard failed (Hard Ordering Gate layer 2): tracked_but_dirty: hypotheses/0002-pipeline-shape-lowers-peak-occupancy.md
+        This is exit 2, not a pass.
+      EXIT CODE: 2
+      ```
+      (`--dirty-ok` only bypasses the EARLIER dirty-tree-under-`rig/`guard, tripped by this same batch's
+      own edits to `rig/report.py`/`rig/README.md` — it has no effect on the Hard Ordering Gate layer 2
+      check that follows it.) This is itself informative, not a dead end: the reason changed from
+      `zero_matches` (file does not exist) to `tracked_but_dirty` (file exists and is tracked, but is not
+      committed-clean) — proof that the gate's glob-and-git-tracked logic is already reading the new
+      files correctly; only the final "clean" sub-condition is pending the operator's commit. Continuing
+      past this point in the real repo would require a real commit, and then the real script would run
+      `npm ci`, case generation, and — if those pass — a genuine `claude -p` invocation: an actual
+      countable `s2` run, which is the measurement this whole cycle exists to perform and is explicitly
+      the operator's decision, not this batch's, per this task's own guardrail.
+
+      **Part B — isolated scratch git repository (never the working repo), same `check_prereg()` function
+      extracted verbatim (`run-pipeline.sh:221-266`), to prove the exit-2-to-exit-0 transition without a
+      real commit in the working tree and without any risk of reaching a model invocation**:
+      pre-state (scratch `hypotheses/` empty):
+      ```
+      $ REPO_ROOT="$SCRATCH" bash check_prereg.sh "$SCRATCH/fixture"
+      zero_matches: hypotheses/0002-*.md
+      EXIT: 2
+      ```
+      post-state (the real, just-authored bytes of both `hypotheses/0002-*.md` and `0003-*.md` copied in,
+      `git add`ed and `git commit`ed **only inside the scratch repo** — zero effect on the working repo's
+      history):
+      ```
+      $ REPO_ROOT="$SCRATCH" bash check_prereg.sh "$SCRATCH/fixture"
+      83ef1760de4e283931d4e5bd8174277d17bccd1be16a0cc08ed4104e9d8a6724
+      EXIT: 0
+      ```
+      **What this proves**: the exact Hard Ordering Gate layer 2 logic — the same bytes `run-pipeline.sh`
+      itself runs — transitions from `exit 2` (missing hypotheses) to `exit 0` with a printed
+      `prereg_digest` (present, tracked, committed, clean hypotheses) once both files exist in that state.
+      **What this does NOT prove**: it does not exercise `run-pipeline.sh`'s OTHER preflight checks
+      (prerequisite commands, MANIFEST recompute-compare, dirty-tree guard) in combination with a
+      committed hypotheses pair — those are unaffected by tasks 6.1/6.2 and were already proven
+      independently in PR5. It also does not run any part of `run-pipeline.sh` past preflight: no `npm
+      ci`, no case generation, no model invocation — a real countable `s2` run was neither started nor
+      needed to satisfy this task, and remains the operator's decision.
+- [x] 6.8 Register the **claim discipline** in `BACKLOG.md` as a candidate practice, blocked on
       recurrence rather than on evidence. Two rules, both applied from task 3.4 onward and both already
       shown to work on first use: (a) any appeal to a rule, convention, precedent or prior decision must
       carry `path:line` plus the verbatim quote, and what cannot be quoted is reframed as "I am choosing
@@ -1071,7 +1218,15 @@ all). This is the PR that makes a countable run possible — see the Hard Orderi
       arithmetic, not fabrication — a declared total of 636 against a `numstat` of 810, with the parts
       listed right beside it. That needs addition, not a fabrication detector.
       Verify: `./hooks/pre-commit --all`.
-- [ ] 6.7 Register the **portable procedure** as a named downstream deliverable in `BACKLOG.md`: the
+      **Done.** `BACKLOG.md` created (task 6.7 establishes the same file; both entries land together as
+      the file's first content, per the file's own ordering note in this PR — 6.8 precedes 6.7). Entry 1
+      is this task's claim-discipline item verbatim, with an explicit "Trigger for building a checker: a
+      second and third occurrence of either rule being violated, observed independently" line so the
+      unblock condition is a concrete trigger, never a vague "later". `type: index` frontmatter per
+      `AGENTS.md`'s contract, `sources` non-empty even at `status: draft`.
+      `./hooks/pre-commit --all` → exit 0 (see the combined run at 6.5/6.7's own done-notes; the same
+      single gate run covers this file).
+- [x] 6.7 Register the **portable procedure** as a named downstream deliverable in `BACKLOG.md`: the
       collector → diagnostician → applier flow applied to a real failing suite outside this repo, which
       is the form the originating incident actually needs and which no artifact in this cycle names.
       Record it as **blocked**, with its unblock condition stated explicitly: the experiment's evidence
@@ -1083,6 +1238,18 @@ all). This is the PR that makes a countable run possible — see the Hard Orderi
       as the demand signal for `blocks/`. `BACKLOG.md` is currently an empty file, so this task
       establishes its shape and must satisfy `AGENTS.md`'s frontmatter contract (`type: index`).
       Verify: `./hooks/pre-commit --all`; `MAP.md`'s area table still describes `BACKLOG.md` accurately.
+      **Done.** Entry 2 of `BACKLOG.md` (see 6.8's done-note for the shared file). Explicit unblock
+      condition: "a `theory/` write on the failure-flood-triage measurement, with scope and spread
+      attached, exists first" — no block or skill written, per instruction. **Correction to this task's
+      own premise**: `BACKLOG.md` did not exist on disk at all before this batch (not "an empty file" —
+      `ls`/`Read` both confirmed no such path), so this task creates the file from nothing rather than
+      populating an existing empty one; the frontmatter-contract requirement is unaffected either way.
+      `MAP.md`'s Areas table gained a new `BACKLOG.md` row (see 6.5's done-note) describing it as
+      "Candidate practices and downstream deliverables, recorded with a named unblock condition and never
+      built ahead of it" — accurate as of this batch's own two entries.
+      `./hooks/pre-commit --all` → exit 0, "redaction check: clean across 172 tracked files" (full PR6
+      tree staged: `BACKLOG.md`, `MAP.md`, `OPERATIONS.md`, both `hypotheses/000{2,3}-*.md`,
+      `rig/README.md`, `rig/report.py`).
 
 ## No-implementation, verification-only tasks
 
@@ -1090,15 +1257,14 @@ all). This is the PR that makes a countable run possible — see the Hard Orderi
 
 ## Blocked tasks
 
-None yet — the stack has not started. PR3 is blocked on PR1 (ADR) per R-F11's own scenario; PR5 is
-blocked on PR4 (`prereg.json`/answer-key must exist for its preflight to check against); PR6 is the
-gate that makes any countable run possible at all. No PR in this list may skip ahead of its dependency.
+**PR6 CLOSED as of this batch (6.1–6.8 all `[x]`) — the stack's own last PR.** PR3 was blocked on PR1
+(ADR) per R-F11's own scenario; PR5 was blocked on PR4 (`prereg.json`/answer-key existing for its
+preflight to check against); PR6 was the gate that made any countable run possible at all — closing it
+does not itself spend that run; see task 6.6's done-note for exactly what was and was not proven.
 
-**Added this batch, not resolved in it:** task 6.4 (`report.py`'s diagnostic precision/recall table,
-R-F3.2) is additionally blocked on the new task 5.9 (`root-cause-report.txt` handoff) — `derive.py`'s
-`causes_claimed`/`causes_correct` cannot be honestly populated until 5.9 threads the model-written
-report file out of the ephemeral workspace, the same unclosed class 5.4b already found and closed for
-`fix-plan.txt`. Found live at task 5.8 (`sdd/failure-flood-triage/apply-progress.md`'s PR5c section);
-registered here so 6.4 does not silently special-case an all-`null` column instead of closing the gap.
-Task 5.9 itself is not blocked on anything — it can be implemented at any time; it is not implemented in
-this batch per explicit instruction.
+**Still blocked, carried forward (not resolved by this batch, and not in this batch's scope):** task 5.9
+(`root-cause-report.txt` handoff, registered at PR5 close) remains **not implemented**. Its own downstream
+consumer, task 6.4's diagnostic precision/recall table, is now built (this batch) but explicitly reports
+`causes_claimed`/`causes_correct` as unpopulated per row rather than special-casing an all-`null` column
+silently — see 6.4's own done-note. `derive.py`'s row builder is unchanged by this batch; task 5.9 is not
+implemented in this batch either, per the same explicit instruction as at PR5 close.
