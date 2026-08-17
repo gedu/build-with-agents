@@ -3,7 +3,7 @@ id: operations
 type: index
 targets: [any]
 status: validated
-verified: 2026-08-10
+verified: 2026-08-13
 sources: ["AGENTS.md", "MAP.md", "decisions/0009-redaction-is-a-repo-wide-rule.md", "decisions/0010-measurements-vary-the-harness-not-the-model.md", "decisions/0011-rig-produces-evidence-not-truth.md", "theory/agents/capability-load-cost.md"]
 ---
 
@@ -38,6 +38,7 @@ only some sessions need belongs behind a read-on-demand pointer rather than in a
 | Change `hooks/pre-commit` | `./hooks/pre-commit --self-test` | Yes. The gate carries its own test (ADR 0013) |
 | Change shell | `bash -n <file>` | Yes. There is still no test *runner*, by decision — ADR 0013 |
 | Change Python | `python3 -m py_compile <file>` | Yes, same reason |
+| Change `rig/collect.py` | `python3 rig/collect.py --self-test` | Yes. The collector carries its own test, same flag-gated shape as `hooks/pre-commit --self-test` (ADR 0013) |
 | Produce a measurement | `./rig/run.sh` → `rig/derive.py` → `rig/report.py` | In that order. See below |
 | Commit reviewed work | see *Review lifecycle* | Currently blocked upstream. See below |
 
@@ -162,6 +163,8 @@ skips rather than replacing an existing hook.
 |---|---|---|
 | `bash`, `git` | Everything | — |
 | `python3` (stdlib only) | `rig/derive.py`, `rig/report.py` | **Rig-only.** `hooks/pre-commit` deliberately does not depend on it — it must run on a machine that installed nothing |
+| GNU-compatible `timeout` | `rig/run.sh`, `rig/run-pipeline.sh` | **Rig-only.** macOS ships a BSD `timeout` that is not compatible; `brew install coreutils` provides the GNU one. Both runners' preflight `die_cannot_run`s without it |
+| `node` (≥18), `npm`, Jest | `rig/fixtures/failure-flood/*`'s own runtime (design.md sec 5) | **Rig-only AND fixture-only.** `node_modules/` is installed on demand by `run-pipeline.sh`'s own `npm ci` step, into a per-run `mktemp` directory outside the repo entirely — never into the fixture tree, so no `.gitignore` change is needed |
 | `claude` CLI | `rig/run.sh` | Subscription auth is enough. No API key. `--bare` is not used in v1 |
 | `gentle-ai` | Review lifecycle | Installed here: **2.3.0 stable** (auto-updated from 2.2.4 on 2026-08-10; `gga` wrapper still v2.10.1). Review is disabled for this clone — see *Review lifecycle* |
 

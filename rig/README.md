@@ -3,8 +3,8 @@ id: rig/index
 type: index
 targets: [any]
 status: draft
-verified: 2026-08-06
-sources: ["decisions/0010-measurements-vary-the-harness-not-the-model.md", "decisions/0011-rig-produces-evidence-not-truth.md", "sdd/measurement-rig/design.md"]
+verified: 2026-08-13
+sources: ["decisions/0010-measurements-vary-the-harness-not-the-model.md", "decisions/0011-rig-produces-evidence-not-truth.md", "decisions/0013-a-committed-executable-carries-its-own-test.md", "decisions/0014-a-fixtures-runtime-is-substrate-not-this-repos-runner.md", "sdd/measurement-rig/design.md", "sdd/failure-flood-triage/design.md"]
 ---
 
 # rig/
@@ -32,13 +32,33 @@ verdict, never the link") and to `journal/` under ADR 0002.
 ```
 rig/
 ├── run.sh                          # guards, launches, persists ONE run — nothing else
+├── run-pipeline.sh                 # sibling runner: multi-step arms (failure-flood-triage)
 ├── derive.py                       # total, deterministic: run dirs -> one committed row each
-├── report.py                       # aggregates rows into the four-cell tables
+├── report.py                       # aggregates rows into per-experiment tables
 ├── surfaces/                       # committed preimages of the expected visible tool set
 ├── fixtures/<experiment>/<version>/ # frozen, hash-frozen (MANIFEST.sha256), additively versioned
 ├── results/<experiment>/runs.jsonl  # committed, append-only, rebuilt by derive.py
 └── runs/                            # gitignored — raw per-run captures, machine-local only
 ```
+
+## The experiment axis is real, and it is dispatched, not forked
+
+Two experiments live here now, not one: `tool-surface-v1` (arms `broad`/`scoped`, `run.sh`) and
+`failure-flood-v1` (arms `monolithic`/`pipeline`, the sibling `run-pipeline.sh`). `derive.py` and
+`report.py` both take an `--experiment <name>` flag (default `tool-surface-v1`, for backward
+compatibility) and dispatch to that experiment's own row-builder and table set — one file each, not a
+copy-pasted sibling per experiment (`sdd/failure-flood-triage/design.md` sec 6: "the deriver is total"
+carries over unchanged; the dispatcher is what is new).
+
+**The two-schema rule.** Each experiment owns its own row shape — `tool-surface-v1`'s row
+(`schema_version` 3, cells `proper`/`improper-success`/`clean-failure`/`failure`) and
+`failure-flood-v1`'s row (`schema_version` 1, `green`/`partial`/`no-progress`/`regressed` plus
+`peak_occupancy_tokens`/`cumulative_occupancy_tokens`/`causes_claimed`/`causes_correct`) are **not**
+unified into one superset schema. A field that exists for one experiment and not the other stays absent
+from the other's rows rather than padded with a placeholder — the same "no field tooling does not read"
+discipline `AGENTS.md`'s frontmatter contract already applies to documents, applied here to `runs.jsonl`
+rows. Adding a third experiment means adding a third row-builder and a third report function, never
+widening the first two.
 
 ## Does NOT belong here
 
@@ -51,3 +71,10 @@ rig/
 `python3` (stdlib only) and a GNU-compatible `timeout` are rig-only prerequisites. The
 portability contract in `hooks/pre-commit` — that it runs on a machine which installed
 nothing — explicitly does not extend here (`decisions/0011`, the boundary section).
+
+**The fixture-runtime boundary.** `failure-flood-v1`'s fixtures (`fixtures/failure-flood/v1/`,
+`v2/`) carry their own `node`/`npm`/Jest runtime, installed on demand per run into a machine-local
+`mktemp` directory. `decisions/0014` (ratified for this cycle's PR1) settles that this does **not**
+reverse `decisions/0013`'s repo-level "no test runner" rule: the fixture's runtime is substrate the rig
+measures, never this repo's own test runner. The boundary is explicit — nothing outside `rig/fixtures/`
+gains a `node_modules/` dependency, and no repo-level command starts depending on Jest.

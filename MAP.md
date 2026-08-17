@@ -29,6 +29,7 @@ where to look and what you are allowed to trust.
 | `MAP.md` | This index — where knowledge lives | Yes | active |
 | `OPERATIONS.md` | What to run and when — gates, rig, review lifecycle. Points at `--help` rather than duplicating flags | Yes | active |
 | `ASK.md` | For the human: what these skills let you ask for, in your own words. The only file here not addressed to an executor | Yes | draft, 5 entries |
+| `BACKLOG.md` | Candidate practices and downstream deliverables, recorded with a named unblock condition and never built ahead of it | Yes | draft, 2 entries |
 | `setup.sh` | Generates per-tool symlinks and installs git hooks; committed, output is not | Yes | active |
 | `hooks/` | Committed git hooks. `pre-commit` is the ADR 0009 redaction gate | Yes | 1 hook (`pre-commit`) |
 | `skills/` | Tool-neutral skills, one dir per skill (`SKILL.md` + optional `assets/`, `references/`) | Yes, when `validated` | 5 skills (`checkout-isolation` draft, `context-checkpoint` draft, `hypothesis-cycle` draft, `project-gap-analysis` draft, `source-verdict` validated) |
@@ -37,8 +38,8 @@ where to look and what you are allowed to trust.
 | `theory/orchestration/` | Multi-agent coordination, delegation, handoffs | Yes, when `validated` | 1 doc (`delegation-and-context-boundaries`, validated) |
 | `theory/loops/` | Iteration shapes: plan/act/verify, review loops, termination | Yes, when `validated` | 2 docs (`verifier-availability`, `reading-and-running-find-different-defects`) |
 | `research/` | Received links, contrasted against evidence, each with a verdict | Verdict only, as evidence | 11 verdicts (3 `supported`, 5 `partially supported`, 3 `unverifiable`) |
-| `decisions/` | Numbered ADRs (`NNNN-slug.md`) — the WHY | Yes | `0001`–`0013` ratified |
-| `hypotheses/` | Falsifiable claims with a declared test, registered before the run that could settle them | **No — zero citability** (ADR 0012). Not even as evidence | 1 open |
+| `decisions/` | Numbered ADRs (`NNNN-slug.md`) — the WHY | Yes | `0001`–`0014` ratified |
+| `hypotheses/` | Falsifiable claims with a declared test, registered before the run that could settle them | **No — zero citability** (ADR 0012). Not even as evidence | 3 open |
 | `gaps/` | Gap analyses of other projects against validated practice — goal (c), and the demand signal for `blocks/` | **Evidence only, and only in aggregate.** One record is one project, never a general claim | 2 records; private projects de-identified, public sources named |
 | `journal/` | Dated conversations and brainstorms | **Never as authority**; valid as provenance (ADR 0007) | 11 entries (2026-08-04, 2026-08-05 ×7, 2026-08-10 ×2, 2026-08-13) |
 | `blocks/_shared/` | Target-agnostic minimal blocks with a contract | Yes, when `validated` | empty |
@@ -46,7 +47,7 @@ where to look and what you are allowed to trust.
 | `blocks/react-native/` | React Native-specific blocks | Yes, when `validated` | empty |
 | `templates/` | Compositions of blocks, ready to copy | Yes, when `validated` | empty |
 | `sdd/` | SDD cycles: proposal, spec, design, tasks, verification | No — process record | 1 cycle (`measurement-rig`), verified **PARTIAL** — verified cost instrument, unverified quality instrument |
-| `rig/` | Measurement harness: fixtures, runner, analyser. Raw captures are gitignored | Code yes; **output is evidence only**, citable once promoted to `theory/` with scope and spread (ADR 0011) | 1 experiment (`tool-surface`), in progress |
+| `rig/` | Measurement harness: fixtures, runner, analyser. Raw captures are gitignored | Code yes; **output is evidence only**, citable once promoted to `theory/` with scope and spread (ADR 0011) | 2 experiments (`tool-surface-v1`, `failure-flood-v1`), both in progress |
 | `upstream/` | Experiments against `gentle-ai` / `engram` / `gga` / `claude-code`, staged bug reports | No — experiments | `gentle-ai`: `0001` filed as [#2478](https://github.com/Gentleman-Programming/gentle-ai/issues/2478), `0002` and `0004` staged, `0003` **rejected** (resolved on 2.3.0 before filing). `claude-code`: `0001` staged |
 
 ## Target coverage
