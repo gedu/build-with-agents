@@ -76,7 +76,7 @@ SURFACE_FILE="$SURFACES_ROOT/failure-flood.txt"
 
 # Node major-version floor: jest@29.7.0's `engines` field is documented as
 # "^14.15.0 || ^16.10.0 || >=18.0.0"; 18 satisfies that outright. Not
-# measured from an installed node_modules — never committed, ADR 0014 A.
+# measured from an installed node_modules — never committed, ADR 0015 A.
 NODE_FLOOR_MAJOR=18
 
 # Per-step timeout, and the suite-collection timeout nested inside a code

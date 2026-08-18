@@ -2,7 +2,7 @@
   "name": "failure-flood-v2-runtime",
   "private": true,
   "version": "1.0.0",
-  "description": "Substrate for rig/fixtures/failure-flood/v2 (ADR 0014 Clause A). Installs to a per-run, machine-local directory only — never inside the committed tree.",
+  "description": "Substrate for rig/fixtures/failure-flood/v2 (ADR 0015 Clause A). Installs to a per-run, machine-local directory only — never inside the committed tree.",
   "scripts": {
     "test": "jest --config jest.config.js --runInBand"
   },

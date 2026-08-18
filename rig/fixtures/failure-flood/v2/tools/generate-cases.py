@@ -501,7 +501,7 @@ def main(argv=None):
         print(f"  {name}: {n} cases (base {base}, ~{n / base:.1f}x) -> {paths[name]}")
     # task 3.4: printed so it can be captured and frozen into
     # answer-key/case-table.sha256 (inside the MANIFEST, task 3.5) — this
-    # generator never writes into <repo> itself (ADR 0014 Clause A).
+    # generator never writes into <repo> itself (ADR 0015 Clause A).
     print(f"case_table_digest: {case_table_digest(all_cases)}")
     return 0
 

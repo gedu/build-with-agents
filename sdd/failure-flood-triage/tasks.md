@@ -128,7 +128,9 @@ Depends on: nothing. Blocks: PR3 (R-F11 scenario — 3a must not proceed without
       PR3 begins. Verify: value present and non-null on every row. **Done and reported below** —
       `occupancy_is_monotone` is `true` on all 42/42 rows, non-null everywhere. See the finding note
       below the task list.
-- [x] 1.5 Create `decisions/0014-a-fixtures-runtime-is-substrate-not-this-repos-runner.md`. Clause A:
+- [x] 1.5 Create `decisions/0015-a-fixtures-runtime-is-substrate-not-this-repos-runner.md` (filed as
+      `0014` at the time, renumbered to `0015` in PR7D after a collision with `main`'s own `0014` — see
+      the ADR's own renumbering note). Clause A:
       a rig fixture (`rig/fixtures/failure-flood/*`) may carry its own runtime (Node/npm) and test
       runner (Jest); that runtime is substrate under measurement, never this repo's verification
       surface, which remains `hooks/pre-commit`, `bash -n`, `python3 -m py_compile`, and each committed
@@ -162,7 +164,7 @@ Depends on: nothing. Blocks: PR3 (R-F11 scenario — 3a must not proceed without
   `schema_version`, `checker_digest`, and the eight new keys (`model_turns`, `occupancy_series`,
   `peak_occupancy_tokens`, `peak_occupancy_turn`, `cumulative_occupancy_tokens`,
   `occupancy_aggregate_matches`, `occupancy_is_monotone`, `context_window_tokens`).
-- **`decisions/0014-*.md`'s Clause B roster follows this task's explicit brief** (four self-test-carrying
+- **`decisions/0015-*.md`'s Clause B roster follows this task's explicit brief** (four self-test-carrying
   executables: `hooks/pre-commit`, `rig/derive.py`, `rig/run-pipeline.sh`, `rig/collect.py`; the case
   generator named as the future candidate, not counted among the four) **rather than
   `design.md`'s own worked "what the ADR must settle" paragraph**, whose literal four-item list
@@ -334,7 +336,7 @@ Depends on: PR1 (ADR must exist — R-F11 scenario), PR2 (collector validates th
       `mktemp` directory outside `<repo>`. `v2/runtime/jest.config.js`/`tsconfig.json` are the same
       `__dirname`/`require.resolve`-based pattern as v1's, unchanged in shape.
 
-      Verified twice, per ADR 0014 Clause A (never inside `<repo>`): (1) scratch build directory,
+      Verified twice, per ADR 0015 Clause A (never inside `<repo>`): (1) scratch build directory,
       `npm install` + `npm test` → 6 suites, 59 tests, 0 failures, exit 0. (2) the actual staged bytes
       copied to a second, fresh `mktemp -d` directory, `npm ci` (fresh install strictly from the
       committed lockfile) → 281 packages, `npx jest --config jest.config.js --runInBand` → 6 suites, 59
@@ -383,7 +385,7 @@ Depends on: PR1 (ADR must exist — R-F11 scenario), PR2 (collector validates th
       tests/0 failures) to keep passing, silently changing that recorded result. Closed by gating each
       block on `process.env.FAILURE_FLOOD_CASE_DIR`: `loadCases()` returns `[]` when unset, and each block
       is wrapped in `(cases.length > 0 ? describe : describe.skip)` rather than trusting `it.each([])`'s
-      own undocumented empty-array behavior. Re-verified in a fresh `mktemp` outside `<repo>` (ADR 0014
+      own undocumented empty-array behavior. Re-verified in a fresh `mktemp` outside `<repo>` (ADR 0015
       Clause A): no env var → 6 suites, **59 passed + 7 skipped = 66 total, 0 failures** (byte-identical
       base-case outcome to PR3a-ii); env var pointing at freshly generated tables → 6 suites, **2,882
       passed, 0 failures** (59 + 2,823, exactly the measured aggregate above) — proving the Python
@@ -427,7 +429,7 @@ Depends on: PR1 (ADR must exist — R-F11 scenario), PR2 (collector validates th
       (`rig/run.sh:122-141`: sorted "sha256(bytes)  relpath" lines, one sha256 over the join) — reused,
       not invented, so a future consumer (`run-pipeline.sh` preflight, task 5.1) has one digest-of-a-
       file-set convention to implement, not two. The generator itself never writes into `<repo>` (ADR
-      0014 Clause A holds); the printed digest was captured and hand-committed into
+      0015 Clause A holds); the printed digest was captured and hand-committed into
       `rig/fixtures/failure-flood/v2/answer-key/case-table.sha256`.
       **Measured, not assumed**: two independent `--out-dir` runs to separate `mktemp` directories
       produced the identical digest `b15b8d1698ea0b45e2c475c1d5c68e2dcac81458522771d724a3ca431e5becb1`
@@ -511,7 +513,7 @@ Depends on: PR3 (clean substrate + generator must exist first).
       recorded at PR3a-i (`apply-progress.md:221-226`) were re-verified against the current source and
       confirmed still correct: `applyKeypadInput`'s decimal-cap boundary, `confirmSeed`'s
       `CONFIRM_POSITIONS`/`picks` index mapping, `parseTransfers`'s direction/fee-association mapping.
-      **Isolation (mktemp scratch outside `<repo>`, ADR 0014 Clause A), one at a time, reverted to clean
+      **Isolation (mktemp scratch outside `<repo>`, ADR 0015 Clause A), one at a time, reverted to clean
       between each, `rig/collect.py` against real `npx jest` output**: (1) `applyKeypadInput.ts:28`
       (`>=`→`>` in the decimal-cap comparison) — 1 failure, signature `277580d674667852`. (2)
       `confirmSeed.ts:15` (`isPickCorrect(seed, position, pick)`→`isPickCorrect(seed, index, pick)`) — 1
@@ -754,7 +756,7 @@ Depends on: PR2 (collector), PR4 (answer-key + `prereg.json` must exist for pref
       Verify: `bash -n rig/run-pipeline.sh`.
       **Done — this batch (PR5a, tasks 5.1/5.2/5.3/5.6 only; not 5.4/5.5/5.7/5.8), full detail and every
       real exit code in `apply-progress.md`'s "PR5a" section.** `bash -n` exit 0. Live, real adversarial
-      runs (never `--self-test` — ADR 0014 Clause B excludes this file): non-shakedown `s2` invocation
+      runs (never `--self-test` — ADR 0015 Clause B excludes this file): non-shakedown `s2` invocation
       today → **exit 2**, naming the exact fired reason `zero_matches: hypotheses/0002-*.md`; a real byte
       tamper on `v1/src/applyKeypadInput.ts` (reverted after) → MANIFEST mismatch → **exit 2**.
       **Two real bugs found and fixed by this same live testing, not asserted from code review**: (1)
@@ -1140,7 +1142,7 @@ all). This is the PR that makes a countable run possible — see the Hard Orderi
       **Done.** `rig/README.md`: new "The experiment axis is real, and it is dispatched, not forked"
       section names both experiments and their arm sets, states the two-schema rule explicitly (each
       experiment owns its own row shape; a field for one is never padded into the other), and a new
-      "fixture-runtime boundary" paragraph under Prerequisites cites `decisions/0014` (PR1's ADR, ratified
+      "fixture-runtime boundary" paragraph under Prerequisites cites `decisions/0015` (PR1's ADR, ratified
       as "a fixture's runtime is substrate, not this repo's runner") without reversing `decisions/0013`.
       `verified` bumped to 2026-08-13; `sources` gained both ADRs plus this cycle's `design.md`.
       `MAP.md`: `rig/` row's experiment count updated from "1 experiment (`tool-surface`), in progress"
@@ -1150,7 +1152,7 @@ all). This is the PR that makes a countable run possible — see the Hard Orderi
       condition) — both are direct consequences of tasks 6.1/6.2/6.7 landing in this same PR, and leaving
       them stale in the one hand-maintained index this repo has would violate `AGENTS.md`'s own "stale
       hand-written indexes are worse than no index" rule. Not touched: `decisions/` row still reads
-      "0001–0013 ratified" even though ADR 0014 already exists on disk (added in PR1, before this batch)
+      "0001–0013 ratified" even though ADR 0014 already exists on disk (that ADR is now `0015`, renumbered in PR7D; this line records what `MAP.md` read at the time) (added in PR1, before this batch)
       — this is a PRE-EXISTING gap this batch found, not one it caused, and is flagged here rather than
       silently fixed or silently left unmentioned, matching this stack's own precedent (`design.md:584-585`'s
       `tools/generate-cases.py` misdescription, flagged at task 3.5, still open).
@@ -1711,3 +1713,133 @@ hooks/pre-commit` empty — none of the three were touched. Task 7.10 above regi
 own missing `--self-test` rather than implementing it here. The WARNING-level findings from the
 2026-08-17 verify-report (placeholder `STEP_TIMEOUT_S`, stale `axis_table.py:19-21` docstring) remain
 untouched, out of this batch's scope. No countable run was spent.
+
+## PR7D — resolve the round-2 ADR-0014 collision (CRITICAL-5); correct report.py's now-false task-5.9 message (WARNING-11)
+
+Depends on: PR7A + PR7B + PR7C (all four round-1 CRITICALs closed) and the round-2 verify-report
+(2026-08-18), which found round 1's four CRITICALs genuinely closed but surfaced one new blocker
+(CRITICAL-5) plus WARNING-11. Both are addressed here; everything else round 2 found (W-7 through W-10,
+the stale `design.md:599`/`:608`, the placeholder `STEP_TIMEOUT_S`) is deliberately out of scope.
+
+- [x] 7.11 Resolve CRITICAL-5: this branch's `decisions/0014-a-fixtures-runtime-is-substrate-not-this-
+      repos-runner.md` collided with `main`'s independently-ratified, already-pushed
+      `decisions/0014-a-public-guarantee-cannot-be-opt-in.md` (`a46794a`, 2026-08-17). Operator decision:
+      `main` keeps `0014` (already public — load-bearing for outside citers); this branch's ADR, never
+      pushed, becomes `0015`.
+      Verify: `git mv` to the new path; the ADR's own frontmatter `id`/title updated plus a renumbering
+      note recording what happened and why (ADR 0007 — no silent amendment); every citation this branch
+      controls updated to `0015`; a repo-wide `rg` sweep shows no surviving reference to the old path
+      except the deliberately-preserved CRITICAL-5 collision record itself.
+      **Done.** `git mv decisions/0014-a-fixtures-runtime-is-substrate-not-this-repos-runner.md
+      decisions/0015-a-fixtures-runtime-is-substrate-not-this-repos-runner.md`. Frontmatter `id`, the `#`
+      title, and a new `renumbered:` field plus an in-body blockquote all record: filed as `0014` on
+      2026-08-11 (unpushed), renumbered to `0015` on 2026-08-18 after `main`'s own `0014` was found
+      already public.
+      Citations updated to `0015`, read individually rather than blindly replaced: `spec.md:85`,
+      `tasks.md` (8 sites: 1.5's own registration, 3.2's/3.3's/3.4's/3.5's/5.6's done-notes, 6.6's
+      done-note, `rig/README.md` citation echoed at 6.7's done-note — `tasks.md:1153`'s own historical
+      note about what `MAP.md` read *at a past date* left untouched, flagged below, not silently changed),
+      `rig/README.md` (its own `sources` list plus its "fixture-runtime boundary" prose),
+      `rig/run-pipeline.sh:79`, `rig/fixtures/failure-flood/v2/tools/generate-cases.py:504`, both
+      `rig/fixtures/failure-flood/{v1,v2}/runtime/package.json` descriptions, and `MAP.md`'s own
+      `decisions/` row (`0001`–`0014` ratified → `0001`–`0013`, `0015` ratified, with a note explaining
+      the gap). `sdd/failure-flood-triage/verify-report.md`'s CRITICAL-5 section (round 2) and its
+      preserved round-1 section were read line by line, not pattern-matched: the collision narrative
+      itself (naming both ADRs as `0014` — that *is* the finding) was left standing exactly as found, a
+      resolution note was appended immediately after it recording this decision and that this batch
+      carried it out, and the file's own incidental citations to this branch's ADR (its `sources` list in
+      both the round-2 and round-1 metadata tables, and both R-F11.1 rows) were moved to `0015`.
+      **Flagged, not changed**: `sdd/failure-flood-triage/apply-progress.md` carries roughly a dozen more
+      `ADR 0014`/`decisions/0014-*` references, all unambiguously about this branch's own ADR, but it was
+      not in this batch's named scope and reads as a historical journal in the same spirit as
+      verify-report's preserved round 1 — left untouched pending an explicit operator call on whether a
+      journal's own past entries should be renumbered too. `tasks.md:1153` was left for the same reason:
+      it documents what `MAP.md` literally read at an earlier PR, not a live citation.
+      ```
+      $ rg -n "0014-a-fixtures-runtime" . --hidden --no-ignore-vcs
+      sdd/failure-flood-triage/verify-report.md:240,245,272   (preserved CRITICAL-5 record + its own
+                                                                 resolution note — expected, not a miss)
+      sdd/failure-flood-triage/apply-progress.md:27            (flagged above, deliberately untouched)
+      $ fd "0014-a-fixtures-runtime" .
+      (no output — the old path is gone)
+      ```
+- [x] 7.12 Correct `rig/report.py`'s false task-5.9 message (WARNING-11): `diagnostic_precision_recall_
+      table`'s docstring and its printed zero-scored line both still said task 5.9 was unimplemented and
+      "R-F3.2 cannot be honestly computed yet." Task 5.9 (both halves — the threading and the scoring
+      function) closed in PR7B; the fields are `None` on every currently-committed row only because none
+      of the three has ever reached `state == "complete"` (`derive.py:995`'s own gate) — all three are
+      `state=void, void_reason=shakedown`. The statement was false and shipped in output-producing code.
+      Verify: `python3 -m py_compile rig/report.py`; `python3 rig/report.py --self-test` exit 0, unchanged
+      case count; no assertion in `derive.py`/`report.py --self-test` referenced the old string, so nothing
+      else needed updating alongside it.
+      **Done.** Docstring now cites `derive.py`'s own `state == "complete"` gate (task 5.9) instead of
+      claiming the task is unimplemented. The printed zero-scored line now reads: *"causes_claimed/
+      causes_correct are null on every row (no row here ever reached state==complete; R-F3.2 has nothing
+      countable to score yet)"* — honest-empty, no fabricated figure, and no longer a false claim about
+      the rig's own implementation state.
+      ```
+      $ python3 -m py_compile rig/report.py
+      EXIT=0
+      $ python3 rig/report.py --self-test
+        [PASS] all four table headers print on zero complete rows
+        [PASS] occupancy_table(rows, field) reports ONLY the requested channel ...
+        [PASS] green_restore_table lists exactly the five raw verdict/unscored counts ...
+
+      self-test: all cases passed
+      EXIT=0
+      ```
+
+**Regression, re-run exactly as required — both named datasets, byte-identical.** Neither `derive.py`
+nor any row-builder was touched this batch, so `checker_digest` itself does not change either:
+`tool-surface-v1` re-derived 42/42 rows, **0 mismatches, 0 new fields**, `git diff --stat` empty (the
+file is byte-identical to what is already committed); `failure-flood-v1` re-derived 3/3 rows, **0
+pre-existing value changes, 0 new fields**, `git diff --stat` likewise empty.
+
+**No countable run was spent anywhere in this PR.** Every claim was proven by re-running the two
+committed `--self-test` flags, re-deriving already-committed raw captures, or reading and `rg`-sweeping
+tracked files — never a real `claude -p` call.
+
+**Gate run, on the real working tree (staged before commit, this branch's own `hooks/pre-commit` — 99
+lines older than `main`'s, per the launch brief's own note; `main`'s newer checker was not run here):**
+```
+$ bash -n rig/run-pipeline.sh
+EXIT=0
+$ python3 -m py_compile rig/derive.py
+EXIT=0
+$ python3 -m py_compile rig/report.py
+EXIT=0
+$ python3 -m py_compile rig/fixtures/failure-flood/v2/tools/generate-cases.py
+EXIT=0
+$ python3 rig/collect.py --self-test
+  self-test: all cases passed
+EXIT=0
+$ python3 rig/derive.py --self-test
+  self-test: all cases passed (49/49 [PASS])
+EXIT=0
+$ python3 rig/report.py --self-test
+  self-test: all cases passed (3/3 [PASS])
+EXIT=0
+$ ./hooks/pre-commit --all
+  redaction check: clean across 173 tracked files
+EXIT=0
+$ ./hooks/pre-commit --self-test
+  self-test: all cases passed
+EXIT=0
+```
+
+**Line budget.** `git diff --cached --numstat` per touched file: `MAP.md` 1/1, `decisions/{0014=>0015}-
+...md` 16/2 (the rename plus the renumbering note), `rig/README.md` 3/2, both fixture `package.json` 1/1
+each, `generate-cases.py` 1/1, `rig/report.py` 7/6, `rig/run-pipeline.sh` 1/1, `spec.md` 1/1. **Authored
+total, excluding `tasks.md` (excluded per this stack's own PR1/PR5/PR7A/PR7B/PR7C precedent) and
+`verify-report.md`'s own pre-existing round-2 content** (already present in the working tree before this
+batch started, authored by the verify phase, not by this apply batch): **48 lines.** This batch's own
+delta inside `verify-report.md` (the CRITICAL-5 resolution note plus five citation updates) is a further
+**20 lines** (16 insertions/4 deletions, isolated by diffing this batch's total 641/12 against the
+625/8 already present in the working tree at the start of this session). **Combined authored total for
+this batch: 68 lines**, well inside the 800-line ceiling. `tasks.md`'s own 10/8 (this section) is excluded
+per precedent.
+
+**Out of scope, confirmed untouched**: `rig/derive.py`, `rig/collect.py`, `hooks/pre-commit`,
+`design.md`, `run-pipeline.sh`'s `STEP_TIMEOUT_S`/`SUITE_TIMEOUT_S` placeholders — none touched. W-7
+through W-10 and the round-2 "What must happen before archive" items 3–9 remain open, deliberately, for a
+future batch. No countable run was spent.

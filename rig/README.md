@@ -4,7 +4,7 @@ type: index
 targets: [any]
 status: draft
 verified: 2026-08-13
-sources: ["decisions/0010-measurements-vary-the-harness-not-the-model.md", "decisions/0011-rig-produces-evidence-not-truth.md", "decisions/0013-a-committed-executable-carries-its-own-test.md", "decisions/0014-a-fixtures-runtime-is-substrate-not-this-repos-runner.md", "sdd/measurement-rig/design.md", "sdd/failure-flood-triage/design.md"]
+sources: ["decisions/0010-measurements-vary-the-harness-not-the-model.md", "decisions/0011-rig-produces-evidence-not-truth.md", "decisions/0013-a-committed-executable-carries-its-own-test.md", "decisions/0015-a-fixtures-runtime-is-substrate-not-this-repos-runner.md", "sdd/measurement-rig/design.md", "sdd/failure-flood-triage/design.md"]
 ---
 
 # rig/
@@ -74,7 +74,8 @@ nothing — explicitly does not extend here (`decisions/0011`, the boundary sect
 
 **The fixture-runtime boundary.** `failure-flood-v1`'s fixtures (`fixtures/failure-flood/v1/`,
 `v2/`) carry their own `node`/`npm`/Jest runtime, installed on demand per run into a machine-local
-`mktemp` directory. `decisions/0014` (ratified for this cycle's PR1) settles that this does **not**
+`mktemp` directory. `decisions/0015` (ratified for this cycle's PR1 as `0014`, renumbered in PR7D
+after a collision with `main`'s own `0014`) settles that this does **not**
 reverse `decisions/0013`'s repo-level "no test runner" rule: the fixture's runtime is substrate the rig
 measures, never this repo's own test runner. The boundary is explicit — nothing outside `rig/fixtures/`
 gains a `node_modules/` dependency, and no repo-level command starts depending on Jest.

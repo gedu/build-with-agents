@@ -82,7 +82,7 @@ arm's context load past what a 1M window can hold — converting a *cost* measur
 ### Measured flood sizes — numbers only, no criterion attached yet
 
 Measured on the injected v2 fixture with generated case tables loaded, in a machine-local workspace
-outside `<repo>` (ADR 0014 Clause A). Test counts confirm the tables were loaded: 499 failed / 2,383
+outside `<repo>` (ADR 0015 Clause A). Test counts confirm the tables were loaded: 499 failed / 2,383
 passed / 2,882 total, matching `answer-key/s2.json` exactly.
 
 | Quantity | Measured | What reads it |

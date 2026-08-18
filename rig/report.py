@@ -241,18 +241,19 @@ def _by_task_arm(rows):
 def diagnostic_precision_recall_table(rows):
     """R-F3.2/R-F4.1: precision/recall pair, per (task_id, arm), reported as
     a pair and never blended into one figure. `causes_claimed`/
-    `causes_correct` stay structurally `None` (never an empty list) on
-    every row until task 5.9 threads `root-cause-report.txt` out of the
-    ephemeral workspace (sdd/failure-flood-triage/tasks.md task 5.9) — this
-    table says so explicitly rather than reporting a fabricated 0/n-a."""
+    `causes_correct` stay structurally `None` (never an empty list) on any
+    row that never reached `state == "complete"` (`derive.py`'s own gate,
+    task 5.9) — this table says so explicitly rather than reporting a
+    fabricated 0/n-a."""
     lines = []
     for key, rs in sorted(_by_task_arm(rows).items()):
         scored = [r for r in rs if r.get("causes_claimed") is not None]
         if not scored:
             lines.append(
                 f"{key[0]}/{key[1]}: N={len(rs)} scored=0 — causes_claimed/"
-                "causes_correct are null on every row (task 5.9 not "
-                "implemented; R-F3.2 cannot be honestly computed yet)"
+                "causes_correct are null on every row (no row here ever "
+                "reached state==complete; R-F3.2 has nothing countable to "
+                "score yet)"
             )
             continue
         precisions, recalls = [], []

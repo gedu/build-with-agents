@@ -24,7 +24,7 @@ per-task done-notes and the findings note directly below it.
   `occupancy_aggregate_matches`, `occupancy_is_monotone`, `context_window_tokens`. `SCHEMA_VERSION` 2 → 3.
 - `rig/results/tool-surface-v1/runs.jsonl` — regenerated (derive.py is a total function; all 42 rows
   rebuilt from the raw captures under gitignored `rig/runs/`).
-- `decisions/0014-a-fixtures-runtime-is-substrate-not-this-repos-runner.md` — new. Two clauses per
+- `decisions/0015-a-fixtures-runtime-is-substrate-not-this-repos-runner.md` — new. Two clauses per
   R-F11.1/R-F11.2.
 - `sdd/failure-flood-triage/tasks.md` — PR1 tasks marked `[x]`, findings note added.
 
@@ -54,7 +54,7 @@ behavior are exactly the shape that could diverge; this result is scoped to `too
   both are exactly 42, with an exact 1:1 `run_id` ↔ directory-name correspondence, symmetric difference
   empty. Recorded as a correction, not papered over with an invented explanation for a gap that isn't
   there on this machine.
-- `decisions/0014-*.md`'s Clause B roster (four self-test-carrying executables: `hooks/pre-commit`,
+- `decisions/0015-*.md`'s Clause B roster (four self-test-carrying executables: `hooks/pre-commit`,
   `rig/derive.py`, `rig/run-pipeline.sh`, `rig/collect.py`; the case generator named as the *future*
   candidate, not one of the four) follows this task's explicit brief rather than `design.md`'s own
   "what the ADR must settle" paragraph, whose literal four-item list drops `rig/derive.py` (ADR 0013's
@@ -246,7 +246,7 @@ names):**
 **Verification run, with real results:**
 - Scratch build (outside `<repo>`): `npm install` in the scratch `runtime/` → 280 packages, generates
   `package-lock.json`. `npm test` → **3 suites, 36 tests, 0 failures, exit 0.**
-- Real verification (per ADR 0014 Clause A — never in the committed tree): copied the actual staged
+- Real verification (per ADR 0015 Clause A — never in the committed tree): copied the actual staged
   `src/`, `tests/`, `runtime/` bytes to a fresh `mktemp -d` directory outside `<repo>` (mirroring
   `rig/run.sh`'s existing pattern), `npm ci` there (fresh install strictly from the committed lockfile,
   not the scratch one) → 281 packages, then `npx jest --config jest.config.js --runInBand` from
@@ -389,7 +389,7 @@ name):**
   matches** — re-verified rather than trusted from the audit, per instruction, for the third module set
   in a row (PR3a-i verified the first three; this verifies all six together in the actual v2 tree).
 
-**Runtime and baseline, per ADR 0014 Clause A (install/run outside `<repo>`, never the committed tree):**
+**Runtime and baseline, per ADR 0015 Clause A (install/run outside `<repo>`, never the committed tree):**
 - `runtime/package.json` pins the identical dependency versions as v1's runtime (no `^`/`~`).
 - `runtime/package-lock.json` (`lockfileVersion: 3`) generated once via `npm install` in a `mktemp`
   scratch directory outside `<repo>`.
@@ -513,7 +513,7 @@ only a repetition-shaped one.
   **Aggregate: 2,823 generated cases / 6 causes = ~470:1** — inside the operator-confirmed ~433–500:1
   band, and inside the ~44–51× per-module multiplier band (47.2×–48.0× achieved, not the edges).
 - **Full v2 Jest suite, real `npm ci` + `npx jest --runInBand`, in a fresh `mktemp -d` outside `<repo>`
-  (ADR 0014 Clause A), run twice — once per env-var state:**
+  (ADR 0015 Clause A), run twice — once per env-var state:**
   - `FAILURE_FLOOD_CASE_DIR` unset: **6 suites, 59 passed + 7 skipped = 66 total, 0 failures** — the 7
     skipped entries are exactly the 7 `describe.skip` wrappers (6 modules + `balanceOfCall`'s second
     function); the 59 passed are byte-identical in count to PR3a-ii's own recorded clean baseline.
@@ -573,7 +573,7 @@ files, exit codes, and line counts.
 - `rig/fixtures/failure-flood/v2/tools/generate-cases.py` — modified. Added `case_table_digest(all_cases)`
   (computed from in-memory serialized bytes, same combining convention as `rig/run.sh`'s
   `hash_fixture_files`, `rig/run.sh:122-141`) and one `main()` print line. 26 insertions, 0 deletions.
-  Generator still never writes into `<repo>` (ADR 0014 Clause A unchanged).
+  Generator still never writes into `<repo>` (ADR 0015 Clause A unchanged).
 - `rig/fixtures/failure-flood/v2/answer-key/case-table.sha256` — new. One line, the hex digest
   `b15b8d1698ea0b45e2c475c1d5c68e2dcac81458522771d724a3ca431e5becb1`, captured from the generator's
   printed output and hand-committed (the generator itself never writes it).
@@ -698,7 +698,7 @@ verified at 3a-i), each module's boundary/index/direction logic unchanged since 
    `account` (drops the case-insensitive compare that both `direction` and, downstream, `feeAmount`
    depend on).
 
-**Isolation validation, one at a time, on a `mktemp` scratch copy outside `<repo>` (ADR 0014 Clause A),
+**Isolation validation, one at a time, on a `mktemp` scratch copy outside `<repo>` (ADR 0015 Clause A),
 reverted to a saved clean backup between each, real `npx jest --runInBand` + `rig/collect.py`:**
 
 - Clean baseline (`C`): `npm ci` → 281 packages; `npx jest --runInBand` → 3 suites, **36 passed, 0
@@ -911,7 +911,7 @@ Two failure modes are visible in one fixture, and only one needed a fix:
    one real cause legitimately span two test files, which this rule would then over-split; `R0`'s
    many-to-one mapping (unchanged) is what would absorb that, not a reason to loosen this fix.
 
-### Re-measurement — v1's ground truth, per ADR 0014 Clause A (mktemp outside `<repo>`)
+### Re-measurement — v1's ground truth, per ADR 0015 Clause A (mktemp outside `<repo>`)
 
 Committed `src/`/`tests`/`runtime` bytes (unchanged by this fix) copied to a fresh `mktemp` scratch
 directory outside `<repo>`; `npm ci`; `npx jest --config jest.config.js --runInBand --json
@@ -1179,7 +1179,7 @@ person name in any committed byte — the two scratch-path mentions inside `s2.j
 the general macOS `/tmp`→`/private/tmp` symlink behavior generically or use an explicit `<host-scratch-path>`
 placeholder, confirmed by `rg` for the actual scratch directory name (no match).
 
-**Redaction/ADR 0014 process.** All measurement ran in `mktemp` scratch directories outside `<repo>` (ADR
+**Redaction/ADR 0015 process.** All measurement ran in `mktemp` scratch directories outside `<repo>` (ADR
 0014 Clause A); no `node_modules` anywhere under `<repo>` (confirmed after cleanup). `rig/fixtures/failure-flood/v1/**`
 was NOT edited beyond the two files this work unit's coordinator explicitly authorized
 (`answer-key/s1.json`, `MANIFEST.sha256`) — `v1/src`, `v1/tests`, `v1/runtime` remain byte-unchanged,
@@ -1943,12 +1943,13 @@ rows exist yet) — correct, not a bug.
 ### 6.5 — `rig/README.md` + `MAP.md`
 
 `rig/README.md` gained "The experiment axis is real..." section (two experiments, two-schema rule) and a
-fixture-runtime-boundary paragraph citing `decisions/0014` (PR1's ADR). `MAP.md`'s `rig/` row updated to
+fixture-runtime-boundary paragraph citing `decisions/0015` (PR1's ADR). `MAP.md`'s `rig/` row updated to
 "2 experiments...". **Also touched, beyond 6.5's literal wording, and stated rather than silent:**
 `hypotheses/` row count (1→3 open) and a new `BACKLOG.md` row — both are direct, same-PR consequences of
 6.1/6.2/6.7 landing together, and leaving them stale would violate `AGENTS.md`'s own rule against stale
 hand-maintained indexes. **Not touched, flagged as pre-existing:** `decisions/` row still reads
-"0001–0013 ratified" though ADR 0014 already exists on disk from PR1 — a gap this batch found, not caused,
+"0001–0013 ratified" though ADR 0014 already exists on disk from PR1 (that ADR is now `0015`, renumbered in PR7D;
+the claim above is preserved as it read at the time) — a gap this batch found, not caused,
 left for a future batch exactly like `design.md:584-585`'s still-open `tools/generate-cases.py`
 misdescription.
 

@@ -1,13 +1,27 @@
 ---
-id: decisions/0014-a-fixtures-runtime-is-substrate-not-this-repos-runner
+id: decisions/0015-a-fixtures-runtime-is-substrate-not-this-repos-runner
 type: decision
 targets: [any]
 status: validated
 verified: 2026-08-11
+renumbered: "Originally filed as 0014 on this branch (2026-08-11, unpushed). Renumbered to 0015 on
+  2026-08-18 after `main` independently ratified and pushed its own `0014-a-public-guarantee-cannot-be-
+  opt-in.md` six days later (`a46794a`, 2026-08-17). Operator decision: the already-pushed number wins —
+  a public identifier is load-bearing for outside citers, an unpushed one owes nothing to anyone.
+  Content and ratification date are unchanged; only the number and every internal citation to it moved."
 sources: ["decisions/0013-a-committed-executable-carries-its-own-test.md", "decisions/0011-rig-produces-evidence-not-truth.md", "sdd/failure-flood-triage/spec.md", "sdd/failure-flood-triage/design.md"]
 ---
 
-# 0014 — A rig fixture's runtime is substrate under measurement, not this repo's test runner
+# 0015 — A rig fixture's runtime is substrate under measurement, not this repo's test runner
+
+> **Renumbered from 0014 on 2026-08-18.** This ADR was first ratified as `0014` on this branch
+> (2026-08-11), before `main` independently ratified its own `0014-a-public-guarantee-cannot-be-opt-in.md`
+> six days later and pushed it (`a46794a`, 2026-08-17). Chronology alone would favor whichever ADR was
+> written first, but `main`'s `0014` was already public by the time this collision was found, while this
+> branch's `0014` had never left a local, unpushed branch — a number already cited outside this
+> repository is load-bearing in a way an unpushed one is not. The operator decided `main` keeps `0014`
+> and this document becomes `0015`. This repo records its own corrections rather than silently amending
+> them (ADR 0007); nothing else about this decision changed.
 
 ## Context
 
