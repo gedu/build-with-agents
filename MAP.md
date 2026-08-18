@@ -48,7 +48,7 @@ where to look and what you are allowed to trust.
 | `blocks/react/` | React-specific blocks | Yes, when `validated` | empty |
 | `blocks/react-native/` | React Native-specific blocks | Yes, when `validated` | empty |
 | `templates/` | Compositions of blocks, ready to copy | Yes, when `validated` | empty |
-| `sdd/` | SDD cycles: proposal, spec, design, tasks, verification | No — process record | 1 cycle (`measurement-rig`), verified **PARTIAL** — verified cost instrument, unverified quality instrument |
+| `sdd/` | SDD cycles: proposal, spec, design, tasks, verification. Closed cycles move to `sdd/archive/` | No — process record | 2 cycles. `measurement-rig`, verified **PARTIAL** — verified cost instrument, unverified quality instrument. `archive/2026-08-18-failure-flood-triage`, archived after 4 verification rounds — an instrument plus a **failed** ratio target, never a comparative result: zero countable runs |
 | `rig/` | Measurement harness: fixtures, runner, analyser. Raw captures are gitignored | Code yes; **output is evidence only**, citable once promoted to `theory/` with scope and spread (ADR 0011) | 2 experiments (`tool-surface-v1`, `failure-flood-v1`), both in progress |
 | `upstream/` | Experiments against `gentle-ai` / `engram` / `gga` / `claude-code`, staged bug reports | No — experiments | `gentle-ai`: `0001` filed as [#2478](https://github.com/Gentleman-Programming/gentle-ai/issues/2478), `0002` and `0004` staged, `0003` **rejected** (resolved on 2.3.0 before filing). `claude-code`: `0001` staged |
 
