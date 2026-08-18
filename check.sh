@@ -205,6 +205,15 @@ check_frontmatter() {
       "$EXCLUDED_PREFIX"*) continue ;;
     esac
     [ -e "$f" ] || continue          # listed, then removed between the two calls
+    # A tool entrypoint is a generated symlink to AGENTS.md (`./setup.sh --claude` and
+    # friends). Reading one means reading AGENTS.md a second time under a second name, which
+    # surfaces as a duplicate `id` — a violation the operator cannot fix, because the file is
+    # not theirs to edit. `.gitignore` hides these, but only after `setup.sh` has written its
+    # managed block, and that block is per-checkout and uncommitted: a clone, a fresh worktree
+    # or a `git reset --hard` leaves it empty and the entrypoints visible again. Skipping the
+    # symlink itself does not depend on that state. AGENTS.md: entrypoints are always symlinks
+    # and are never committed, so no content file is lost here.
+    [ -L "$f" ] && continue
     [ -r "$f" ] || die_cannot_run "'$f' is unreadable; a file that cannot be read is not a file that passed"
     if [ ! -s "$f" ]; then
       # awk never enters a zero-byte file, so it would be validated by nobody.
@@ -309,7 +318,14 @@ self_test() {
   }
 
   fixture() {
-    rm -rf "$TMP/skills" "$TMP/rig" "$TMP/ASK.md" "$TMP/note.md"
+    # Wipe the tree rather than naming what to delete. The enumerated form leaked: `other.md`,
+    # written by the duplicate-id case, survived into every later case, and those cases still
+    # passed because each one expected a non-zero exit and the leftover duplicate was just one
+    # more violation in a run that was already failing. The first case to expect 0 is what
+    # exposed it. A fixture that lists what to remove is a fixture that hides state as soon as
+    # a case writes a path it does not know about.
+    find "$TMP" -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} + \
+      || die_cannot_run "could not reset the self-test fixture"
     write_fm "ASK.md" "ask/index" "index" "[any]" "draft" "2026-08-17" "[]" "ask"
     printf '\nSay **"do the thing"** reaches `alpha`.\n' >> "$TMP/ASK.md"
     write_fm "skills/README.md" "skills/index" "index" "[any]" "draft" "2026-08-17" "[]" "skills"
@@ -379,6 +395,14 @@ self_test() {
   chmod 000 "$TMP/note.md"
   expect 2 "an unreadable content file escalates instead of being skipped"
   chmod 644 "$TMP/note.md"
+
+  # Found on this checker's first run against a real merged tree, not imagined: `git reset
+  # --hard` reverted .gitignore's per-checkout managed block, the generated CLAUDE.md symlink
+  # became visible again, and AGENTS.md was reported as a duplicate id of itself.
+  fixture
+  ln -s "note.md" "$TMP/ALIAS.md"
+  expect 0 "a generated symlink entrypoint is skipped, not read as a second content file"
+  rm -f "$TMP/ALIAS.md"
 
   [ "$FAILED" -eq 0 ] || {
     printf '\n  SELF-TEST FAILED — this checker is not behaving as specified.\n' >&2
