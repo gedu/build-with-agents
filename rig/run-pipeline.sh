@@ -99,13 +99,20 @@ PERMISSION_MODE_CHOICES="acceptEdits auto bypassPermissions manual dontAsk plan"
 
 usage() {
   cat <<'USAGE'
-Usage: rig/run-pipeline.sh <task_id> <arm> <iteration> --permission-mode <mode> [--shakedown] [--dirty-ok]
+Usage: rig/run-pipeline.sh <task_id> <arm> <iteration> --permission-mode <mode> --model <model-id> [--shakedown] [--dirty-ok]
 
   task_id            s1 (failure-flood/v1, stage 1) | s2 (failure-flood/v2, stage 2)
   arm                monolithic | pipeline
   iteration          an iteration slot, e.g. 03, or a void re-run suffix, e.g. 03r1
   --permission-mode  REQUIRED, never inherited (R-F7.4). One of:
                      acceptEdits, auto, bypassPermissions, manual, dontAsk, plan
+  --model            REQUIRED, never inherited, no default (ADR 0010, R-F7.1).
+                     The exact model id/alias passed straight through to
+                     `claude -p --model`. Unlike --permission-mode this is not
+                     a closed enum (model ids/aliases are not fixed by this
+                     script) — only presence is enforced, exactly like
+                     --permission-mode is required but its CHOICES are still
+                     validated; a per-invocation value is never assumed.
   --shakedown        stamps void_reason=shakedown UNCONDITIONALLY on the arm-level
                      row (Hard Ordering Gate layer 1) and skips the pre-registration
                      preflight (layer 2). Distinct from --dirty-ok (R-F8.2).
@@ -265,20 +272,24 @@ print(hashlib.sha256("\n".join(sorted(digest_input)).encode()).hexdigest())
 PY
 }
 
-# read_back_init <stream.jsonl> — prints "<surface_sha256> <permission_mode>"
-# (empty fields when no init event was emitted). surface_sha256 reuses
-# rig/derive.py:87-91's surface_digest() convention exactly:
+# read_back_init <stream.jsonl> — prints "<surface_sha256> <permission_mode>
+# <model_actual>" (empty fields when no init event was emitted). surface_sha256
+# reuses rig/derive.py:87-91's surface_digest() convention exactly:
 # sha256(sorted(set(tool_names))), so task 5.8's row builder can compare it
 # to rig/surfaces/failure-flood.txt without a second algorithm. This file
-# RECORDS the comparison inputs; it does not decide surface-mismatch itself
-# — every existing precedent (rig/derive.py:456-464, never rig/run.sh) puts
-# that decision in derive.py, so failure-flood-v1 keeps the same split.
+# RECORDS the comparison inputs; it does not decide surface-mismatch (or,
+# now, model-mismatch) itself — every existing precedent (rig/derive.py:
+# 456-464, never rig/run.sh) puts that decision in derive.py, so
+# failure-flood-v1 keeps the same split. model_actual mirrors mode exactly:
+# both are read from the SAME init event, by the SAME function, the same way
+# permission_mode_actual has always been read back — model pinning (ADR 0010,
+# R-F7.1) gets no separate mechanism.
 read_back_init() {
   python3 - "$1" <<'PY'
 import hashlib, json, sys
 
 path = sys.argv[1]
-tools, mode = [], ""
+tools, mode, model = [], "", ""
 try:
     with open(path, "rb") as f:
         for raw in f:
@@ -292,11 +303,12 @@ try:
             if ev.get("type") == "system" and ev.get("subtype") == "init":
                 tools = ev.get("tools", [])
                 mode = ev.get("permissionMode", "")
+                model = ev.get("model", "")
                 break
 except FileNotFoundError:
     pass
 digest = hashlib.sha256("\n".join(sorted(set(tools))).encode()).hexdigest() if tools else ""
-print(f"{digest} {mode}")
+print(f"{digest} {mode} {model}")
 PY
 }
 
@@ -305,6 +317,7 @@ PY
 SHAKEDOWN=0
 DIRTY_OK=0
 PERMISSION_MODE=""
+MODEL=""
 POSITIONAL=()
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -313,6 +326,9 @@ while [ $# -gt 0 ]; do
     --permission-mode)
       [ $# -ge 2 ] || die_bad_args "--permission-mode requires a value"
       PERMISSION_MODE="$2"; shift 2 ;;
+    --model)
+      [ $# -ge 2 ] || die_bad_args "--model requires a value"
+      MODEL="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     --*) die_bad_args "unknown flag '$1'" ;;
     *) POSITIONAL+=("$1"); shift ;;
@@ -333,6 +349,20 @@ case " $PERMISSION_MODE_CHOICES " in
   *" $PERMISSION_MODE "*) ;;
   *) die_bad_args "--permission-mode must be one of: $PERMISSION_MODE_CHOICES — got '$PERMISSION_MODE'" ;;
 esac
+
+# ADR 0010 / R-F7.1: model is a named argument, never inherited, no default —
+# same required-argument shape as --permission-mode above (R-F7.4), for the
+# identical reason: an inherited value is exactly the hazard that let two
+# committed shakedown rows of the SAME arm (s1-monolithic-01, s1-monolithic-9054)
+# disagree on model (claude-opus-5[1m] vs claude-sonnet-5) before this guard
+# existed, which is a model comparison masquerading as a harness-shape
+# comparison (ADR 0010: "measurements vary the harness, not the model"). No
+# CHOICES enum here, unlike --permission-mode: model ids/aliases are not a
+# fixed, closed set this script can enumerate (`claude --model` accepts both
+# aliases like "opus"/"sonnet" and full model names) — only presence is
+# enforced, and the actual value is read back and compared per invocation
+# (read_back_init below), never assumed to have taken effect.
+[ -n "$MODEL" ] || die_bad_args "--model is required (ADR 0010, R-F7.1) — declare the exact model id/alias per invocation, never inherited"
 
 RUN_ID="${TASK_ID}-${ARM}-${ITERATION}"
 
@@ -517,15 +547,19 @@ write_step_status() {
   # $10 src_changed  $11 ro_changed (task 5.5 — the two zones the arm-level
   # classification reads; substrate_changed stays the OR of both, unchanged
   # shape, for anything already reading that one field)
+  # $12 model_actual — read back exactly the same way permission_mode_actual
+  # is (ADR 0010, R-F7.1); empty for a code step, which never invokes `claude`.
   ROLE="$2" KIND="$3" EXIT_CODE="$4" WALL_MS="$5" SUBSTRATE_CHANGED="$6" \
   SURFACE_SHA256="$7" PERMISSION_MODE_ACTUAL="$8" TIMED_OUT="${9:-0}" \
-  SRC_CHANGED="${10:-0}" RO_CHANGED="${11:-0}" \
-  DECLARED_PERMISSION_MODE="$PERMISSION_MODE" STATUS_FILE="$1/status.json" \
+  SRC_CHANGED="${10:-0}" RO_CHANGED="${11:-0}" MODEL_ACTUAL="${12:-}" \
+  DECLARED_PERMISSION_MODE="$PERMISSION_MODE" DECLARED_MODEL="$MODEL" \
+  STATUS_FILE="$1/status.json" \
   python3 <<'PY'
 import json, os
 
 env = os.environ
 actual = env["PERMISSION_MODE_ACTUAL"] or None
+model_actual = env["MODEL_ACTUAL"] or None
 data = {
     "role": env["ROLE"],
     "kind": env["KIND"],
@@ -544,6 +578,9 @@ data = {
     "declared_permission_mode": env["DECLARED_PERMISSION_MODE"],
     "permission_mode_actual": actual,
     "permission_mode_matches_declared": (actual == env["DECLARED_PERMISSION_MODE"]) if actual else None,
+    "declared_model": env["DECLARED_MODEL"],
+    "model_actual": model_actual,
+    "model_matches_declared": (model_actual == env["DECLARED_MODEL"]) if model_actual else None,
 }
 with open(env["STATUS_FILE"], "w") as f:
     json.dump(data, f, indent=2, sort_keys=True)
@@ -613,7 +650,7 @@ run_model_step() {
     # narrowing here, unlike rig/run.sh's own experiment.
     exec timeout "$STEP_TIMEOUT_S" claude -p "$prompt_text" \
       --output-format stream-json --verbose \
-      --strict-mcp-config --permission-mode "$PERMISSION_MODE" \
+      --strict-mcp-config --permission-mode "$PERMISSION_MODE" --model "$MODEL" \
       >>"$dir/stream.jsonl" 2>>"$dir/stderr.log"
   ) &
   local child=$!
@@ -637,9 +674,13 @@ run_model_step() {
   [ "$ro_changed" -eq 1 ] && RO_SUBSTRATE_VIOLATION=1
   [ "$role" = "diagnose" ] && [ "$src_changed" -eq 1 ] && DIAGNOSTICIAN_SRC_VIOLATION=1
 
-  local read_back surf perm
+  local read_back surf perm model_actual
   read_back="$(read_back_init "$dir/stream.jsonl")"
-  surf="${read_back%% *}"; perm="${read_back#* }"
+  # Three space-separated fields, none of which contain a space themselves
+  # (a hex digest, a `claude --permission-mode` enum value, a model id/alias)
+  # — read splits on IFS rather than the old two-field `%% */# * ` trick,
+  # which has no clean way to extend to a third field.
+  read -r surf perm model_actual <<<"$read_back"
 
   # Thread the fix-plan out (design.md sec 2): the diagnostician's only
   # writable place is its workspace root; copy it out and hash it before
@@ -650,7 +691,7 @@ run_model_step() {
     cp "$ws/fix-plan.txt" "$dir/handoff/fix-plan.txt"
   fi
 
-  write_step_status "$dir" "$role" model "$exit_code" $((end_ms - start_ms)) "$substrate" "$surf" "$perm" "$timed_out" "$src_changed" "$ro_changed"
+  write_step_status "$dir" "$role" model "$exit_code" $((end_ms - start_ms)) "$substrate" "$surf" "$perm" "$timed_out" "$src_changed" "$ro_changed" "$model_actual"
   [ "$timed_out" -eq 1 ] && { ABORT_REASON="timeout"; return 0; }
   return 0
 }
@@ -693,7 +734,7 @@ run_code_step() {
 
   # Tokens are recorded 0, not absent (design.md sec 2: "keeps the 'zero
   # model tokens' claim read back rather than asserted").
-  write_step_status "$dir" "$role" code "$exit_code" $((end_ms - start_ms)) "$substrate" "" "" 0 "$src_changed" "$ro_changed"
+  write_step_status "$dir" "$role" code "$exit_code" $((end_ms - start_ms)) "$substrate" "" "" 0 "$src_changed" "$ro_changed" ""
   # collector-error (design.md Decision 3: run-axis void, never a suite
   # state) is collect.py's own exit 2.
   [ "$exit_code" -eq 2 ] && { ABORT_REASON="collector-error"; return 0; }
@@ -772,7 +813,7 @@ FIXTURE_VERSION="$FIXTURE_VERSION" STEP_NAMES="$STEP_NAMES_CSV" RUN_DIR="$RUN_DI
 NODE_VERSION="$NODE_VERSION" NPM_VERSION="$NPM_VERSION" PYTHON_VERSION="$PYTHON_VERSION" \
 DRIVER_VERSION="$DRIVER_VERSION" LOCKFILE_SHA256="$LOCKFILE_SHA256" \
 CASE_TABLE_DIGEST="$CASE_TABLE_DIGEST" CASE_COUNT="$CASE_COUNT" PREREG_DIGEST="$PREREG_DIGEST" \
-CODE_COMMIT="$CODE_COMMIT" DECLARED_PERMISSION_MODE="$PERMISSION_MODE" \
+CODE_COMMIT="$CODE_COMMIT" DECLARED_PERMISSION_MODE="$PERMISSION_MODE" DECLARED_MODEL="$MODEL" \
 STATE="$ARM_STATE" VOID_REASON="$ARM_VOID_REASON" ABORT_REASON="$ABORT_REASON" DIRTY_OK_USED="$DIRTY_OK" \
 SHAKEDOWN_USED="$SHAKEDOWN" WORKSPACE_FILE_COUNT="$WORKSPACE_FILE_COUNT" \
 RO_SUBSTRATE_VIOLATION="$RO_SUBSTRATE_VIOLATION" DIAGNOSTICIAN_SRC_VIOLATION="$DIAGNOSTICIAN_SRC_VIOLATION" \
@@ -797,6 +838,7 @@ arm = {
     "case_count": int(env["CASE_COUNT"] or 0),
     "prereg_digest": env["PREREG_DIGEST"] or None,
     "declared_permission_mode": env["DECLARED_PERMISSION_MODE"],
+    "declared_model": env["DECLARED_MODEL"],
     "workspace_file_count": int(env["WORKSPACE_FILE_COUNT"]),
     "dirty_ok_used": env["DIRTY_OK_USED"] == "1",
     "shakedown_used": env["SHAKEDOWN_USED"] == "1",

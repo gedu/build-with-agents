@@ -616,7 +616,14 @@ def fixture_digest_at(root: Path):
 
 
 FAILURE_FLOOD_EXPERIMENT = "failure-flood-v1"
-FAILURE_FLOOD_SCHEMA_VERSION = 1
+FAILURE_FLOOD_SCHEMA_VERSION = 2  # v2: PR7A closes verify-report CRITICAL-3/-4.
+# Added declared_model (row) + model_matches_declared (per step, read back
+# from run-pipeline.sh's own write_step_status, mirroring
+# permission_mode_matches_declared) and the model-mismatch void it can now
+# trigger; and input_tokens/output_tokens/cache_creation_input_tokens/
+# cache_read_input_tokens/tool_calls, per step AND per run (R-F7.3). Same
+# no-migrations rule as tool-surface-v1's v2->v3 bump (design.md Decision 8):
+# re-deriving rewrites every existing row with this version and these fields.
 FAILURE_FLOOD_RUN_ID_RE = re.compile(r"^(s[12])-(monolithic|pipeline)-([0-9][A-Za-z0-9]*)$")
 FAILURE_FLOOD_FIXTURE_VERSIONS = {"s1": "v1", "s2": "v2"}
 FAILURE_FLOOD_FIXTURE_ROOTS = {
@@ -752,6 +759,30 @@ def build_row_failure_flood(run_dir: Path, surfaces, digests, answer_keys):
                 state, void_reason = "void", "permission-mode-mismatch"
                 anomaly_classes.add("permission-mode-mismatch")
                 break
+            # model-mismatch (CRITICAL-3, verify-report 2026-08-17): the
+            # STRONGER declared-value comparison, deliberately NOT the
+            # self-consistency check build_row (tool-surface-v1) uses at
+            # `model not in (result_event.get("modelUsage") or {})` — that
+            # check only proves the init event's own model id appears
+            # somewhere in the SAME run's usage breakdown; it says nothing
+            # about whether the run actually used the model the invocation
+            # DECLARED. ADR 0010 ("measurements vary the harness, not the
+            # model") and R-F7.1 ("model id ... fixed across arms") both need
+            # the declared-value comparison specifically, because the failure
+            # this guards against is exactly what the three committed
+            # shakedown rows already show: two runs of the SAME arm
+            # (s1-monolithic-01, s1-monolithic-9054) disagreeing on model
+            # (claude-opus-5[1m] vs claude-sonnet-5) with nothing to catch it.
+            # A self-consistency check cannot catch that — both runs are
+            # internally consistent, each with a DIFFERENT model. Reusing
+            # run-pipeline.sh's own read-back (model_matches_declared,
+            # written by write_step_status the same way
+            # permission_mode_matches_declared already is) rather than
+            # inventing a second comparison mechanism here.
+            if step.get("model_matches_declared") is False:
+                state, void_reason = "void", "model-mismatch"
+                anomaly_classes.add("model-mismatch")
+                break
 
     # ---- per-step evidence: occupancy (reusing parse_stream/compute_occupancy
     # unchanged — both are already experiment-agnostic) and bash_call_count.
@@ -779,6 +810,22 @@ def build_row_failure_flood(run_dir: Path, surfaces, digests, answer_keys):
             step_out["peak_occupancy_tokens"] = occ["peak_occupancy_tokens"]
             step_out["cumulative_occupancy_tokens"] = occ["cumulative_occupancy_tokens"]
             step_out["bash_call_count"] = sum(1 for tc in tool_calls if tc["name"] == "Bash")
+            # R-F7.3 (CRITICAL-4, verify-report 2026-08-17): "input, output,
+            # cache_read_input, and cache_creation_input tokens recorded
+            # separately (never a single total), plus tool-call count and
+            # names." Occupancy above is a DIFFERENT channel (R-F5, a derived
+            # proxy for context load) and does not satisfy this — it never
+            # did, that is the regression this restores. Reusing build_row's
+            # (tool-surface-v1's) own extraction verbatim, applied per step
+            # here instead of once per row, since one step here is one
+            # role's one invocation — the same granularity build_row's single
+            # row already has for its single role.
+            step_usage = (result_event or {}).get("usage", {})
+            step_out["input_tokens"] = step_usage.get("input_tokens")
+            step_out["output_tokens"] = step_usage.get("output_tokens")
+            step_out["cache_creation_input_tokens"] = step_usage.get("cache_creation_input_tokens")
+            step_out["cache_read_input_tokens"] = step_usage.get("cache_read_input_tokens")
+            step_out["tool_calls"] = [{"name": tc["name"], "is_error": tc["is_error"]} for tc in tool_calls]
             model_turns_total += occ["model_turns"]
             if occ["peak_occupancy_tokens"] is not None:
                 peak_occupancy_tokens = max(peak_occupancy_tokens or 0, occ["peak_occupancy_tokens"])
@@ -788,6 +835,22 @@ def build_row_failure_flood(run_dir: Path, surfaces, digests, answer_keys):
             if occ["context_window_tokens"] is not None:
                 context_window_tokens = occ["context_window_tokens"]
         steps_out.append(step_out)
+
+    # R-F7.3's "Aggregated per role and per run" half — the per-step fields
+    # just added ARE the per-role breakdown (each step is one role's one
+    # invocation); these are the per-run totals, summed the same way
+    # bash_call_count_total already is below. Never summed INTO occupancy or
+    # any other single figure — a separate, parallel set of fields, per the
+    # requirement's own "never a single total."
+    input_tokens_total = sum((s.get("input_tokens") or 0) for s in steps_out if s.get("kind") == "model")
+    output_tokens_total = sum((s.get("output_tokens") or 0) for s in steps_out if s.get("kind") == "model")
+    cache_creation_input_tokens_total = sum(
+        (s.get("cache_creation_input_tokens") or 0) for s in steps_out if s.get("kind") == "model"
+    )
+    cache_read_input_tokens_total = sum(
+        (s.get("cache_read_input_tokens") or 0) for s in steps_out if s.get("kind") == "model"
+    )
+    tool_calls_total = [tc for s in steps_out if s.get("kind") == "model" for tc in (s.get("tool_calls") or [])]
 
     # ---- green-restore (R-F4.2), from the LAST 99-verify step's real
     # collection.json plus the fixture's own F0 — no capture gap here,
@@ -830,6 +893,12 @@ def build_row_failure_flood(run_dir: Path, surfaces, digests, answer_keys):
         "prereg_digest": prereg_digest,
         "code_commit": arm_data.get("code_commit"),
         "declared_permission_mode": arm_data.get("declared_permission_mode"),
+        # ADR 0010 / R-F7.1 (CRITICAL-3): the pinned, per-invocation model
+        # declaration, read straight from arm.json — never a repo constant.
+        # "model" above stays the observed value from the first model step's
+        # init event (unchanged meaning); this is what was DECLARED, so the
+        # two are comparable per row without a second file.
+        "declared_model": arm_data.get("declared_model"),
         "workspace_file_count": arm_data.get("workspace_file_count"),
         "state": state,
         "void_reason": void_reason,
@@ -844,6 +913,17 @@ def build_row_failure_flood(run_dir: Path, surfaces, digests, answer_keys):
         "occupancy_is_monotone": occupancy_is_monotone,
         "context_window_tokens": context_window_tokens,
         "bash_call_count": bash_call_count_total,
+        # R-F7.3 (CRITICAL-4): the four components, separate, never
+        # collapsed into occupancy or into each other — "per run" aggregate;
+        # each step in "steps" below carries the same four fields at "per
+        # role" granularity, plus its own tool_calls (names + count via
+        # len()). tool_calls here is the per-run concatenation, same shape
+        # build_row (tool-surface-v1) already uses for its own single-role row.
+        "input_tokens": input_tokens_total,
+        "output_tokens": output_tokens_total,
+        "cache_creation_input_tokens": cache_creation_input_tokens_total,
+        "cache_read_input_tokens": cache_read_input_tokens_total,
+        "tool_calls": tool_calls_total,
         "suite_state": suite_state,
         "partial_reason": partial_reason,
         "report_bytes": report_bytes,

@@ -2065,3 +2065,126 @@ and its downstream consumer (6.4's diagnostic precision/recall table) already re
 honestly rather than silently. No countable `s2` comparison run has been performed; that decision, and
 the real hypothesis-file commit the Hard Ordering Gate requires before one can even start, both remain
 the operator's.
+
+## PR7A — Pin the model + restore R-F7.3 token breakdown (closes verify-report CRITICAL-3/CRITICAL-4) — DONE
+
+Source: `sdd/failure-flood-triage/verify-report.md`, verified 2026-08-17, FAIL verdict, 4 CRITICAL
+findings. This batch closes exactly two — CRITICAL-3 (model not pinned) and CRITICAL-4 (R-F7.3 token
+breakdown missing) — per explicit instruction. CRITICAL-1 (`R-F2.2`) and CRITICAL-2 (`R-F3.2` scoring,
+task 5.9's own re-scoping) are untouched, PR7B's own batch. Tasks 7.1–7.4, all `[x]`; see `tasks.md`'s own
+PR7A section for the full per-task done-notes (this entry summarizes files, verification, and line count).
+
+**Files changed:**
+- `rig/run-pipeline.sh` — modified. `--model` added as a required named argument mirroring
+  `--permission-mode` exactly (usage text, `MODEL=""` var, arg-parse case, post-parse required check —
+  no closed enum, since model ids/aliases are not a fixed set `claude --model` accepts, confirmed by
+  reading `claude --help` before implementing). Passed through to `claude -p --model "$MODEL"`.
+  `read_back_init()` now reads a third field, `model_actual`, from the same init event's `model` key.
+  `run_model_step` parses the 3-field read-back with `read -r surf perm model_actual <<<"$read_back"`
+  (replacing the old 2-field `%% */# * ` trick). `write_step_status()` gained `declared_model`,
+  `model_actual`, `model_matches_declared` (computed identically to the pre-existing permission-mode
+  triple); both `run_model_step`'s and `run_code_step`'s calls updated (the latter passes an empty
+  `model_actual`, since a code step never invokes `claude`). `arm.json` gained `declared_model` at the
+  arm level.
+- `rig/derive.py` — modified. `build_row_failure_flood` gained a `model-mismatch` void
+  (`step.get("model_matches_declared") is False`, mirroring `permission-mode-mismatch`'s existing shape)
+  — the STRONGER declared-value comparison, deliberately NOT `build_row`'s own self-consistency check
+  (`model not in (result_event.get("modelUsage") or {})`), because a self-consistency check cannot catch
+  two internally-consistent runs of the SAME arm disagreeing with EACH OTHER, which is exactly what the
+  three committed shakedown rows already show. Row gained `declared_model` (from `arm_data`). Per-step
+  and per-run `input_tokens`/`output_tokens`/`cache_creation_input_tokens`/`cache_read_input_tokens`/
+  `tool_calls` added (R-F7.3), reusing `build_row`'s own extraction expressions verbatim, never a second
+  extraction. `FAILURE_FLOOD_SCHEMA_VERSION` bumped 1 → 2 (same no-migrations convention as
+  `tool-surface-v1`'s 2 → 3 bump in PR1).
+- `rig/results/tool-surface-v1/runs.jsonl` — regenerated (`derive.py` is a total function; `checker_digest`
+  changes on any edit to the file, `build_row` itself untouched, so nothing else should differ — verified,
+  see below).
+- `rig/results/failure-flood-v1/runs.jsonl` — regenerated from the same 3 raw captures still on disk under
+  gitignored `rig/runs/failure-flood-v1/` (left over from PR5/PR6). All three still `state=void,
+  void_reason=shakedown`; now additionally carry real per-step/per-run token breakdowns and tool-call
+  names, and `declared_model: null` (honest — these captures predate `--model` existing as a flag, so
+  nothing was ever declared for them; not retrofitted to look pinned).
+- `sdd/failure-flood-triage/tasks.md` — new `## PR7A` section, tasks 7.1–7.4 registered and marked `[x]`
+  with full done-notes.
+
+**Why no real (non-`--shakedown`) invocation was run, and how the change was proven anyway**: the launch
+instruction is explicit that a countable run is the operator's decision, not this batch's, and that
+proof must come from `--shakedown` invocations, unit-level checks, or extracted-function tests. Two of
+the four required-argument gates (`--permission-mode`, then `--model`) were proven with real invocations
+that refuse at exit 2 during preflight, before any run directory is claimed (confirmed:
+`rig/runs/failure-flood-v1/` held the same 3 directories before and after). Beyond that point, a
+`--shakedown` invocation would still spend a real, costed `claude -p` call for no additional proof value
+this batch needed — so `read_back_init()` and `write_step_status()` were instead extracted verbatim into
+standalone scripts (mirroring task 6.6's own `check_prereg()` extraction, praised as sound evidence in
+the 2026-08-17 verify-report) and fed synthetic input, and `build_row_failure_flood` was unit-tested
+against synthetic run directories built in Python. No `claude -p` call was made anywhere in this batch.
+
+**Verification run, with real results:**
+- `bash -n rig/run-pipeline.sh` → exit 0.
+- `python3 -m py_compile rig/derive.py` → exit 0.
+- `python3 -m py_compile rig/collect.py` → exit 0 (untouched, checked anyway).
+- `python3 rig/collect.py --self-test` → exit 0, 14/14 `[PASS]`, 0 `[FAIL]` (untouched, unaffected).
+- Real invocations, real exit codes, no run directory ever claimed:
+  ```
+  $ ./rig/run-pipeline.sh s1 monolithic 99
+    !! --permission-mode is required (R-F7.4) — one of: acceptEdits auto bypassPermissions manual dontAsk plan
+  EXIT=2
+  $ ./rig/run-pipeline.sh s1 monolithic 99 --permission-mode bypassPermissions
+    !! --model is required (ADR 0010, R-F7.1) — declare the exact model id/alias per invocation, never inherited
+  EXIT=2
+  $ ./rig/run-pipeline.sh s1 monolithic 99 --permission-mode bypassPermissions --model claude-opus-5 --dirty-ok
+    COULD NOT RUN: pre-registration guard failed (Hard Ordering Gate layer 2): missing-prereg-config: ...
+  EXIT=2 (unaffected — v1 has no prereg.json by design, R-F9.1; both new required-arg gates already
+  passed before this point was reached)
+  ```
+- `read_back_init()` extracted verbatim, fed a synthetic `stream.jsonl` carrying the real committed
+  `s1-monolithic-01` model id `claude-opus-5[1m]` (brackets included, to prove they survive `read -r`
+  splitting): surface digest, permission mode, and model all parsed correctly — 3/3 `[PASS]`.
+- `write_step_status()` extracted verbatim, three synthetic cases: model matches declared → `true`;
+  model mismatch (`claude-opus-5[1m]` declared, `claude-sonnet-5` actual — the exact real hazard) →
+  `false`; code step (no model invocation) → `null`/`null`, never trips. 3/3 cases correct.
+- `build_row_failure_flood` unit-tested against synthetic run directories (Python, `tempfile`): model
+  mismatch → `state=void, void_reason=model-mismatch`; model match → stays `complete`; field entirely
+  absent (an old capture) → stays `complete`, never a false positive. 3/3 cases correct.
+- `build_row_failure_flood` unit-tested for R-F7.3: synthetic 2-turn stream with distinct token counts
+  and two tool names (`Bash`, `Read`) → row-level `input_tokens=220`, `output_tokens=30`,
+  `cache_creation_input_tokens=5`, `cache_read_input_tokens=11`, `tool_calls` names `["Bash", "Read"]`;
+  same four values and both names independently confirmed at the step level. All assertions passed.
+- **Regression, required and re-run: tool-surface-v1's 42-row projection.** Snapshot of the committed
+  `runs.jsonl` taken before this batch's edits; re-derived with the final `derive.py`
+  (`python3 rig/derive.py`, default experiment); diffed field-by-field per `run_id`, excluding
+  `schema_version` and `checker_digest`. **0 mismatches across 42/42 rows.** `schema_version` unchanged
+  at `3` on every row both before and after (confirming `build_row` truly untouched); `checker_digest`
+  differs on every row (expected — `sha256` of `derive.py`'s own bytes).
+- `python3 rig/derive.py --experiment failure-flood-v1` → exit 0, 3 rows, all still `state=void,
+  void_reason=shakedown`; real token/tool-call data populated, `declared_model: null` on all three
+  (honest — pre-dates this PR's `--model` flag).
+- `python3 rig/report.py --experiment failure-flood-v1` → exit 0, unchanged shape (0 complete rows, all
+  three shakedown rows still named in the excluded list). `python3 rig/report.py` (default,
+  tool-surface-v1) → exit 0, unaffected.
+- `git add rig/run-pipeline.sh rig/derive.py rig/results/tool-surface-v1/runs.jsonl
+  rig/results/failure-flood-v1/runs.jsonl sdd/failure-flood-triage/tasks.md` then
+  `./hooks/pre-commit --all` → **exit 0**, `"redaction check: clean across 173 tracked files"`.
+  `./hooks/pre-commit --self-test` → **exit 0**, all 3 cases PASS.
+- `git diff --stat -- rig/collect.py rig/report.py` → empty, confirming both files genuinely untouched.
+
+**Line budget:** `git diff --cached --numstat` on the four hand-authored/regenerated files:
+```
+81  1   rig/derive.py
+3   3   rig/results/failure-flood-v1/runs.jsonl
+42  42  rig/results/tool-surface-v1/runs.jsonl
+59  17  rig/run-pipeline.sh
+```
+Both `runs.jsonl` files are machine-regenerated (`derive.py` is a total function) — generated goldens,
+excluded from the authored-risk count per `sdd-phase-common.md` §E, the same exclusion PR1/PR5 already
+established for this exact file class. **Authored total: 82 (`derive.py`) + 76 (`run-pipeline.sh`) =
+158.** Raw total including both goldens: 248. Both figures are well inside the 800-line ceiling for this
+batch — no split needed.
+
+**Not committed or pushed** — staged only, per instruction; the commit remains the orchestrator's, which
+still has the attempt ledger to settle.
+
+**PR7A is now closed: tasks 7.1–7.4 all `[x]`.** CRITICAL-1 and CRITICAL-2 remain exactly as the
+verify-report found them, untouched — PR7B's scope, not this batch's. No countable run was spent
+anywhere in this PR; the real hypothesis-file commit and any real `s2` comparison run remain the
+operator's decision.
