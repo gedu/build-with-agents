@@ -1875,3 +1875,237 @@ verified defect is itself a change that needs verification.
       one job it exists for — detecting that a fixture changed after a measurement.
       Verify: a row's `fixture_digest` must come from its own capture, and re-deriving after an unrelated
       fixture edit must leave already-recorded rows byte-identical.
+
+## PR8 — `rig/check.sh`: a fast pre-flight gate, so the next PR7E never happens again
+
+Round 4 verify passed and archive was permitted, but the cycle it closes exposed a process defect four
+times over: PR7D and PR7E were each blocked by the *previous* round's own remedy, and the worst case
+(PR7E's task 7.13) was CRITICAL-6 — an ADR renumber edited **comment lines** inside manifest-covered
+fixture files, `MANIFEST.sha256` was never re-frozen, and `rig/run-pipeline.sh` exited 2 at preflight on
+**both** fixtures. The rig was entirely unrunnable and nobody noticed until a 20-minute verify round. The
+check that would have caught it is a two-second `diff`. This PR builds that `diff`, plus five more checks
+the same failure class could hide behind, and proves every one of the six actually fires — not just that
+it passes on a clean tree.
+
+Depends on: PR1–PR7E (all `[x]` except 7.10 and 7.15, both deliberately out of scope here — see below).
+Not itself a fix for any open verify finding; a process gate this cycle's own anomaly log demonstrates was
+missing.
+
+- [x] 8.1 Build `rig/check.sh`: six checks, `--help`, and its own `--self-test` (ADR 0013). Rig-scoped and
+      standalone — `OPERATIONS.md` states the hooks and the root `check.sh` deliberately do not depend on
+      `python3`; this gate needs it (to reuse `compute_manifest()` and drive `derive.py`/`report.py`/
+      `collect.py`), so it lives under `rig/`, never folded into either of those. Stdlib and bash, matching
+      every other rig-scoped executable's own shell/interpreter choice (decisions/0011).
+      1. **MANIFEST.sha256 recompute-compare, both fixtures.** `compute_manifest()` is extracted verbatim
+         from `rig/run-pipeline.sh` by `sed -n '/^compute_manifest() {/,/^}/p'` and `eval`'d into the
+         gate's own shell — never re-implemented, and picked up automatically if the function's body ever
+         changes; only a rename would require touching this file.
+      2. **Composes** `rig/derive.py --self-test`, `rig/report.py --self-test`, `rig/collect.py
+         --self-test` — one PASS/FAIL line each, their own cases never duplicated.
+      3. **Runner preflight reaches past the manifest gate on both fixtures, without spending a run.** `v1`
+         has no `answer-key/prereg.json` by design (task_id `s1` is always `--shakedown`), so a
+         non-shakedown `s1` invocation is *expected* to exit 2 at the pre-registration gate — that is the
+         proof the manifest gate was already passed, not a failure. `v2` *does* have a `prereg.json` that
+         currently passes, so this probe deliberately collides with the already-committed void run
+         `s2-pipeline-9054`: `run-pipeline.sh`'s own idempotent-skip path exits 0 before
+         `materialize_step`/`run_model_step` ever run — no `claude -p` invocation, no new run directory,
+         even though `npm ci` + case generation (real, cache-warm, sub-second) do run first. If that
+         collision target is ever removed, the check refuses rather than risk claiming a fresh run
+         directory. Both probes pass `--dirty-ok`: this gate is meant to run while `rig/` files are being
+         edited, and its own presence as an uncommitted `rig/` file would otherwise trip the unrelated
+         dirty-tree guard on every invocation.
+      4. **`rig/derive.py` re-derives byte-identically** for both `tool-surface-v1` and `failure-flood-v1`
+         — hashes the committed `runs.jsonl` before and after a real re-derivation.
+      5. **Stray or partial run directories** under `rig/runs/failure-flood-v1/`. `derive.py` enumerates
+         every directory matching its run-id pattern, so an extra one silently becomes an extra row. Two
+         shapes detected: a partial (no `arm.json`), and a complete-looking-but-corrupted one (a model
+         step reporting `exit_code: 0` with every read-back field `null` and no `stream.jsonl` on disk —
+         the exact shape a backgrounded probe with a failed `kill` produces live).
+      6. **`bash -n`** over `rig/run.sh`, `rig/run-pipeline.sh`, `rig/check.sh` itself, and **`python3 -m
+         py_compile`** over `rig/collect.py`, `rig/derive.py`, `rig/report.py`, and the fixture's own
+         committed `generate-cases.py`/`axis_table.py`.
+      `--self-test` is kept proportionate (ADR 0013's own instruction for this unit): it exercises this
+      gate's OWN classifier functions (`classify_manifest`, `classify_preflight_v1/v2`, `classify_run_dir`,
+      plus `compute_manifest()` itself via a synthetic fixture) against synthetic input in a throwaway
+      `mktemp -d`, and does **not** re-invoke `run-pipeline.sh`/`derive.py`/`report.py`/`collect.py` — those
+      already carry their own self-test (composed, not duplicated, by check 2).
+      Verify: `bash -n rig/check.sh`; `./rig/check.sh --help`; `./rig/check.sh --self-test`; `./rig/check.sh`
+      against the real repo.
+      **Done.**
+      ```
+      $ bash -n rig/check.sh
+      EXIT=0
+      $ ./rig/check.sh --self-test
+        [15 case lines, all PASS]
+
+        self-test: all cases passed
+      EXIT=0
+      $ ./rig/check.sh
+        [20 case lines, all PASS — manifest x2, self-test x3, preflight x2,
+         derive-reproduce x2, stray-run-dir x3, syntax x8]
+
+        rig/check.sh: 20/20 check(s) passed.
+      EXIT=0        real 2.19s (repeat runs: 1.79s–2.64s; well inside "seconds")
+      ```
+      Fixed one real bug while writing this, caught by the gate's own first real run rather than assumed
+      correct: `self_test()` originally used `trap 'rm -rf "$tmp"' EXIT` with `tmp` declared `local` — the
+      trap fires at the *whole script's* exit, by which point the function-local `tmp` is out of scope
+      again, and `set -u` turned the reference into `tmp: unbound variable`, silently flipping a passing
+      self-test's own exit code from 0 to 1. Fixed by cleaning up explicitly on every return path instead
+      of relying on a function-scoped variable inside a script-level trap.
+- [x] 8.2 Mutation-prove check 1 (manifest recompute-compare) — **reproduces CRITICAL-6 specifically.** In
+      a scratch copy of the repo outside `<repo>` (never the working tree), edited line 1 of
+      `rig/fixtures/failure-flood/v2/src/balanceOfCall.ts` — a comment line only, no payload change — and
+      did **not** re-freeze `MANIFEST.sha256`.
+      ```
+      $ ./rig/check.sh   # in the scratch copy, mutated
+        [PASS] manifest:v1 recompute-compare clean (...)
+        [FAIL] manifest:v2 -- MANIFEST.sha256 mismatch under .../v2 -- recomputed digest differs from the
+               committed one (this is exactly CRITICAL-6's shape: a fixture file changed and the manifest
+               was never re-frozen)
+        rig/check.sh: 2/20 check(s) failed.
+      EXIT=1   real 2.62s
+      ```
+      (The second failure, `preflight:v2`, is the same manifest mismatch propagating into `run-pipeline.sh`'s
+      own live check — two independent checks catching the same real regression, not a miscount.) Restored
+      the original file; re-ran clean (`20/20`, `EXIT=0`).
+- [x] 8.3 Mutation-prove check 2 (composed `--self-test` flags). In the scratch copy, changed
+      `rig/derive.py`'s `parse_root_cause_report()` sentinel comparison from `"ROOT-CAUSE-REPORT v1"` to
+      `"ROOT-CAUSE-REPORT v2"` — a one-character production defect, not a test edit.
+      ```
+      $ ./rig/check.sh   # in the scratch copy, mutated
+        [FAIL] self-test:derive.py -- exited 1 -- [derive.py's own self-test cases naming the failure]
+        [FAIL] derive-reproduce:tool-surface-v1 -- ...runs.jsonl changed after re-derivation (checker_digest
+               shifted because derive.py's own source changed) -- derive.py is not a pure function of the
+               run directories
+        [FAIL] derive-reproduce:failure-flood-v1 -- (same cause)
+        rig/check.sh: 3/20 check(s) failed.
+      EXIT=1
+      ```
+      All three failures trace to the same one-line cause (a real, coherent cascade, not three unrelated
+      bugs). Restored `derive.py` and the two `runs.jsonl` files (`git checkout --`); re-ran clean.
+- [x] 8.4 Mutation-prove check 3 (preflight reaches past the manifest gate). In the scratch copy, renamed
+      the literal string `check_prereg()` prints for a missing `v1` prereg file from
+      `"missing-prereg-config"` to `"missing-prereg-cfg-RENAMED"` — simulating an unrelated refactor
+      silently changing the gate's own output text, the exact drift class this check exists to catch.
+      ```
+      $ ./rig/check.sh   # in the scratch copy, mutated
+        [FAIL] preflight:v1 -- expected exit 2 at the pre-registration gate with no new run directory; got
+               exit 2, run-dir count 3 -> 3 -- ...missing-prereg-cfg-RENAMED: no .../prereg.json exists...
+        rig/check.sh: 1/20 check(s) failed.
+      EXIT=1   real 2.22s
+      ```
+      Isolated: only `preflight:v1` failed (no cascade), and the run-dir count stayed `3 -> 3` throughout —
+      confirming no run was spent and `claude -p` was never invoked even under the mutation. Restored
+      `run-pipeline.sh`; re-ran clean.
+- [x] 8.5 Mutation-prove check 4 (`derive.py` byte-identical re-derivation). In the scratch copy,
+      hand-tampered the committed `rig/results/failure-flood-v1/runs.jsonl`, changing
+      `s1-monolithic-01`'s `void_reason` to a marker string, simulating drift between the committed file
+      and what `derive.py` would actually produce.
+      ```
+      $ ./rig/check.sh   # in the scratch copy, mutated
+        [FAIL] derive-reproduce:failure-flood-v1 -- .../runs.jsonl changed after re-derivation
+               (before=2d6fab9... after=e907fdb3...) -- derive.py is not a pure function of the run
+               directories
+        rig/check.sh: 1/20 check(s) failed.
+      EXIT=1   real 2.19s
+      ```
+      `derive.py`'s own rerun (inside the check) overwrote the tampered file back to its true, correct
+      bytes — no manual restore needed; confirmed with `diff` against the pre-mutation copy. Re-ran clean.
+- [x] 8.6 Mutation-prove check 5 (stray/partial run directories) — **both shapes**, injected together in
+      the scratch copy under `rig/runs/failure-flood-v1/`:
+      (a) `s1-monolithic-77/` — a bare directory, no `arm.json` at all (the literal "partial" shape).
+      (b) `s2-pipeline-88/steps/03-apply/` with an `arm.json` model step reporting `exit_code: 0`,
+      `permission_mode_actual: null`, `surface_sha256: null`, and deliberately **no** `stream.jsonl` — the
+      exact shape a backgrounded probe with a failed `kill` produces live (per the launch brief's own
+      incident).
+      ```
+      $ ./rig/check.sh   # in the scratch copy, mutated
+        [FAIL] stray-run-dir:s1-monolithic-77 -- partial run directory -- no arm.json; derive.py would
+               still enumerate it as a row and default it to void
+        [FAIL] stray-run-dir:s2-pipeline-88 -- complete-looking but corrupted -- step 03-apply reports
+               exit_code 0 with every read-back field null and no stream.jsonl on disk
+        [FAIL] derive-reproduce:failure-flood-v1 -- ...runs.jsonl changed after re-derivation
+        rig/check.sh: 3/22 check(s) failed.
+      EXIT=1
+      ```
+      The third failure is the concrete proof of the launch brief's own claim — "an extra one silently
+      becomes an extra row" — the two stray directories really did change `runs.jsonl`'s content on
+      re-derivation. (An earlier attempt at shape (a) used a zero-byte `status.json`, which made
+      `derive.py` **crash** with a `JSONDecodeError` instead of silently producing a void row — a stronger
+      failure than the launch brief described, and not the shape it names; corrected to a truly bare
+      directory, matching "a partial has no `arm.json`" literally, before recording this evidence.) Removed
+      both directories, `git checkout --` the results file; re-ran clean (`20/20`).
+- [x] 8.7 Mutation-prove check 6 (`bash -n` / `py_compile`). In the scratch copy, appended an unterminated
+      `if` to `rig/run.sh` and an invalid `def broken(:` to `rig/report.py`.
+      ```
+      $ ./rig/check.sh   # in the scratch copy, mutated
+        [FAIL] syntax:bash -n run.sh -- .../rig/run.sh: line 524: syntax error: unexpected end of file
+        [FAIL] self-test:report.py -- exited 1 -- ...def broken(: ^ SyntaxError: invalid syntax
+        [FAIL] syntax:py_compile report.py -- File ".../rig/report.py", line 508 ...
+        rig/check.sh: 3/20 check(s) failed.
+      EXIT=1   real 2.09s
+      ```
+      Both named files pinpointed correctly, plus the correct self-test cascade for `report.py`. Restored
+      both files (`diff` confirmed byte-identical to the pre-mutation copies); re-ran clean.
+- [x] 8.8 Register `rig/check.sh` in `OPERATIONS.md`'s decision table (the "what to run and when" row) and
+      in the prerequisites table's `python3` row, alongside `rig/derive.py`/`rig/report.py`, naming it
+      explicitly as a rig-scoped sibling rather than an exception to "the hooks and `check.sh` deliberately
+      do not depend on `python3`."
+      Verify: the new decision-table row names what it checks and when; the prerequisites-table edit does
+      not weaken or contradict the existing "hooks and root `check.sh` do not depend on python3" claim.
+      **Done.**
+
+**Regressions, re-run exactly as required — both named datasets, byte-identical, on the real repo (never
+the scratch copy used for 8.2–8.7).** No production file this batch touches (`rig/check.sh` is new;
+`OPERATIONS.md` and `tasks.md` are documentation) changes `derive.py`'s own logic or `checker_digest`:
+`tool-surface-v1` re-derived **42/42 rows, 0 mismatches, 0 new fields**, `git diff --stat` empty;
+`failure-flood-v1` re-derived **3/3 rows, 0 pre-existing value changes, 0 new fields**, `git diff --stat`
+empty. `rig/runs/failure-flood-v1/` holds exactly **3 directories** (`s1-monolithic-01`,
+`s1-monolithic-9054`, `s2-pipeline-9054`) at the end of this batch, confirmed by directory listing.
+
+**No countable run was spent anywhere in this PR.** `claude -p` was never invoked — not by the real
+`rig/check.sh` runs (both preflight probes exit before model invocation by construction), and not during
+mutation testing (every mutation ran in a scratch copy outside `<repo>`, and the one mutation that could in
+principle have let a run through — check 3's — was engineered to fail at the pre-registration gate itself,
+never past it).
+
+**Gate run, on the real repo (staged before commit, this branch's own `hooks/pre-commit`):**
+```
+$ python3 rig/collect.py --self-test
+  self-test: all cases passed
+EXIT=0
+$ python3 rig/derive.py --self-test
+  self-test: all cases passed
+EXIT=0
+$ python3 rig/report.py --self-test
+  self-test: all cases passed
+EXIT=0
+$ bash -n rig/run.sh rig/run-pipeline.sh rig/check.sh
+EXIT=0
+$ python3 -m py_compile rig/collect.py rig/derive.py rig/report.py \
+    rig/fixtures/failure-flood/v2/tools/generate-cases.py rig/fixtures/failure-flood/v2/tools/axis_table.py
+EXIT=0
+$ ./hooks/pre-commit --all
+  redaction check: clean across 178 tracked files
+EXIT=0
+$ ./hooks/pre-commit --self-test
+  self-test: all cases passed
+EXIT=0
+$ ./rig/check.sh
+  rig/check.sh: 20/20 check(s) passed.
+EXIT=0   real 2.19s
+```
+
+**Line budget.** `git diff --cached --numstat` per touched file: `rig/check.sh` 522/0 (new file),
+`OPERATIONS.md` 2/1. **Authored total for this batch: 524 lines** (522 insertions + 2 insertions/1
+deletion), well inside the 800-line ceiling. `tasks.md`'s own delta (this section) is excluded per this
+stack's own PR1/PR5/PR7A–D precedent.
+
+**Out of scope, confirmed untouched and not closed**: task 7.10 (`run-pipeline.sh --self-test` — its own
+bash harness, a separate construction per the launch brief) and task 7.15 (needs re-scoping first — round 4
+established the present-derived class is at least three fields wide, not one). `hooks/pre-commit`, the root
+`check.sh`, `design.md`, and every fixture payload file remain untouched — only `rig/fixtures/failure-
+flood/v2/src/balanceOfCall.ts` was ever edited, and only inside the scratch copy for task 8.2, never in the
+working tree (confirmed: `git status --porcelain` shows only `rig/check.sh` new and `OPERATIONS.md`/
+`tasks.md` modified throughout this batch).
