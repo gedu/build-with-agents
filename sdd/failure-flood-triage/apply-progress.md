@@ -2188,3 +2188,222 @@ still has the attempt ledger to settle.
 verify-report found them, untouched — PR7B's scope, not this batch's. No countable run was spent
 anywhere in this PR; the real hypothesis-file commit and any real `s2` comparison run remain the
 operator's decision.
+
+## PR7B — `suite_state_cause` + attribution scoring (closes verify-report CRITICAL-1/CRITICAL-2) — DONE
+
+Depends on PR7A (same `--model`-bearing `run-pipeline.sh`/`derive.py`; PR7A's own `--model`/
+`model-mismatch`/R-F7.3 work is untouched by this batch). Source: the 2026-08-17 verify-report's
+remaining two CRITICAL findings.
+
+### Task 7.5 — `R-F2.2` `suite_state_cause` + `suite-state-mismatch` void
+
+Read `spec.md:245-262` verbatim before implementing (not inferred from the requirement's name, per this
+batch's own instruction). A new `suite_state_cause(observed_suite_state, observed_failures, s0)` function
+in `rig/derive.py`: `injection` iff the observed `suite_state` AND its normalized signature (when
+`suite_state != "ran"`, `collect.py`'s own R-F2.3 synthetic `__suite__` failure) exactly match the frozen
+`S0`; `environment` otherwise, forcing `state=void, void_reason=suite-state-mismatch` and adding
+`"suite-state-mismatch"` to `anomaly_classes`. Wired into `build_row_failure_flood`'s existing
+`99-verify`/`collection.json`-reading block, reading `ak.get("S0")` — confirmed via `git grep` that no
+prior code in `rig/` ever read `S0`. The override is downgrade-only: it runs only while `state` is still
+`"complete"`, so it can never upgrade a row an earlier check (surface/permission-mode/model-mismatch/
+no-preregistration) already voided.
+
+**Disclosed limit, not hidden:** both fixtures' frozen `S0` today is `"ran"` (`s1.json`/`s2.json`'s own
+`S0.suite_state`), so the signature-comparison branch is untestable against any real committed data — it
+still exists and stays conservative (`"environment"` whenever no frozen signature is available to prove a
+match), exercised only by synthetic `S0` blocks carrying a `did-not-start` baseline with a `signature`
+key, which no real fixture has yet.
+
+### Task 7.6 — `R-F3.2` attribution scoring, its own task (not folded into 5.9)
+
+Three new functions in `rig/derive.py`:
+- `parse_root_cause_report(text)` — R-F3.1's exact format: line 1 the literal sentinel
+  `ROOT-CAUSE-REPORT v1`; every following non-blank line MUST match `^[\w/.\-]+:\d+$`; ANY other content
+  anywhere makes the WHOLE file malformed. Returns a deduplicated `frozenset`, or `None` on missing/
+  malformed input — never raises.
+- `score_diagnostic_attribution(report_text, rc_true)` — `claimed` = that parse result (empty set when
+  `None`); `correct = claimed & rc_true`, `rc_true` being `R0`'s own frozen `cause_site` set. Returns
+  `(claimed_list, correct_list)`, both sorted for determinism.
+- `read_root_cause_report_handoff(run_dir, steps_meta)` — scans `steps_meta` for a
+  `handoff/root-cause-report.txt` file (the file task 5.9's threading half now writes), never assuming a
+  fixed step index.
+
+Scored against **spec.md's own frozen FILE format (R-F3.1)**, deliberately never `result.result`'s chat
+prose: `design.md:608`'s ASCII diagram ("scoring: CAUSE lines parsed from `result.result` in BOTH arms")
+predates R-F3.1's exact format and is stale — this batch's own instruction was to implement against
+spec.md's exact text, not that older summary, and spec.md is the artifact both operator decisions and
+`sdd-design`'s own corrections were folded into afterward.
+
+`precision`/`recall` are NOT new fields on the row — `report.py`'s `diagnostic_precision_recall_table`
+(task 6.4) already computes them correctly from `causes_claimed`/`causes_correct`/`causes_present` (the
+`n/a`-when-`claimed`-is-empty behaviour was already implemented there, only ever waiting on non-`null`
+input). This task's only job was the two sets, wired into `build_row_failure_flood` in place of the
+hardcoded `None`, gated on `state == "complete" and ak` — **never gated on the handoff file's own
+presence**, because "missing" is one of R-F3.2's own two scoring inputs, not a reason to leave the field
+`null`. A run captured before this PR (the three already-committed shakedown rows) has no handoff file to
+read and scores exactly as the spec itself specifies for "missing" — `claimed = []`, not a special-cased
+null.
+
+### Task 5.9, re-scoped (threading half closed)
+
+`rig/run-pipeline.sh`'s `run_model_step()` now copies `$ws/root-cause-report.txt` to
+`$dir/handoff/root-cause-report.txt` whenever the workspace root has one, mirroring the pre-existing
+`fix-plan.txt` handoff exactly in shape — gated on `role = monolith` or `role = apply` (each arm's own
+FINAL model step; the shared prompt file asks every role to write one "before you finish", so a diagnose
+step's own copy is a stale intermediate never scored). `tasks.md`'s own task 5.9 text is corrected in
+place to state plainly that its original scoping only ever covered this threading half, not the scoring
+function — the verify-report's exact recommendation, and this cycle's own stated discipline of recording
+misses rather than quietly amending them.
+
+### Verification — real, none mocked
+
+**Unit tests (23), `parse_root_cause_report`/`score_diagnostic_attribution`/`suite_state_cause`/
+`read_root_cause_report_handoff`**, run via a standalone script importing `rig/derive.py` directly
+(`sys.path.insert(0, "rig"); import derive`) — exact inputs and outputs:
+
+```
+well-formed parses to 2 claims: parse_root_cause_report("ROOT-CAUSE-REPORT v1\nsrc/a.ts:1\nsrc/b.ts:2\n")
+  == frozenset({"src/a.ts:1", "src/b.ts:2"})                                              PASS
+malformed (prose) -> None: parse_root_cause_report(
+  "ROOT-CAUSE-REPORT v1\nThe bug is in the keypad handler somewhere.\n") is None           PASS
+missing sentinel -> None: parse_root_cause_report("src/a.ts:1\nsrc/b.ts:2\n") is None      PASS
+missing file (None) -> None: parse_root_cause_report(None) is None                        PASS
+blank lines skipped, still valid: parse_root_cause_report(
+  "ROOT-CAUSE-REPORT v1\n\nsrc/a.ts:1\n\n") == frozenset({"src/a.ts:1"})                   PASS
+duplicate lines deduplicated: parse_root_cause_report(
+  "ROOT-CAUSE-REPORT v1\nsrc/a.ts:1\nsrc/a.ts:1\n") == frozenset({"src/a.ts:1"})           PASS
+one bad line -> whole file malformed: parse_root_cause_report(
+  "ROOT-CAUSE-REPORT v1\nsrc/a.ts:1\nnot a path line at all\n") is None                    PASS
+empty string -> None: parse_root_cause_report("") is None                                 PASS
+score well-formed: claimed sorted list == ["src/a.ts:1", "src/b.ts:2"]                     PASS
+score well-formed: correct == ["src/a.ts:1"] (rc_true={"src/a.ts:1","src/c.ts:9"})         PASS
+score malformed (the exact scenario spec.md names — "scores as no claims, not a crash"):
+  score_diagnostic_attribution(
+    "ROOT-CAUSE-REPORT v1\nThe bug is in the keypad handler somewhere.\n",
+    {"src/a.ts:1", "src/c.ts:9"}) == ([], [])   -- no exception raised                     PASS
+score missing (None text): score_diagnostic_attribution(None, rc_true) == ([], [])         PASS
+score hostile/binary bytes-as-text: score_diagnostic_attribution(
+  "ROOT-CAUSE-REPORT v1\n\x00\x01binary\n", rc_true) == ([], []) -- no exception raised     PASS
+score non-ASCII path: score_diagnostic_attribution(
+  "ROOT-CAUSE-REPORT v1\nsrc/café.ts:3\n", rc_true) == (["src/café.ts:3"], []) -- no crash
+  (Python's `\w` is Unicode-aware by default; disclosed, not a bug)                        PASS
+ran==ran -> injection: suite_state_cause("ran", [], {"suite_state": "ran"}) == "injection"  PASS
+did-not-start vs frozen ran -> environment: suite_state_cause("did-not-start",
+  [{"test_id": "__suite__", "signature": "X"}], {"suite_state": "ran"}) == "environment"    PASS
+no S0 -> None: suite_state_cause("ran", [], None) is None                                  PASS
+no observed suite_state -> None: suite_state_cause(None, [], {"suite_state": "ran"}) is None PASS
+did-not-start, matching signature -> injection: suite_state_cause("did-not-start",
+  [{"test_id": "__suite__", "signature": "X"}],
+  {"suite_state": "did-not-start", "signature": "X"}) == "injection"                        PASS
+did-not-start, different signature -> environment: suite_state_cause("did-not-start",
+  [{"test_id": "__suite__", "signature": "Y"}],
+  {"suite_state": "did-not-start", "signature": "X"}) == "environment"                      PASS
+did-not-start, no signature present -> environment (conservative): suite_state_cause(
+  "did-not-start", [], {"suite_state": "did-not-start", "signature": "X"}) == "environment"  PASS
+handoff file found and read: read_root_cause_report_handoff() on a synthetic run dir with
+  steps/01-monolith/handoff/root-cause-report.txt -> returns exact file text                PASS
+no handoff file -> None: read_root_cause_report_handoff() on a synthetic run dir with no
+  handoff/ directory at all -> None                                                         PASS
+
+23/23 passed
+```
+
+**Full-row integration tests (16), real `build_row_failure_flood()` calls against synthetic run
+directories** (real `arm.json`/`status.json`/`stream.jsonl`/`collection.json`/handoff files on a
+`tempfile.mkdtemp()` tree, a real answer key with `S0`/`F0`/`R0`, and the real committed surface digest —
+never a mocked row builder):
+
+```
+Case 1 (suite_state="ran" matches frozen S0.suite_state="ran", well-formed handoff report):
+  state stays complete                                                                     PASS
+  suite_state_cause == "injection"                                                          PASS
+  verdict == "green" (no observed failures)                                                 PASS
+  causes_claimed == ["src/a.ts:1", "src/b.ts:2"] (from the real handoff file)               PASS
+  causes_correct == ["src/a.ts:1"] (intersection with R0's cause_site set)                  PASS
+
+Case 2 (observed suite_state="did-not-start" vs frozen S0.suite_state="ran" -> environment):
+  state forced to "void"                                                                    PASS
+  void_reason == "suite-state-mismatch"                                                     PASS
+  suite_state_cause == "environment"                                                        PASS
+  "suite-state-mismatch" present in anomaly_classes                                          PASS
+  causes_claimed/causes_correct stay None (void row is never scored)                         PASS
+
+Case 3 (complete, suite_state="ran", malformed handoff report -- prose, not path:line lines):
+  state stays complete (a malformed REPORT never trips R-F2.2's own void)                    PASS
+  causes_claimed == [] (malformed, not a crash)                                              PASS
+  causes_correct == []                                                                       PASS
+
+Case 4 (complete, suite_state="ran", no handoff/ directory at all -- pre-threading run shape):
+  causes_claimed == [] (spec's own "missing" rule, not a special-cased null)                 PASS
+  causes_correct == []                                                                       PASS
+  state stays complete (a missing report never voids per R-F2.2/R-F3.2)                      PASS
+
+integration: 16/16 passed
+```
+
+**Regression, required and re-run: tool-surface-v1's 42-row projection.** Snapshot of the committed
+`runs.jsonl` taken before this batch's edits; re-derived with the final PR7B-bearing `derive.py`
+(`python3 rig/derive.py`, default experiment); diffed field-by-field per `run_id`, excluding
+`schema_version` and `checker_digest`. **0 mismatches across 42/42 rows, zero new fields** — confirming
+`build_row` itself (tool-surface-v1's own row builder) is untouched by this PR; only
+`build_row_failure_flood` and its module-level helper functions changed. `schema_version` unchanged at
+`3` on every row (this is `SCHEMA_VERSION`, a separate module constant from `FAILURE_FLOOD_SCHEMA_VERSION`,
+unaffected by this PR's bump of the latter). `checker_digest` differs on every row (expected — `sha256`
+of `derive.py`'s own bytes, changes on any edit to the file).
+
+`python3 rig/derive.py --experiment failure-flood-v1` → exit 0, 3 rows, all still `state=void,
+void_reason=shakedown`. **0 pre-existing value changes across 3/3 rows**; the only field-level delta is
+one purely additive new field, `suite_state_cause: null` on all three — unchanged from `null` because the
+field is gated on `state == "complete"` and all three rows are `void`/`shakedown`. `causes_claimed`/
+`causes_correct` are unchanged (`null`) on all three for the same reason: void rows are never scored.
+`FAILURE_FLOOD_SCHEMA_VERSION` bumped `2` → `3` on all three, per the same no-migrations convention as
+every prior bump in this stack.
+
+**Gates:**
+```
+$ bash -n rig/run-pipeline.sh
+EXIT=0
+$ python3 -m py_compile rig/derive.py
+EXIT=0
+$ python3 rig/collect.py --self-test
+  self-test: all cases passed
+EXIT=0
+$ ./hooks/pre-commit --all
+  redaction check: clean across 173 tracked files
+EXIT=0
+$ ./hooks/pre-commit --self-test
+  ok    clean tree, with an empty file and placeholder paths
+  ok    an absolute home path is reported
+  ok    an unreadable tracked file escalates instead of being skipped
+  self-test: all cases passed
+EXIT=0
+```
+
+`git diff --stat -- rig/collect.py rig/report.py` → empty, confirming both files genuinely untouched;
+`report.py`'s own `diagnostic_precision_recall_table` (task 6.4) needed no change — it was already
+correct and only ever waiting on non-`null` input.
+
+**Line budget:** `git diff --cached --numstat` on the four hand-authored/regenerated files:
+```
+141 18  rig/derive.py
+3   3   rig/results/failure-flood-v1/runs.jsonl
+42  42  rig/results/tool-surface-v1/runs.jsonl
+16  0   rig/run-pipeline.sh
+```
+Both `runs.jsonl` files are machine-regenerated (`derive.py` is a total function) — generated goldens,
+excluded from the authored-risk count per `sdd-phase-common.md` §E. **Authored total: 141 + 18 (`derive.py`)
+= 159, plus 16 (`run-pipeline.sh`) = 175.** Raw total including both goldens: 265. Well inside the
+800-line ceiling for this batch.
+
+**Not committed or pushed** — staged only, per instruction; the commit and the attempt-ledger settlement
+remain the orchestrator's.
+
+**PR7B is now closed: tasks 7.5–7.7 all `[x]`; task 5.9 re-scoped and closed (`[x]`), its own original
+scoping named as insufficient rather than quietly amended.** All four CRITICAL findings from the
+2026-08-17 verify-report are now closed (CRITICAL-1/-2 here, CRITICAL-3/-4 in PR7A). No countable run was
+spent anywhere in this PR; every claim was proven by a synthetic unit test or a synthetic full-row
+integration test against the real `build_row_failure_flood()` function. A real (non-`--shakedown`) run
+remains the operator's own decision, unchanged from PR7A's own statement of the same constraint. The
+WARNING-level findings from the same verify-report (timeouts, the ADR 0009 documentation-trap violation
+already fixed separately in a prior commit, the stale ratio-claim docstring, the empty self-test section,
+task 6.4's done-note inaccuracy) remain out of this batch's scope.

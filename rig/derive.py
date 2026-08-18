@@ -616,12 +616,15 @@ def fixture_digest_at(root: Path):
 
 
 FAILURE_FLOOD_EXPERIMENT = "failure-flood-v1"
-FAILURE_FLOOD_SCHEMA_VERSION = 2  # v2: PR7A closes verify-report CRITICAL-3/-4.
+FAILURE_FLOOD_SCHEMA_VERSION = 3  # v3: PR7B closes verify-report CRITICAL-1/-2.
 # Added declared_model (row) + model_matches_declared (per step, read back
 # from run-pipeline.sh's own write_step_status, mirroring
 # permission_mode_matches_declared) and the model-mismatch void it can now
 # trigger; and input_tokens/output_tokens/cache_creation_input_tokens/
-# cache_read_input_tokens/tool_calls, per step AND per run (R-F7.3). Same
+# cache_read_input_tokens/tool_calls, per step AND per run (R-F7.3) — those
+# landed at v2 (PR7A). v3 adds suite_state_cause (R-F2.2) and its
+# suite-state-mismatch void, and populates causes_claimed/causes_correct
+# (R-F3.2) from a real handoff file instead of a hardcoded None. Same
 # no-migrations rule as tool-surface-v1's v2->v3 bump (design.md Decision 8):
 # re-deriving rewrites every existing row with this version and these fields.
 FAILURE_FLOOD_RUN_ID_RE = re.compile(r"^(s[12])-(monolithic|pipeline)-([0-9][A-Za-z0-9]*)$")
@@ -687,6 +690,102 @@ def green_restore_verdict(observed_failures, f0_failures, ro_substrate_violation
     if observed_ids < f0_ids:
         return "partial", True
     return "no-progress", True
+
+
+_ROOT_CAUSE_LINE_RE = re.compile(r"^[\w/.\-]+:\d+$")
+
+
+def parse_root_cause_report(text):
+    """R-F3.1: line 1 MUST be the literal sentinel `ROOT-CAUSE-REPORT v1`;
+    every following non-blank line MUST match `^[\\w/.\\-]+:\\d+$`, naming one
+    claimed `path:line`; any other content anywhere makes the WHOLE file
+    malformed (spec's own words, not inferred). Returns a frozenset of
+    deduplicated claimed lines, or None when the text is missing entirely or
+    fails either check — never raises, matching R-F3.2's own scenario ("A
+    malformed report scores as no claims, not a crash")."""
+    if text is None:
+        return None
+    lines = text.splitlines()
+    if not lines or lines[0] != "ROOT-CAUSE-REPORT v1":
+        return None
+    claimed = set()
+    for line in lines[1:]:
+        if line.strip() == "":
+            continue
+        if not _ROOT_CAUSE_LINE_RE.match(line):
+            return None
+        claimed.add(line)
+    return frozenset(claimed)
+
+
+def score_diagnostic_attribution(report_text, rc_true):
+    """R-F3.2 (CRITICAL-2, verify-report 2026-08-17): `claimed` = deduplicated
+    set of valid lines (empty if malformed/missing, never a crash); `correct`
+    = `claimed & rc_true`, where `rc_true` is `R0`'s own frozen `cause_site`
+    set. Scored against spec.md's own frozen FILE format (R-F3.1) — never
+    `result.result`'s chat prose, which is what design.md's now-stale ASCII
+    diagram sketched before R-F3.1's exact format existed (implemented to
+    spec.md's exact text, per this batch's own instruction, not to that
+    older summary). `precision`/`recall` themselves are computed downstream,
+    per (task_id, arm), by `report.py`'s own
+    `diagnostic_precision_recall_table` (task 6.4) from these two lists plus
+    the pre-existing `causes_present` field — `n/a`-when-`claimed`-is-empty
+    is already implemented at that layer; this function's only job is the
+    two sets. Returns (claimed_list, correct_list), both sorted for
+    determinism."""
+    claimed = parse_root_cause_report(report_text)
+    if claimed is None:
+        claimed = frozenset()
+    correct = claimed & rc_true
+    return sorted(claimed), sorted(correct)
+
+
+def read_root_cause_report_handoff(run_dir, steps_meta):
+    """Task 5.9 (re-scoped this batch): the handoff copy `run-pipeline.sh`
+    now writes at each arm's own final model step (monolith's only step, or
+    pipeline's apply step), mirroring the pre-existing `fix-plan.txt`
+    handoff convention. Returns the raw text, or None when no step captured
+    one — an old run captured before this threading existed, or a role this
+    fixture's shared prompt file never reaches for this arm."""
+    for step in steps_meta:
+        step_name = step.get("index")
+        if not step_name:
+            continue
+        candidate = run_dir / "steps" / step_name / "handoff" / "root-cause-report.txt"
+        if candidate.is_file():
+            return candidate.read_text()
+    return None
+
+
+def suite_state_cause(observed_suite_state, observed_failures, s0):
+    """R-F2.2 (CRITICAL-1, verify-report 2026-08-17): `injection` iff the
+    observed `suite_state` AND its normalized signature (when `suite_state
+    != "ran"`, collect.py's own R-F2.3 synthetic `__suite__` failure)
+    exactly match the frozen `S0` recorded during isolation validation
+    before any prompt; `environment` otherwise. Both fixtures' frozen `S0`
+    today is `"ran"` (measured before any injection could break suite
+    startup — see `s1.json`/`s2.json`'s own `S0` blocks), so this collapses
+    to a plain `suite_state` equality check for every row derivable today;
+    the signature branch exists for a future fixture whose frozen baseline
+    is itself `did-not-start`/`partial`, and stays conservative
+    (`"environment"`) whenever no frozen signature is available to prove a
+    match — the same "downgrade, never invent a match" discipline the
+    read-back checks above already follow. Returns None when there is
+    nothing to classify (no observed suite_state, or no frozen S0)."""
+    if s0 is None or observed_suite_state is None:
+        return None
+    if observed_suite_state != s0.get("suite_state"):
+        return "environment"
+    if observed_suite_state == "ran":
+        return "injection"
+    frozen_signature = s0.get("signature")
+    observed_signature = next(
+        (f.get("signature") for f in observed_failures if f.get("test_id") == "__suite__"),
+        None,
+    )
+    if frozen_signature is not None and observed_signature == frozen_signature:
+        return "injection"
+    return "environment"
 
 
 def build_row_failure_flood(run_dir: Path, surfaces, digests, answer_keys):
@@ -857,6 +956,7 @@ def build_row_failure_flood(run_dir: Path, surfaces, digests, answer_keys):
     # unlike diagnostic attribution below.
     suite_state = partial_reason = report_bytes = None
     verdict = integrity_guard_pass = None
+    suite_state_cause_value = None
     verify_path = run_dir / "steps" / "99-verify" / "collection.json"
     ak = answer_keys.get(task_id)
     if state == "complete" and verify_path.is_file() and ak:
@@ -864,13 +964,36 @@ def build_row_failure_flood(run_dir: Path, surfaces, digests, answer_keys):
         suite_state = collection.get("suite_state")
         partial_reason = collection.get("partial_reason")
         report_bytes = collection.get("report_bytes")
-        if suite_state == "ran":
+        observed_failures = collection.get("failures", [])
+        # R-F2.2 (CRITICAL-1): run-axis/suite-axis independence's third
+        # field. An "environment" cause forces void — same downgrade-only
+        # discipline as the read-back checks above (this block only runs
+        # while state is still "complete", so it never upgrades a row an
+        # earlier check already voided).
+        suite_state_cause_value = suite_state_cause(suite_state, observed_failures, ak.get("S0"))
+        if suite_state_cause_value == "environment":
+            state, void_reason = "void", "suite-state-mismatch"
+            anomaly_classes.add("suite-state-mismatch")
+        elif suite_state == "ran":
             verdict, integrity_guard_pass = green_restore_verdict(
-                collection.get("failures", []), ak["F0"]["failures"], ro_substrate_violation
+                observed_failures, ak["F0"]["failures"], ro_substrate_violation
             )
 
     bash_call_count_total = sum(s.get("bash_call_count", 0) for s in steps_out)
     fixture_version = FAILURE_FLOOD_FIXTURE_VERSIONS.get(task_id, "v1")
+
+    # Diagnostic attribution (R-F3.2, CRITICAL-2): scored whenever the row
+    # is (still) complete and an answer key exists — never gated on the
+    # handoff file's own presence, because "missing" is one of R-F3.2's own
+    # two scoring inputs ("claimed = ... empty if malformed/missing"), not a
+    # reason to leave the field null. A row this deriver cannot score at all
+    # (void, or no answer key) keeps both fields None, the same precedent as
+    # verdict/integrity_guard_pass above.
+    causes_claimed = causes_correct = None
+    if state == "complete" and ak:
+        rc_true = {d["cause_site"] for d in ak.get("R0", [])}
+        report_text = read_root_cause_report_handoff(run_dir, steps_meta)
+        causes_claimed, causes_correct = score_diagnostic_attribution(report_text, rc_true)
 
     row = {
         "schema_version": FAILURE_FLOOD_SCHEMA_VERSION,
@@ -925,24 +1048,24 @@ def build_row_failure_flood(run_dir: Path, surfaces, digests, answer_keys):
         "cache_read_input_tokens": cache_read_input_tokens_total,
         "tool_calls": tool_calls_total,
         "suite_state": suite_state,
+        "suite_state_cause": suite_state_cause_value,
         "partial_reason": partial_reason,
         "report_bytes": report_bytes,
         "verdict": verdict,
         "integrity_guard_pass": integrity_guard_pass,
-        # Diagnostic attribution (R-F3.2) is DEFERRED, not invented: scoring
-        # needs the model-written root-cause-report.txt file, and no step in
-        # run-pipeline.sh threads that file out of the ephemeral workspace
-        # before it is discarded — the same class of gap task 5.4b found and
-        # closed for fix-plan.txt (which DOES get an explicit handoff copy,
-        # run-pipeline.sh's own comment above run_model_step()). Found live
-        # while building this row (the s1 shakedown transcript shows the
-        # model reporting causes only in prose, never matching the frozen
-        # `<path>:<line>`-only file format R-F3.1 requires), flagged here
-        # rather than scored against the wrong artifact. A future task must
-        # add a handoff copy analogous to fix-plan.txt's before these three
-        # fields can be populated honestly.
-        "causes_claimed": None,
-        "causes_correct": None,
+        # Diagnostic attribution (R-F3.2, CRITICAL-2): populated by
+        # score_diagnostic_attribution() above from the real handoff file
+        # when one exists, never invented. Task 5.9's own gap (no step
+        # threaded root-cause-report.txt out of the ephemeral workspace) is
+        # closed alongside this — run_model_step() now copies it out the
+        # same way fix-plan.txt already was. A run captured before this PR
+        # (the three committed shakedown rows) has no handoff file to read,
+        # so it scores exactly as R-F3.2 itself specifies for "missing" —
+        # claimed = empty set, not a special-cased null; this is the literal
+        # spec text applied honestly to data this deriver can see, not a
+        # retrofit.
+        "causes_claimed": causes_claimed,
+        "causes_correct": causes_correct,
         "causes_present": len(ak["R0"]) if ak else None,
         "steps": steps_out,
         "anomaly_classes": sorted(anomaly_classes),

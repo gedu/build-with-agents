@@ -998,7 +998,7 @@ Depends on: PR2 (collector), PR4 (answer-key + `prereg.json` must exist for pref
       this check — committing failure-flood's own results file is task 5.7's shakedown-landing territory,
       out of this task's scope. `./hooks/pre-commit --all` → "redaction check: clean across 163 tracked
       files".
-- [ ] 5.9 Thread `root-cause-report.txt` out of the ephemeral per-step workspace, mirroring the
+- [x] 5.9 Thread `root-cause-report.txt` out of the ephemeral per-step workspace, mirroring the
       already-existing `fix-plan.txt` handoff (`rig/run-pipeline.sh` — the `run_model_step` diagnose-role
       block: `mkdir -p "$dir/handoff"; cp "$ws/fix-plan.txt" "$dir/handoff/fix-plan.txt"`), so
       `rig/derive.py`'s `causes_claimed`/`causes_correct` (R-F3.2) can be scored against the real
@@ -1023,6 +1023,31 @@ Depends on: PR2 (collector), PR4 (answer-key + `prereg.json` must exist for pref
       `root-cause-report.txt` shows it copied to `steps/0N-<role>/handoff/root-cause-report.txt` inside
       the run directory; re-run `rig/derive.py --experiment failure-flood-v1` and confirm
       `causes_claimed`/`causes_correct` are populated (no longer unconditionally `null`) for that row.
+
+      **Re-scoped at PR7B close (verify-report 2026-08-17, CRITICAL-2): this task's own original scoping
+      was insufficient, stated plainly rather than quietly amended.** As registered above, 5.9 named only
+      HALF of what closing R-F3.2 requires — threading `root-cause-report.txt` out of the ephemeral
+      workspace. It never named the scoring function itself (the deduplicated `claimed` set, `correct =
+      claimed ∩ RC_true`, `precision`/`recall`, the malformed-file-is-not-a-crash behaviour spec.md's own
+      R-F3.2 text specifies) as a second, distinct deliverable. Closing 5.9 as originally worded would have
+      produced a file on disk and still no number — exactly the gap the verify-report caught. Both halves
+      are now closed, as two separate work units, not folded silently into one: the threading half here in
+      `rig/run-pipeline.sh` (`run_model_step`, gated to `role = monolith` or `role = apply` — each arm's own
+      final model step, never the diagnose step's own intermediate copy); the scoring half as its own task,
+      **7.6** below, per the verify-report's explicit recommendation ("register the R-F3.2 scoring function
+      as a task in its own right, distinct from 5.9").
+      **Done (threading half).** `run_model_step()` now copies `$ws/root-cause-report.txt` to
+      `$dir/handoff/root-cause-report.txt` whenever the workspace root has one, mirroring the pre-existing
+      `fix-plan.txt` handoff exactly in shape, gated on role rather than a fixed step name so it applies to
+      both monolithic (`role=monolith`) and pipeline (`role=apply`) arms without a second code path.
+      `rig/derive.py`'s `read_root_cause_report_handoff()` (task 7.6) reads it back by scanning `steps_meta`
+      for a `handoff/root-cause-report.txt` file, never assuming a fixed step index.
+      **Verified, no real `claude -p` invocation spent**: `bash -n rig/run-pipeline.sh` → exit 0; a
+      synthetic run directory carrying `steps/01-monolith/handoff/root-cause-report.txt` (real
+      `build_row_failure_flood()` call, not a mock) shows `causes_claimed`/`causes_correct` populated from
+      it; a synthetic run directory with no `handoff/` at all shows both fields resolve to `[]` (spec's own
+      "missing" rule), never `None` and never a crash — see task 7.6's own done-note for the exact test
+      commands and outputs, not restated twice here.
 
 ## PR6 — Hypotheses + `OPERATIONS.md` + `report.py` tables
 
@@ -1420,3 +1445,134 @@ ceiling for this batch.
 file was touched. CRITICAL-1 (`R-F2.2`, `suite_state_cause`) and CRITICAL-2 (`R-F3.2` attribution
 scoring, task 5.9's own re-scoping) remain exactly as the verify-report found them — PR7B's scope, not
 this one's.
+
+## PR7B — `suite_state_cause` + attribution scoring (closes verify-report CRITICAL-1/CRITICAL-2)
+
+Depends on: PR7A (same `--model`-bearing `run-pipeline.sh`/`derive.py`; PR7B does not touch PR7A's own
+`--model`/`model-mismatch`/R-F7.3 work). Source: the 2026-08-17 verify-report found four CRITICAL
+findings; PR7A closed CRITICAL-3/CRITICAL-4, this PR closes the remaining two. Per the verify-report's
+own two recommendations: (1) implement `R-F2.2` mechanically rather than withdraw it, and (2) register
+the `R-F3.2` scoring function as a task in its own right, distinct from 5.9 — task 5.9 itself is
+re-scoped above to state plainly that its original wording only ever covered half of what closing
+`R-F3.2` needs.
+
+- [x] 7.5 Implement `R-F2.2`'s `suite_state_cause` field and its `suite-state-mismatch` void in
+      `rig/derive.py`'s `build_row_failure_flood`.
+      Verify: unit test against synthetic `(observed_suite_state, observed_failures, S0)` triples —
+      matching `ran`, mismatched `suite_state`, and the `did-not-start`-with-signature branch (match and
+      mismatch) — plus a full-row integration test proving the void override fires.
+      **Done.** Read `spec.md:245-262` verbatim before implementing, not inferred from the requirement's
+      name (this batch's own instruction): `injection` iff the observed `suite_state` AND its normalized
+      signature (when `suite_state != "ran"`, `collect.py`'s own R-F2.3 synthetic `__suite__` failure)
+      exactly match the frozen `S0`; `environment` otherwise, forcing `state=void,
+      void_reason=suite-state-mismatch`. A new `suite_state_cause()` function reads `S0` from the answer
+      key (`ak.get("S0")`, never read before this task — confirmed by `git grep` showing zero prior reads
+      of `S0` in `rig/`) and the observed `suite_state`/`failures` from the same `99-verify` step's
+      `collection.json` already read for green-restore. **Both fixtures' frozen `S0` today is `"ran"`**
+      (`s1.json`/`s2.json`'s own `S0.suite_state`), so the signature branch is untestable against real
+      committed data — disclosed rather than hidden: the function still implements it (conservative,
+      `"environment"` whenever no frozen signature is available to prove a match), tested only against
+      synthetic `S0` blocks carrying a `did-not-start` baseline with a `signature` key, which no real
+      fixture has yet. The override is downgrade-only, matching the existing read-back-check discipline:
+      it only fires while `state` is still `"complete"`, so it can never upgrade a row an earlier check
+      (surface/permission-mode/model-mismatch/no-preregistration) already voided.
+      `python3 -m py_compile rig/derive.py` → exit 0.
+- [x] 7.6 Implement `R-F3.2`'s scoring function — the task the verify-report named as missing entirely,
+      registered here distinct from 5.9 per its explicit recommendation.
+      Verify: unit test the parser and scorer against well-formed, malformed (prose), missing-sentinel,
+      blank-lines-only, duplicate-line, hostile/binary-byte, and non-ASCII-path inputs — the malformed
+      path is the scenario `spec.md` itself names ("A malformed report scores as no claims, not a
+      crash") and MUST be exercised with a real malformed string, not merely asserted safe by inspection.
+      **Done.** Three new functions in `rig/derive.py`: `parse_root_cause_report()` (R-F3.1's own format —
+      literal sentinel line 1, every following non-blank line matching `^[\w/.\-]+:\d+$`, ANY other
+      content anywhere makes the WHOLE file malformed, per the requirement's own words — returns a
+      deduplicated `frozenset` or `None`, never raises); `score_diagnostic_attribution()` (`claimed` =
+      that parse result, or `∅` when `None`; `correct = claimed ∩ RC_true`, where `RC_true` is `R0`'s own
+      frozen `cause_site` set — returns `(claimed_list, correct_list)`, both sorted for determinism);
+      `read_root_cause_report_handoff()` (scans `steps_meta` for `handoff/root-cause-report.txt`, the
+      file task 5.9's threading half now writes). Scored against **spec.md's own frozen FILE format
+      (R-F3.1)**, deliberately never `result.result`'s chat prose — `design.md:608`'s ASCII diagram
+      ("scoring: CAUSE lines parsed from `result.result` in BOTH arms") predates R-F3.1's exact format and
+      is stale here; this batch's own instruction was to implement against `spec.md`'s exact text, not
+      that older summary, and `spec.md` is the artifact both operator decisions and `sdd-design`'s
+      corrections were folded into afterward. `precision`/`recall` themselves are NOT new fields — task
+      6.4's `report.py::diagnostic_precision_recall_table` already computes them correctly from
+      `causes_claimed`/`causes_correct`/`causes_present` (the `n/a`-when-`claimed`-is-empty behaviour was
+      already implemented there, only ever waiting on non-`null` input); this task's only job was the two
+      sets `causes_claimed`/`causes_correct` on the row, wired in place of the hardcoded `None`.
+      `causes_claimed`/`causes_correct` are populated whenever `state == "complete"` and an answer key
+      exists — **never gated on the handoff file's own presence**, because "missing" is one of R-F3.2's
+      own two scoring inputs, not a reason to leave the field `null`; a run captured before this PR (the
+      three already-committed shakedown rows) has no handoff file to read and scores exactly as the spec
+      itself specifies for "missing" — `claimed = []`, not a special-cased null.
+      **23 unit tests + 16 full-row integration tests, all real, none mocked** (see apply-progress for the
+      exact commands/outputs) — including the malformed-input case with a real prose string
+      (`"The bug is in the keypad handler somewhere."` after the sentinel line) confirmed to return
+      `claimed=[], correct=[]` with no exception, and a hostile binary-byte input
+      (`"ROOT-CAUSE-REPORT v1\n\x00\x01binary\n"`) confirmed to do the same.
+      `python3 -m py_compile rig/derive.py` → exit 0.
+- [x] 7.7 `FAILURE_FLOOD_SCHEMA_VERSION` bump and full regression re-derive.
+      Verify: re-derive both experiments; `tool-surface-v1`'s 42-row projection byte-identical excluding
+      only `schema_version`/`checker_digest`; `failure-flood-v1`'s 3 rows change no pre-existing value,
+      new fields purely additive.
+      **Done.** `FAILURE_FLOOD_SCHEMA_VERSION` bumped 2 → 3 (same no-migrations convention as every prior
+      bump in this stack — re-deriving rewrites every existing row with this version and the new field).
+      `tool-surface-v1`: **0 mismatches across 42/42 rows**, **zero new fields** (this experiment's own
+      row builder, `build_row`, is untouched by this PR — only `build_row_failure_flood` and its module-
+      level helpers changed). `failure-flood-v1`: **0 pre-existing value changes across 3/3 rows**; the
+      only field-level delta is one purely additive new field, `suite_state_cause`, which is `null` on
+      all three (unchanged from `null` because all three rows are `state=void, void_reason=shakedown` —
+      the field is gated on `state == "complete"`, matching the existing precedent for
+      `verdict`/`integrity_guard_pass`). `causes_claimed`/`causes_correct` are unchanged (`null`) on all
+      three for the same reason — void rows are never scored.
+
+**Regression, run exactly as required — tool-surface-v1's 42-row projection, byte-identical**: snapshot
+of the committed `rig/results/tool-surface-v1/runs.jsonl` taken before this PR's edits; re-derived with
+the final PR7B-bearing `derive.py`. Diffed field-by-field per `run_id`, excluding `schema_version` and
+`checker_digest`: **0 mismatches across 42/42 rows**, zero new fields (confirming `build_row` itself is
+untouched — the schema_version constant it reads, `SCHEMA_VERSION = 3`, is a SEPARATE constant from
+`FAILURE_FLOOD_SCHEMA_VERSION`, unaffected by this PR's bump of the latter).
+
+`rig/results/failure-flood-v1/runs.jsonl` (the 3 already-committed shakedown rows, `state=void,
+void_reason=shakedown`, unchanged since PR5) re-derived against the same raw captures still on disk under
+gitignored `rig/runs/failure-flood-v1/`: **0 pre-existing value changes across 3/3 rows**; one purely
+additive field, `suite_state_cause: null` on all three (never scored — void rows stay void).
+`state`/`void_reason` unchanged (`void`/`shakedown` on all three, matching every prior PR's own committed
+values).
+
+**No countable run was spent anywhere in this PR.** Every claim above was proven by a synthetic unit test
+or a synthetic full-row integration test calling the real `build_row_failure_flood()` — never a real
+`claude -p` call. A real (non-`--shakedown`) run remains the operator's decision, per this batch's own
+instruction.
+
+**Gate run, on the real staged tree:**
+```
+$ bash -n rig/run-pipeline.sh
+EXIT=0
+$ python3 -m py_compile rig/derive.py
+EXIT=0
+$ python3 rig/collect.py --self-test
+  self-test: all cases passed
+EXIT=0
+$ ./hooks/pre-commit --all
+  redaction check: clean across 173 tracked files
+EXIT=0
+$ ./hooks/pre-commit --self-test
+  ok    clean tree, with an empty file and placeholder paths
+  ok    an absolute home path is reported
+  ok    an unreadable tracked file escalates instead of being skipped
+  self-test: all cases passed
+EXIT=0
+```
+
+**Line budget**: `git diff --cached --numstat` — `rig/derive.py` 141/18 (159 authored), `rig/run-pipeline.sh`
+16/0 (16 authored), `rig/results/tool-surface-v1/runs.jsonl` 42/42 (generated golden, same exclusion PR1/
+PR5/PR7A already established), `rig/results/failure-flood-v1/runs.jsonl` 3/3 (same exclusion). **Authored
+total: 175**, well inside the 800-line ceiling for this batch (and inside PR7A's own 158, since this PR's
+two new scoring/classification functions are smaller than PR7A's model-pinning plumbing).
+
+**Out of scope, confirmed untouched**: `git diff --stat -- rig/collect.py rig/report.py` empty — neither
+file was touched; `report.py`'s own `diagnostic_precision_recall_table` (task 6.4) needed no change,
+exactly as designed — it was already correct and only ever waiting on non-`null` input. No countable
+(non-`--shakedown`) run was spent — that remains the operator's own decision, unchanged from PR7A's own
+statement of the same constraint.

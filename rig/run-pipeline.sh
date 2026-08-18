@@ -691,6 +691,22 @@ run_model_step() {
     cp "$ws/fix-plan.txt" "$dir/handoff/fix-plan.txt"
   fi
 
+  # Thread the root-cause report out (task 5.9, re-scoped: R-F3.2's scoring
+  # function needs this file surviving past this workspace's own discard,
+  # the same class of gap fix-plan.txt already had closed above — the
+  # frozen `<path>:<line>`-only file (R-F3.1), never the chat prose;
+  # verify-report CRITICAL-2 named the two halves of this gap separately).
+  # Copied at each arm's OWN FINAL model step only (monolith's only step, or
+  # pipeline's apply step): the shared prompt file (task 5.4b's own "one
+  # .txt per task_id, never per role") asks every role to write this file
+  # "before you finish", so a diagnose step may write one too — but that
+  # copy is a stale intermediate the fresh apply workspace never inherits,
+  # so it is never the one derive.py should score.
+  if { [ "$role" = "monolith" ] || [ "$role" = "apply" ]; } && [ -f "$ws/root-cause-report.txt" ]; then
+    mkdir -p "$dir/handoff"
+    cp "$ws/root-cause-report.txt" "$dir/handoff/root-cause-report.txt"
+  fi
+
   write_step_status "$dir" "$role" model "$exit_code" $((end_ms - start_ms)) "$substrate" "$surf" "$perm" "$timed_out" "$src_changed" "$ro_changed" "$model_actual"
   [ "$timed_out" -eq 1 ] && { ABORT_REASON="timeout"; return 0; }
   return 0
