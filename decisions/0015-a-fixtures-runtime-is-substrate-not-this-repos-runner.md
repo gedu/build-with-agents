@@ -4,11 +4,7 @@ type: decision
 targets: [any]
 status: validated
 verified: 2026-08-11
-renumbered: "Originally filed as 0014 on this branch (2026-08-11, unpushed). Renumbered to 0015 on
-  2026-08-18 after `main` independently ratified and pushed its own `0014-a-public-guarantee-cannot-be-
-  opt-in.md` six days later (`a46794a`, 2026-08-17). Operator decision: the already-pushed number wins —
-  a public identifier is load-bearing for outside citers, an unpushed one owes nothing to anyone.
-  Content and ratification date are unchanged; only the number and every internal citation to it moved."
+renumbered: "from 0014 on 2026-08-18 — see the note in the body"
 sources: ["decisions/0013-a-committed-executable-carries-its-own-test.md", "decisions/0011-rig-produces-evidence-not-truth.md", "sdd/failure-flood-triage/spec.md", "sdd/failure-flood-triage/design.md"]
 ---
 

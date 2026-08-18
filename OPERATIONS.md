@@ -32,11 +32,15 @@ only some sessions need belongs behind a read-on-demand pointer rather than in a
 | You are about to… | Run | Non-negotiable? |
 |---|---|---|
 | Work in a fresh clone | `./setup.sh --<tool>` | Yes. Nothing tool-specific is committed |
-| Get the redaction gate installed | `./setup.sh --hooks` | Yes. Without it the gate does not fire |
-| Commit anything | nothing — the hook fires by itself | Yes, once installed |
+| Get the redaction gates installed | `./setup.sh --hooks` | Yes. Without it neither gate fires |
+| Commit anything | nothing — both hooks fire by themselves | Yes, once installed |
 | Check the whole tree, not just a diff | `./hooks/pre-commit --all` | Before any push, and after any bulk edit |
-| Change `hooks/pre-commit` | `./hooks/pre-commit --self-test` | Yes. The gate carries its own test (ADR 0013) |
-| Change shell | `bash -n <file>` | Yes. There is still no test *runner*, by decision — ADR 0013 |
+| Check commit messages that are already written | `./hooks/commit-msg --range <A> <B>` | Before pushing from a checkout where the hooks were never installed |
+| Check the structural invariants | `./check.sh` | After writing or editing any content `.md`, and after adding a skill |
+| Change `hooks/pre-commit` or `hooks/commit-msg` | that file's `--self-test` | Yes. Each gate carries its own test (ADR 0013) |
+| Change `hooks/redaction-patterns.sh` | **both** hooks' `--self-test` | Yes. One list, two readers |
+| Change `check.sh` | `./check.sh --self-test` | Yes, same reason |
+| Change shell | `sh -n <file>`, or `bash -n` for `setup.sh` and `hooks/pre-commit` | Yes. There is still no test *runner*, by decision — ADR 0013 |
 | Change Python | `python3 -m py_compile <file>` | Yes, same reason |
 | Change `rig/collect.py` | `python3 rig/collect.py --self-test` | Yes. The collector carries its own test, same flag-gated shape as `hooks/pre-commit --self-test` (ADR 0013) |
 | Produce a measurement | `./rig/run.sh` → `rig/derive.py` → `rig/report.py` | In that order. See below |
@@ -77,11 +81,78 @@ see `journal/2026-08-05-redaction-gate-and-2478-on-224.md`.
 written as a bare word. No pattern can tell a public repository name from a client's. A clean run is not
 evidence about that class — ask before writing a shared source's name, per `AGENTS.md`.
 
+### `./hooks/commit-msg`
+
+The same redaction rule over the **proposed commit message**, which `pre-commit` never saw —
+`AGENTS.md` forbids the same shapes "in prose, in frontmatter, or in a commit message". Installed by
+`./setup.sh --hooks` alongside `pre-commit`, and it shares one pattern list with it,
+`hooks/redaction-patterns.sh`. Exit codes are `pre-commit`'s, and mean the same things.
+
+A message rejected here has **not** entered history: fix the message and commit again. That is the
+whole reason this runs at `commit-msg` rather than after a push.
+
+Two modes, and the second is the one you need in a worktree or a fresh clone:
+
+```sh
+./hooks/commit-msg <file>          # what git calls. Never run by hand
+./hooks/commit-msg --range <A> <B> # every commit message in A..B. `-` for A means "no lower bound"
+```
+
+`--range` refuses an unresolvable revision with exit 2 rather than scanning an empty range, and it
+prints the number of messages it actually scanned, including zero. **Read that number**: a range that
+turns out to be empty and a range that was clean look identical otherwise.
+
+### `./check.sh`
+
+The structural invariants `hooks/pre-commit` does not cover, and the counterpart to it: that gate
+answers *does this contain something that must never be published*, this one answers *does this repo
+still hold the shape its own rules describe*. Frontmatter on every content `.md`, and every directory
+under `skills/` having an entry in `ASK.md`. Reasoning in ADR 0014, which is `draft` — the decision is
+implemented, the operator has not ratified it.
+
+| Exit | Meaning | What you must do |
+|---|---|---|
+| 0 | Clean | Proceed |
+| 1 | A violation | Fix it. The file and the field are named |
+| 2 | **Could not run** | **Treat as a failure, not a pass.** An unreadable file, no content files found, or `skills/` present with no `ASK.md` |
+
+It reads tracked files **and** untracked files git would not ignore, which is where it differs from
+`./hooks/pre-commit --all`. That gate reads tracked files only, so a file you just wrote and have not
+staged is invisible to it — recorded in `journal/2026-08-13-skills-nobody-could-ask-for.md`. Anything
+under `rig/fixtures/` is out of scope by design; those files imitate a foreign project.
+
+What it does **not** check: whether an `ASK.md` entry is any good, `targets` membership, and whether a
+`sources` entry resolves. `./check.sh --help` carries the full list and the reason for each.
+
+### There is no CI. Every command above is yours to run
+
+ADR 0014 decided this repository needs a server-side copy of these checks and records why it is
+deferred. Nothing on a server runs them today, so treat this section as the operating reality rather
+than a temporary note:
+
+- **Before any push**, run `./hooks/pre-commit --all` and `./check.sh`. Nothing will do it for you and
+  nothing will tell you that you skipped it.
+- **`--all` reads tracked files only.** A file you just wrote is invisible to it until you stage it.
+  Staging then rerunning is the check; writing then running is not.
+- **A clone has no gate at all** until somebody runs `./setup.sh --hooks`, and a worktree does not
+  inherit that install. Run `skills/checkout-isolation`'s gate check to see which `pre-commit` — if
+  any — actually guards the tree you are in.
+
+`main` is protected by a repository ruleset: pull request required, force-push and deletion blocked,
+and **no required status check**, because there is no check for it to require. A pull request
+therefore merges on nobody having looked.
+
+Nothing in that file may `continue-on-error`, `|| true`, or skip its way to green. A job that cannot
+run its check must fail; that is the rule the whole file exists to hold.
+
 ### `bash -n` and `python3 -m py_compile`
 
-This project has **no test runner** (`sdd/testing-capabilities.md`). These two plus running the thing and
-reading its real output are the entire verification surface. A claim that something works must be backed
-by output you actually produced.
+This project has **no test runner** (`sdd/testing-capabilities.md`). These two, the `--self-test` flag on
+each committed executable (ADR 0013), and running the thing and reading its real output are the entire
+verification surface. A claim that something works must be backed by output you actually produced.
+
+Note which shell: `setup.sh` and `hooks/pre-commit` are `bash`; `hooks/commit-msg`, `check.sh` and
+`hooks/redaction-patterns.sh` are POSIX `sh`, so `sh -n` is the right check for those three.
 
 ## Producing a measurement
 
@@ -162,7 +233,7 @@ skips rather than replacing an existing hook.
 | Tool | Needed for | Notes |
 |---|---|---|
 | `bash`, `git` | Everything | — |
-| `python3` (stdlib only) | `rig/derive.py`, `rig/report.py` | **Rig-only.** `hooks/pre-commit` deliberately does not depend on it — it must run on a machine that installed nothing |
+| `python3` (stdlib only) | `rig/derive.py`, `rig/report.py` | **Rig-only.** The hooks and `check.sh` deliberately do not depend on it — they must run on a machine that installed nothing, and in CI with no setup step |
 | GNU-compatible `timeout` | `rig/run.sh`, `rig/run-pipeline.sh` | **Rig-only.** macOS ships a BSD `timeout` that is not compatible; `brew install coreutils` provides the GNU one. Both runners' preflight `die_cannot_run`s without it |
 | `node` (≥18), `npm`, Jest | `rig/fixtures/failure-flood/*`'s own runtime (design.md sec 5) | **Rig-only AND fixture-only.** `node_modules/` is installed on demand by `run-pipeline.sh`'s own `npm ci` step, into a per-run `mktemp` directory outside the repo entirely — never into the fixture tree, so no `.gitignore` change is needed |
 | `claude` CLI | `rig/run.sh` | Subscription auth is enough. No API key. `--bare` is not used in v1 |

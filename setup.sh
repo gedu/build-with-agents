@@ -36,6 +36,7 @@ Flags:
   --codex     .codex/skills -> ../skills  (Codex reads AGENTS.md natively; no alias needed)
   --copilot   .github/copilot-instructions.md -> ../AGENTS.md  (repo root only)
   --hooks     .git/hooks/pre-commit -> ../../hooks/pre-commit  (redaction gate, ADR 0009)
+              .git/hooks/commit-msg -> ../../hooks/commit-msg  (same gate, commit message)
   --all       every tool above, plus --hooks
   --dry-run   report the actions without touching the filesystem
   --help      this message
@@ -185,6 +186,12 @@ tool_copilot() {
 # nothing under .git/ is trackable, and an entry there would be noise in the managed
 # block.
 #
+# Two hooks, one rule: pre-commit scans the staged files, commit-msg scans the proposed
+# message. AGENTS.md forbids the same shapes in both, and until commit-msg existed the
+# message half was documented and unenforced (ADR 0014). They share one pattern list in
+# hooks/redaction-patterns.sh, which is sourced rather than linked — it is data, not a
+# hook, and git has no hook slot for it.
+#
 # link() carries the safety contract that matters here: `gga install` writes a real
 # .git/hooks/pre-commit for AI code review, and if one already exists this warns and
 # skips rather than silently replacing someone's review hook. Chain them by hand if
@@ -192,7 +199,9 @@ tool_copilot() {
 install_hooks() {
   say "[hooks]"
   link "../../hooks/pre-commit" "$REPO_ROOT/.git/hooks/pre-commit" || :
-  say "note  redaction gate only. Run ./hooks/pre-commit --all to audit the whole tree."
+  link "../../hooks/commit-msg" "$REPO_ROOT/.git/hooks/commit-msg" || :
+  say "note  redaction gates only. Run ./hooks/pre-commit --all to audit the whole tree,"
+  say "      and ./check.sh for the structural invariants it does not cover."
 }
 
 list_contains() {

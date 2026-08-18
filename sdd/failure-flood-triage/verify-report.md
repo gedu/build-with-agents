@@ -1,3 +1,12 @@
+---
+id: sdd/failure-flood-triage/verify-report
+type: journal
+targets: [any]
+status: draft
+verified: 2026-08-18
+sources: ["sdd/failure-flood-triage/spec.md", "sdd/failure-flood-triage/tasks.md", "sdd/failure-flood-triage/apply-progress.md", "sdd/failure-flood-triage/design.md"]
+---
+
 ```yaml
 schema: gentle-ai.verify-result/v1
 evidence_revision: sha256:b6bf1d11b633cf765701e18748ae82483c705d17f0321ac77ec4b35a02d0d0a6

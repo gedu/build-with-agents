@@ -4,10 +4,7 @@ type: journal
 targets: [any]
 status: draft
 verified: 2026-08-11
-sources: ["sdd/failure-flood-triage/proposal.md", "sdd/failure-flood-triage/spec.md",
-"sdd/failure-flood-triage/design.md", "sdd/measurement-rig/tasks.md",
-"decisions/0013-a-committed-executable-carries-its-own-test.md", "skills/hypothesis-cycle/SKILL.md",
-"skills/README.md"]
+sources: ["sdd/failure-flood-triage/proposal.md", "sdd/failure-flood-triage/spec.md", "sdd/failure-flood-triage/design.md", "sdd/measurement-rig/tasks.md", "decisions/0013-a-committed-executable-carries-its-own-test.md", "skills/hypothesis-cycle/SKILL.md", "skills/README.md"]
 ---
 
 # Tasks: failure-flood-triage

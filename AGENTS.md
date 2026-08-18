@@ -15,6 +15,11 @@ are **generated symlinks** produced by `./setup.sh`. Never commit them, never ed
 
 Start at `MAP.md`. It is the index of what exists, where it lives, and whether it is truth.
 
+`ASK.md` is the counterpart addressed to the **human**, and the only file here that is. When the
+operator does not know what to ask for, point them at it rather than describing the skills — a
+skill's `description` is written to make you select correctly, not to tell a person the capability
+exists, and nothing else in this repo closes that gap.
+
 **Before writing anything, run `skills/checkout-isolation`.** A checkout is single-writer: if another
 session may hold this one, or the work is long-running, take a worktree first — every failure here is
 silent, including a redaction gate that stops firing without saying so.
@@ -53,10 +58,14 @@ Every committed file is published the moment it is pushed, and pushing is not re
 way that matters. Applies repo-wide, to every directory and every `status`. ADR 0009 carries the
 reasoning.
 
-Half of this is enforced. `hooks/pre-commit` blocks a commit containing an absolute home path or a
-known secret shape — install it with `./setup.sh --hooks`, audit the whole tree with
-`./hooks/pre-commit --all`. The other half, a private name written as a bare word, **cannot** be
-pattern-matched and stays a judgment call. A clean check is not evidence about that half.
+Half of this is enforced. `hooks/pre-commit` blocks a commit whose staged files contain an absolute
+home path or a known secret shape, and `hooks/commit-msg` blocks the same shapes in the commit
+message — install both with `./setup.sh --hooks`, audit the whole tree with `./hooks/pre-commit --all`.
+Both are local and opt-in, and **there is no server-side copy yet** — ADR 0014 decided there should be
+one and records why it is deferred. So a clone that never runs `./setup.sh --hooks` has no gate at
+all: assume nothing about a checkout you did not install into. The other half, a private name written
+as a bare word, **cannot** be pattern-matched and stays a judgment call. A clean check is not
+evidence about that half.
 
 | Never commit | Write instead |
 |---|---|
