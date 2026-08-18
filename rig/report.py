@@ -25,6 +25,8 @@ weighted or ANDed with another (R-A1.3/R-F4.3).
 STDLIB ONLY (decisions/0011): json, statistics, pathlib.
 """
 
+import contextlib
+import io
 import json
 import statistics
 import sys
@@ -367,10 +369,104 @@ EXPERIMENTS = {
 }
 
 
+# ---- --self-test (flag-gated; ADR 0013's ratified shape, mirroring
+# collect.py's own --self-test and derive.py's --self-test: same flag, same
+# PASS/FAIL-per-case shape, same exit-code contract) --------------------------
+#
+# ADR 0013: a committed executable carries its own test. report.py received
+# real new logic this cycle (task 6.4's --experiment dispatcher and its two
+# failure-flood-v1 tables) with none of its own. No fixtures directory, no
+# filesystem I/O at all — every row here is an inline synthetic dict, since
+# report.py's own inputs are already just JSON rows, not run directories.
+
+_SELF_TEST_HEADERS_FAILURE_FLOOD = (
+    "Diagnostic precision/recall",
+    "Green-restore verdict distribution",
+    "Peak occupancy tokens",
+    "Cumulative occupancy tokens",
+)
+
+
+def _self_test_four_headers_on_empty_rows():
+    """The PR6 gatekeeping defect this batch's own instruction names: green-
+    restore was emitted by a per-key loop that produced nothing on an empty
+    collection while its three sibling tables printed unconditionally — a
+    header that silently vanishes on zero rows is exactly the "silent drop"
+    R-A1.2 forbids elsewhere in this file. Counting headers on an EMPTY row
+    set is the regression test that would have caught it before it shipped."""
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        report_failure_flood([])
+    out = buf.getvalue()
+    missing = [h for h in _SELF_TEST_HEADERS_FAILURE_FLOOD if h not in out]
+    ok = not missing
+    print(f"  [{'PASS' if ok else 'FAIL'}] all four table headers print on zero complete rows"
+          + ("" if ok else f" (missing: {missing})"))
+    return ok
+
+
+def _self_test_no_composite_field():
+    """R-A1.3/R-F4.3: nothing in this file ever sums, weights or ANDs a
+    channel with another. Checked in two directions, since either alone
+    leaves a hole: (a) occupancy_table takes exactly one `field` argument, so
+    a call asking for peak_occupancy_tokens must never leak a
+    cumulative_occupancy_tokens value into its own line, and vice versa; (b)
+    green_restore_table's four verdict counts plus `unscored` are printed
+    side by side (space-joined counts), never folded into a single derived
+    'score' token."""
+    ok = True
+    rows = [
+        {"task_id": "s1", "arm": "monolithic", "verdict": "green",
+         "peak_occupancy_tokens": 111, "cumulative_occupancy_tokens": 555},
+        {"task_id": "s1", "arm": "monolithic", "verdict": "regressed",
+         "peak_occupancy_tokens": 222, "cumulative_occupancy_tokens": 999},
+    ]
+    peak_line = occupancy_table(rows, "peak_occupancy_tokens")[0]
+    cumulative_line = occupancy_table(rows, "cumulative_occupancy_tokens")[0]
+    case_a = ("111" in peak_line and "222" in peak_line
+              and "555" not in peak_line and "999" not in peak_line
+              and "555" in cumulative_line and "999" in cumulative_line
+              and "111" not in cumulative_line and "222" not in cumulative_line)
+    ok = ok and case_a
+    print(f"  [{'PASS' if case_a else 'FAIL'}] occupancy_table(rows, field) reports ONLY the requested"
+          " channel — a peak call never carries a cumulative value or vice versa")
+
+    gr_line = green_restore_table(rows)[0]
+    # Exactly the five known verdict/unscored tokens, each a raw per-verdict
+    # count (never combined with a sibling verdict or with either occupancy
+    # channel — "unscored" is R-F4.2's own fifth bucket name, not a derived
+    # figure, so this checks token identity rather than a naive substring
+    # match against "score").
+    verdict_tokens = {tok.split("=")[0] for tok in gr_line.split() if "=" in tok and not tok.startswith("N=")}
+    case_b = (verdict_tokens == {"green", "partial", "no-progress", "regressed", "unscored"}
+              and "green=1" in gr_line and "regressed=1" in gr_line
+              and "peak_occupancy_tokens" not in gr_line and "cumulative_occupancy_tokens" not in gr_line)
+    ok = ok and case_b
+    print(f"  [{'PASS' if case_b else 'FAIL'}] green_restore_table lists exactly the five raw verdict/"
+          "unscored counts side by side, never combined with each other or with either occupancy channel")
+    return ok
+
+
+def run_self_test() -> bool:
+    print("report.py self-test (ADR 0013 — the PR6 empty-table regression, plus R-A1.3/R-F4.3's"
+          " no-composite-field rule):")
+    results = [
+        _self_test_four_headers_on_empty_rows(),
+        _self_test_no_composite_field(),
+    ]
+    ok = all(results)
+    print("\nself-test: all cases passed" if ok else "\nSELF-TEST FAILED", file=sys.stderr if not ok else sys.stdout)
+    return ok
+
+
+# ---- CLI --------------------------------------------------------------
+
 def parse_args(argv):
     """Manual parsing, stdlib only (decisions/0011) — mirrors derive.py's
-    own `--experiment` flag exactly (task 5.8's convention, reused here)."""
+    own `--experiment` flag exactly (task 5.8's convention, reused here).
+    --self-test is flag-gated (ADR 0013) and never runs unconditionally."""
     experiment = "tool-surface-v1"
+    self_test = False
     i = 0
     while i < len(argv):
         if argv[i] == "--experiment":
@@ -379,14 +475,19 @@ def parse_args(argv):
                 sys.exit(2)
             experiment = argv[i + 1]
             i += 2
+        elif argv[i] == "--self-test":
+            self_test = True
+            i += 1
         else:
             print(f"unknown argument: {argv[i]!r}", file=sys.stderr)
             sys.exit(2)
-    return experiment
+    return experiment, self_test
 
 
 def main():
-    experiment = parse_args(sys.argv[1:])
+    experiment, self_test = parse_args(sys.argv[1:])
+    if self_test:
+        return 0 if run_self_test() else 1
     if experiment not in EXPERIMENTS:
         print(f"unknown --experiment {experiment!r}; known: {sorted(EXPERIMENTS)}", file=sys.stderr)
         return 2

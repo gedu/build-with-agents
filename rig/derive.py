@@ -31,7 +31,9 @@ holding the raw evidence, never blindly on a fresh clone.
 import hashlib
 import json
 import re
+import shutil
 import sys
+import tempfile
 from pathlib import Path
 
 SCHEMA_VERSION = 3  # v3: added model_turns, occupancy_series, peak_occupancy_tokens,
@@ -1099,9 +1101,343 @@ EXPERIMENTS = {
 }
 
 
+# ---- --self-test (flag-gated; ADR 0013's ratified shape, mirroring
+# collect.py's own --self-test exactly: same flag, same output prefix, same
+# PASS/FAIL-per-case shape, same exit-code contract) -------------------------
+#
+# ADR 0013: a committed executable carries its own test. This absorbs three
+# prior batches' own verification scripts (model-mismatch void, R-F7.3 token
+# breakdown, suite_state_cause + R-F3.2 scoring) that each proved real
+# behaviour and would otherwise have evaporated with the session that wrote
+# them. Every fixture below is synthesised in a temp dir this function
+# creates and removes — no dependency on rig/runs/ or any path outside this
+# repo, other than the committed rig/surfaces/failure-flood.txt preimage the
+# real pipeline also reads.
+
+def _self_test_parse_root_cause_report():
+    well_formed = "ROOT-CAUSE-REPORT v1\nsrc/a.ts:1\nsrc/b.ts:2\n"
+    cases = [
+        ("well-formed -> 2 claims", parse_root_cause_report(well_formed) == frozenset({"src/a.ts:1", "src/b.ts:2"})),
+        ("malformed prose -> None", parse_root_cause_report("ROOT-CAUSE-REPORT v1\nThe bug is in the keypad handler somewhere.\n") is None),
+        ("missing sentinel -> None", parse_root_cause_report("src/a.ts:1\nsrc/b.ts:2\n") is None),
+        ("missing file (None) -> None", parse_root_cause_report(None) is None),
+        ("blank lines skipped, still valid", parse_root_cause_report("ROOT-CAUSE-REPORT v1\n\nsrc/a.ts:1\n\n") == frozenset({"src/a.ts:1"})),
+        ("duplicate lines deduplicated", parse_root_cause_report("ROOT-CAUSE-REPORT v1\nsrc/a.ts:1\nsrc/a.ts:1\n") == frozenset({"src/a.ts:1"})),
+        ("one bad line -> whole file malformed", parse_root_cause_report("ROOT-CAUSE-REPORT v1\nsrc/a.ts:1\nnot a path line at all\n") is None),
+        ("empty string -> None", parse_root_cause_report("") is None),
+    ]
+    ok = all(c for _, c in cases)
+    for name, cond in cases:
+        print(f"  [{'PASS' if cond else 'FAIL'}] parse_root_cause_report: {name}")
+    return ok
+
+
+def _self_test_score_diagnostic_attribution():
+    well_formed = "ROOT-CAUSE-REPORT v1\nsrc/a.ts:1\nsrc/b.ts:2\n"
+    rc_true = {"src/a.ts:1", "src/c.ts:9"}
+    claimed, correct = score_diagnostic_attribution(well_formed, rc_true)
+    claimed_m, correct_m = score_diagnostic_attribution("ROOT-CAUSE-REPORT v1\nThe bug is in the keypad handler somewhere.\n", rc_true)
+    claimed_none, correct_none = score_diagnostic_attribution(None, rc_true)
+    # Hostile/non-ASCII input, per hypothesis-cycle corner-case discipline —
+    # a real binary-byte string and a real accented path, never conceivable-
+    # only inputs.
+    claimed_h, correct_h = score_diagnostic_attribution("ROOT-CAUSE-REPORT v1\n\x00\x01binary\n", rc_true)
+    claimed_u, correct_u = score_diagnostic_attribution("ROOT-CAUSE-REPORT v1\nsrc/café.ts:3\n", rc_true)
+    cases = [
+        ("well-formed: claimed sorted list", claimed == ["src/a.ts:1", "src/b.ts:2"]),
+        ("well-formed: correct = intersection", correct == ["src/a.ts:1"]),
+        ("malformed (R-F3.2's own named scenario): claimed empty, no crash", claimed_m == [] and correct_m == []),
+        ("missing (None text): claimed empty, no crash", claimed_none == [] and correct_none == []),
+        ("hostile/binary bytes-as-text: no crash, claimed empty", claimed_h == [] and correct_h == []),
+        ("non-ASCII path: \\w matches unicode word chars in Python re, no crash", claimed_u == ["src/café.ts:3"]),
+    ]
+    ok = all(c for _, c in cases)
+    for name, cond in cases:
+        print(f"  [{'PASS' if cond else 'FAIL'}] score_diagnostic_attribution: {name}")
+    return ok
+
+
+def _self_test_suite_state_cause():
+    s0_dns = {"suite_state": "did-not-start", "signature": "X"}
+    cases = [
+        ("ran==ran -> injection", suite_state_cause("ran", [], {"suite_state": "ran"}) == "injection"),
+        ("did-not-start vs frozen ran -> environment",
+         suite_state_cause("did-not-start", [{"test_id": "__suite__", "signature": "X"}], {"suite_state": "ran"}) == "environment"),
+        ("no S0 -> None", suite_state_cause("ran", [], None) is None),
+        ("no observed suite_state -> None", suite_state_cause(None, [], {"suite_state": "ran"}) is None),
+        ("did-not-start, matching signature -> injection",
+         suite_state_cause("did-not-start", [{"test_id": "__suite__", "signature": "X"}], s0_dns) == "injection"),
+        ("did-not-start, different signature -> environment",
+         suite_state_cause("did-not-start", [{"test_id": "__suite__", "signature": "Y"}], s0_dns) == "environment"),
+        ("did-not-start, no signature present -> environment (conservative)",
+         suite_state_cause("did-not-start", [], s0_dns) == "environment"),
+    ]
+    ok = all(c for _, c in cases)
+    for name, cond in cases:
+        print(f"  [{'PASS' if cond else 'FAIL'}] suite_state_cause: {name}")
+    return ok
+
+
+def _self_test_read_root_cause_report_handoff():
+    well_formed = "ROOT-CAUSE-REPORT v1\nsrc/a.ts:1\nsrc/b.ts:2\n"
+    tmpdir = Path(tempfile.mkdtemp())
+    try:
+        run_dir = tmpdir / "s1-monolithic-01"
+        (run_dir / "steps" / "01-monolith" / "handoff").mkdir(parents=True)
+        (run_dir / "steps" / "01-monolith" / "handoff" / "root-cause-report.txt").write_text(well_formed)
+        found = read_root_cause_report_handoff(run_dir, [{"index": "01-monolith", "kind": "model"}, {"index": "99-verify", "kind": "code"}])
+
+        run_dir2 = tmpdir / "s1-monolithic-02"
+        (run_dir2 / "steps" / "01-monolith").mkdir(parents=True)
+        missing = read_root_cause_report_handoff(run_dir2, [{"index": "01-monolith", "kind": "model"}])
+    finally:
+        shutil.rmtree(tmpdir)
+    cases = [
+        ("handoff file found and read", found == well_formed),
+        ("no handoff file -> None", missing is None),
+    ]
+    ok = all(c for _, c in cases)
+    for name, cond in cases:
+        print(f"  [{'PASS' if cond else 'FAIL'}] read_root_cause_report_handoff: {name}")
+    return ok
+
+
+def _self_test_write_stream(path, model, events=None):
+    """Minimal synthetic stream.jsonl: one init event plus caller-supplied
+    events (default: a bare result event). Mirrors the real transcript shape
+    parse_stream() reads — never a second parsing mechanism."""
+    init_ev = {"type": "system", "subtype": "init", "model": model, "cwd": str(path.parent), "tools": []}
+    lines = [init_ev] + (events if events is not None else [{"type": "result", "usage": {
+        "input_tokens": 10, "output_tokens": 5, "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0,
+    }}])
+    path.write_text("\n".join(json.dumps(ev) for ev in lines) + "\n")
+
+
+def _self_test_make_ff_run_dir(root, run_id, step_overrides, write_stream=True):
+    """One synthetic s1-monolithic-<N> run directory: arm.json + status.json
+    + one model step, matching run-pipeline.sh's own real Amendment-1 shape
+    closely enough for build_row_failure_flood to read it as a real run."""
+    run_dir = root / run_id
+    (run_dir / "steps" / "01-monolith").mkdir(parents=True, exist_ok=True)
+    step = {
+        "index": "01-monolith", "kind": "model", "permission_mode_matches_declared": True,
+        "surface_sha256": None, **step_overrides,
+    }
+    if write_stream:
+        _self_test_write_stream(run_dir / "steps" / "01-monolith" / "stream.jsonl", step_overrides.get("model_actual"))
+    (run_dir / "status.json").write_text(json.dumps({"state": "complete", "void_reason": None}))
+    (run_dir / "arm.json").write_text(json.dumps({
+        # prereg_digest is required or the Hard Ordering Gate layer-3 check
+        # (build_row_failure_flood's own "no-preregistration" void) fires
+        # before anything this fixture exists to test even runs.
+        "declared_model": step_overrides.get("declared_model"), "prereg_digest": "deadbeef", "steps": [step],
+    }))
+    return run_dir
+
+
+def _self_test_build_row_model_mismatch():
+    """Absorbed from a prior batch's own scratch script (PR7A's model-pin
+    verification): three cases proving the DECLARED-value comparison (never
+    build_row's own self-consistency check, which cannot catch two
+    internally-consistent runs of the same arm on different models)."""
+    surfaces = {FAILURE_FLOOD_SURFACE_ARM: []}  # empty surface -> surface-mismatch never fires; isolates this check
+    digests = {"fixture": {}, "checker": "x"}
+    tmproot = Path(tempfile.mkdtemp())
+    try:
+        d1 = _self_test_make_ff_run_dir(tmproot, "s1-monolithic-99mismatch",
+                                          {"declared_model": "claude-opus-5[1m]", "model_actual": "claude-sonnet-5",
+                                           "model_matches_declared": False})
+        row1, *_ = build_row_failure_flood(d1, surfaces, digests, {})
+        case1 = (row1["state"] == "void" and row1["void_reason"] == "model-mismatch"
+                 and "model-mismatch" in row1["anomaly_classes"] and row1["declared_model"] == "claude-opus-5[1m]")
+
+        d2 = _self_test_make_ff_run_dir(tmproot, "s1-monolithic-99match",
+                                          {"declared_model": "claude-opus-5[1m]", "model_actual": "claude-opus-5[1m]",
+                                           "model_matches_declared": True})
+        row2, *_ = build_row_failure_flood(d2, surfaces, digests, {})
+        case2 = row2["state"] == "complete" and row2["void_reason"] is None
+
+        d3 = _self_test_make_ff_run_dir(tmproot, "s1-monolithic-99old",
+                                          {"declared_model": "claude-opus-5[1m]", "model_actual": None,
+                                           "model_matches_declared": None})
+        row3, *_ = build_row_failure_flood(d3, surfaces, digests, {})
+        case3 = row3["state"] == "complete"
+    finally:
+        shutil.rmtree(tmproot)
+    cases = [
+        ("model_matches_declared=False -> state=void, void_reason=model-mismatch", case1),
+        ("model_matches_declared=True -> state stays complete", case2),
+        ("model_matches_declared absent/None (old capture) -> never falsely voids", case3),
+    ]
+    ok = all(c for _, c in cases)
+    for name, cond in cases:
+        print(f"  [{'PASS' if cond else 'FAIL'}] build_row_failure_flood: {name}")
+    return ok
+
+
+def _self_test_build_row_token_breakdown():
+    """Absorbed from a prior batch's own scratch script (PR7A's R-F7.3
+    restoration): per-step and per-run input/output/cache_read/
+    cache_creation tokens, plus tool_calls names+count — never a single
+    total, per and R-F7.3's own words."""
+    surfaces = {FAILURE_FLOOD_SURFACE_ARM: []}
+    digests = {"fixture": {}, "checker": "x"}
+    tmproot = Path(tempfile.mkdtemp())
+    try:
+        events = [
+            {"type": "assistant", "message": {"id": "m1", "usage": {
+                "input_tokens": 100, "output_tokens": 10, "cache_read_input_tokens": 5, "cache_creation_input_tokens": 2},
+                "content": [{"type": "tool_use", "id": "t1", "name": "Bash", "input": {}}]}},
+            {"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "t1", "content": "ok"}]}},
+            {"type": "assistant", "message": {"id": "m2", "usage": {
+                "input_tokens": 120, "output_tokens": 20, "cache_read_input_tokens": 6, "cache_creation_input_tokens": 3},
+                "content": [{"type": "tool_use", "id": "t2", "name": "Read", "input": {"file_path": "/x/a"}}]}},
+            {"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "t2", "content": "ok"}]}},
+            {"type": "result", "usage": {
+                "input_tokens": 220, "output_tokens": 30, "cache_read_input_tokens": 11, "cache_creation_input_tokens": 5}},
+        ]
+        d = _self_test_make_ff_run_dir(tmproot, "s1-monolithic-99tok",
+                                         {"declared_model": "claude-opus-5[1m]", "model_actual": "claude-opus-5[1m]",
+                                          "model_matches_declared": True}, write_stream=False)
+        _self_test_write_stream(d / "steps" / "01-monolith" / "stream.jsonl", "claude-opus-5[1m]", events)
+        row, *_ = build_row_failure_flood(d, surfaces, digests, {})
+        names = sorted(tc["name"] for tc in row["tool_calls"])
+        step_out = row["steps"][0]
+        step_names = sorted(tc["name"] for tc in step_out["tool_calls"])
+        cases = [
+            ("row input_tokens", row["input_tokens"] == 220),
+            ("row output_tokens", row["output_tokens"] == 30),
+            ("row cache_creation_input_tokens", row["cache_creation_input_tokens"] == 5),
+            ("row cache_read_input_tokens", row["cache_read_input_tokens"] == 11),
+            ("row tool_calls names", names == ["Bash", "Read"]),
+            ("step input/output/cache tokens match row (one model step)",
+             step_out["input_tokens"] == 220 and step_out["output_tokens"] == 30
+             and step_out["cache_creation_input_tokens"] == 5 and step_out["cache_read_input_tokens"] == 11),
+            ("step tool_calls names", step_names == ["Bash", "Read"]),
+        ]
+    finally:
+        shutil.rmtree(tmproot)
+    ok = all(c for _, c in cases)
+    for name, cond in cases:
+        print(f"  [{'PASS' if cond else 'FAIL'}] build_row_failure_flood token breakdown: {name}")
+    return ok
+
+
+def _self_test_build_row_suite_state_and_attribution():
+    """Absorbed from a prior batch's own scratch script (PR7B's
+    suite_state_cause + R-F3.2 scoring closure): four full-row cases against
+    the REAL committed rig/surfaces/failure-flood.txt preimage — injection
+    (green, scored), environment (forced void), malformed handoff (claimed
+    empty, not voided), and no handoff file at all (claimed empty, not
+    voided) — the 16 assertions the verify-report's own malformed-input
+    scenario named."""
+    surface_names = load_surface(FAILURE_FLOOD_SURFACE_ARM)
+    surface_dig = surface_digest(surface_names)
+    surfaces = {FAILURE_FLOOD_SURFACE_ARM: surface_names}
+    digests = {"fixture": {"v1": None, "v2": None}, "checker": CHECKER_DIGEST}
+    answer_keys = {"s1": {
+        "task_id": "s1", "S0": {"suite_state": "ran"}, "F0": {"failures": []},
+        "R0": [{"cause_site": "src/a.ts:1"}, {"cause_site": "src/c.ts:9"}],
+    }}
+
+    def make(run_id, handoff_text, collection, tmproot):
+        run_dir = tmproot / run_id
+        if handoff_text is not None:
+            (run_dir / "steps" / "01-monolith" / "handoff").mkdir(parents=True)
+            (run_dir / "steps" / "01-monolith" / "handoff" / "root-cause-report.txt").write_text(handoff_text)
+        else:
+            (run_dir / "steps" / "01-monolith").mkdir(parents=True)
+        _self_test_write_stream(run_dir / "steps" / "01-monolith" / "stream.jsonl", "claude-sonnet-5")
+        (run_dir / "steps" / "99-verify").mkdir(parents=True)
+        (run_dir / "steps" / "99-verify" / "collection.json").write_text(json.dumps(collection))
+        (run_dir / "status.json").write_text(json.dumps({"state": "complete", "void_reason": None}))
+        (run_dir / "arm.json").write_text(json.dumps({"prereg_digest": "deadbeef", "steps": [
+            {"index": "01-monolith", "kind": "model", "surface_sha256": surface_dig,
+             "permission_mode_matches_declared": True, "model_matches_declared": True},
+            {"index": "99-verify", "kind": "code"},
+        ]}))
+        return run_dir
+
+    tmproot = Path(tempfile.mkdtemp())
+    ok = True
+    try:
+        d1 = make("s1-monolithic-01", "ROOT-CAUSE-REPORT v1\nsrc/a.ts:1\nsrc/b.ts:2\n",
+                   {"suite_state": "ran", "partial_reason": None, "report_bytes": 100, "failures": []}, tmproot)
+        row1, *_ = build_row_failure_flood(d1, surfaces, digests, answer_keys)
+        case1 = [
+            ("state stays complete", row1["state"] == "complete"),
+            ("suite_state_cause == injection", row1["suite_state_cause"] == "injection"),
+            ("verdict == green (no failures)", row1["verdict"] == "green"),
+            ("causes_claimed populated from handoff", row1["causes_claimed"] == ["src/a.ts:1", "src/b.ts:2"]),
+            ("causes_correct == intersection with R0", row1["causes_correct"] == ["src/a.ts:1"]),
+        ]
+
+        d2 = make("s1-monolithic-02", "ROOT-CAUSE-REPORT v1\nsrc/a.ts:1\n",
+                   {"suite_state": "did-not-start", "partial_reason": "missing node_modules", "report_bytes": 10,
+                    "failures": [{"test_id": "__suite__", "status": "failed", "signature": "sig-env"}]}, tmproot)
+        row2, *_ = build_row_failure_flood(d2, surfaces, digests, answer_keys)
+        case2 = [
+            ("state forced to void", row2["state"] == "void"),
+            ("void_reason == suite-state-mismatch", row2["void_reason"] == "suite-state-mismatch"),
+            ("suite_state_cause == environment", row2["suite_state_cause"] == "environment"),
+            ("'suite-state-mismatch' in anomaly_classes", "suite-state-mismatch" in row2["anomaly_classes"]),
+            ("causes_claimed/correct stay None (void row, not scored)",
+             row2["causes_claimed"] is None and row2["causes_correct"] is None),
+        ]
+
+        d3 = make("s1-monolithic-03", "The root cause is in the keypad handler, roughly.\n",
+                   {"suite_state": "ran", "partial_reason": None, "report_bytes": 50, "failures": []}, tmproot)
+        row3, *_ = build_row_failure_flood(d3, surfaces, digests, answer_keys)
+        case3 = [
+            ("state stays complete (malformed report is not voided by R-F2.2)", row3["state"] == "complete"),
+            ("causes_claimed == [] (malformed, not a crash)", row3["causes_claimed"] == []),
+            ("causes_correct == []", row3["causes_correct"] == []),
+        ]
+
+        d4 = make("s1-monolithic-04", None,
+                   {"suite_state": "ran", "partial_reason": None, "report_bytes": 50, "failures": []}, tmproot)
+        row4, *_ = build_row_failure_flood(d4, surfaces, digests, answer_keys)
+        case4 = [
+            ("no handoff file -> causes_claimed == [] per spec's 'missing' rule", row4["causes_claimed"] == []),
+            ("causes_correct == []", row4["causes_correct"] == []),
+            ("state still complete (missing report never voids per R-F2.2/R-F3.2)", row4["state"] == "complete"),
+        ]
+
+        for case_name, checks in (("case1 (injection, well-formed)", case1), ("case2 (environment -> void)", case2),
+                                   ("case3 (malformed handoff)", case3), ("case4 (no handoff file)", case4)):
+            case_ok = all(c for _, c in checks)
+            ok = ok and case_ok
+            print(f"  [{'PASS' if case_ok else 'FAIL'}] build_row_failure_flood {case_name}: "
+                  + ", ".join(f"{n}={c}" for n, c in checks))
+    finally:
+        shutil.rmtree(tmproot)
+    return ok
+
+
+def run_self_test() -> bool:
+    print("derive.py self-test (ADR 0013 — R-F2.2/R-F3.2/R-F7.1/R-F7.3, restoring three prior"
+          " batches' own scratch verification):")
+    results = [
+        _self_test_parse_root_cause_report(),
+        _self_test_score_diagnostic_attribution(),
+        _self_test_suite_state_cause(),
+        _self_test_read_root_cause_report_handoff(),
+        _self_test_build_row_model_mismatch(),
+        _self_test_build_row_token_breakdown(),
+        _self_test_build_row_suite_state_and_attribution(),
+    ]
+    ok = all(results)
+    print("\nself-test: all cases passed" if ok else "\nSELF-TEST FAILED", file=sys.stderr if not ok else sys.stdout)
+    return ok
+
+
 def parse_args(argv):
-    """Manual parsing, stdlib only (decisions/0011) — one recognised flag."""
+    """Manual parsing, stdlib only (decisions/0011) — two recognised flags.
+    --self-test is flag-gated (ADR 0013, mirroring collect.py's own
+    convention) and never runs unconditionally; it is checked by main()
+    before --experiment is validated, the same order collect.py uses."""
     experiment = "tool-surface-v1"
+    self_test = False
     i = 0
     while i < len(argv):
         if argv[i] == "--experiment":
@@ -1110,14 +1446,19 @@ def parse_args(argv):
                 sys.exit(2)
             experiment = argv[i + 1]
             i += 2
+        elif argv[i] == "--self-test":
+            self_test = True
+            i += 1
         else:
             print(f"unknown argument: {argv[i]!r}", file=sys.stderr)
             sys.exit(2)
-    return experiment
+    return experiment, self_test
 
 
 def main():
-    experiment = parse_args(sys.argv[1:])
+    experiment, self_test = parse_args(sys.argv[1:])
+    if self_test:
+        return 0 if run_self_test() else 1
     if experiment not in EXPERIMENTS:
         print(f"unknown --experiment {experiment!r}; known: {sorted(EXPERIMENTS)}", file=sys.stderr)
         return 2

@@ -1576,3 +1576,138 @@ file was touched; `report.py`'s own `diagnostic_precision_recall_table` (task 6.
 exactly as designed — it was already correct and only ever waiting on non-`null` input. No countable
 (non-`--shakedown`) run was spent — that remains the operator's own decision, unchanged from PR7A's own
 statement of the same constraint.
+
+## PR7C — `derive.py`/`report.py` self-tests (ADR 0013: a committed executable carries its own test)
+
+Depends on: PR7A + PR7B (the two files that received the most new logic this cycle and had no test of
+their own). Source: my own PR7B closing note flagged this gap directly — `rig/collect.py` and
+`hooks/pre-commit` have `--self-test`; `rig/derive.py`, `rig/report.py` and `rig/run-pipeline.sh` do not,
+and PR7B's own 23 unit + 16 integration tests lived only in a session scratchpad about to be discarded,
+so that proof would have evaporated with nothing committed to replace it.
+
+- [x] 7.8 Add `--self-test` to `rig/derive.py`, absorbing all three scratch verification scripts (model-
+      mismatch void, R-F7.3 token breakdown, `suite_state_cause` + R-F3.2 scoring) that a prior session
+      wrote and never committed. Follows `collect.py`'s own `--self-test` convention exactly: same flag
+      name, same `run_self_test() -> bool` / per-case `[PASS]`/`[FAIL]` print shape, same
+      `main()` dispatch ordering (checked before `--experiment` is validated), same exit-code contract (0
+      pass, 1 fail). Fixtures are synthesised in a `tempfile.mkdtemp()` this function creates and removes
+      — no dependency on any path outside this repo, other than the real committed
+      `rig/surfaces/failure-flood.txt` preimage the pipeline itself reads. Does **not** collide with the
+      pre-existing, unrelated `run_self_tests()` (plural — R-A1.4's checker self-test, which already runs
+      unconditionally on every real invocation and stays untouched).
+      Verify: `python3 -m py_compile rig/derive.py`; `python3 rig/derive.py --self-test` exit 0 with every
+      case `[PASS]`; both named regressions re-run clean.
+      **Done.** 49 assertions across 7 self-test functions, all real, none mocked — every one caught a
+      real fixture bug during this batch's own writing (a missing `prereg_digest` in two of the three
+      synthetic-run-directory helpers tripped the Hard Ordering Gate's own `no-preregistration` void before
+      the intended check ever ran; a missing `status.json` in the third left every row `state=void,
+      void_reason=null`). Fixed by adding `prereg_digest`/`status.json` to the fixture builders, not by
+      loosening any assertion. Breakdown: `parse_root_cause_report` 8 cases, `score_diagnostic_attribution`
+      6 cases (including the malformed-prose scenario R-F3.2 names by name, plus a hostile binary-byte
+      input and a non-ASCII path per corner-case discipline), `suite_state_cause` 7 cases,
+      `read_root_cause_report_handoff` 2 cases, `build_row_failure_flood` model-mismatch 3 cases, token
+      breakdown 7 assertions in 1 case, and the suite-state/attribution integration suite 4 cases (16
+      assertions) against the real committed surface preimage. All 3 scratchpad files' cases survived into
+      the committed self-test; none were dropped.
+      ```
+      $ python3 -m py_compile rig/derive.py
+      EXIT=0
+      $ python3 rig/derive.py --self-test
+        [49 case lines, all PASS — see apply-progress for full verbatim output]
+
+      self-test: all cases passed
+      EXIT=0
+      ```
+- [x] 7.9 Add `--self-test` to `rig/report.py`, covering at minimum the defect caught at PR6 gatekeeping:
+      `report_failure_flood` must print all four table headers even when there are zero complete rows
+      (the historical bug — green-restore was emitted by a per-key loop that produced nothing on an empty
+      collection while its three siblings printed unconditionally). Also covers R-A1.3/R-F4.3 (no
+      composite/summed/ANDed field) honestly, not merely asserted by inspection.
+      Verify: `python3 -m py_compile rig/report.py`; `python3 rig/report.py --self-test` exit 0; both
+      untouched entry points (`rig/report.py` default and `--experiment failure-flood-v1`) still exit 0
+      unaffected.
+      **Done.** 3 self-test cases, all real: (1) `report_failure_flood([])` captured via
+      `contextlib.redirect_stdout` — all four headers ("Diagnostic precision/recall", "Green-restore
+      verdict distribution", "Peak occupancy tokens", "Cumulative occupancy tokens") confirmed present on
+      an empty row set, the exact regression shape this batch's own instruction named; (2)/(3) R-A1.3/
+      R-F4.3: `occupancy_table(rows, field)` proven to report ONLY the requested channel (a peak call's
+      output line was checked to carry neither of the cumulative call's own values, and vice versa) and
+      `green_restore_table` proven to list exactly its five raw verdict/`unscored` counts side by side,
+      never combined with each other or with either occupancy channel. One self-test bug found and fixed
+      during writing: a naive `"score" not in line.lower()` substring check false-failed against the
+      legitimate field name `unscored` (which contains "score" as a substring) — replaced with an exact
+      token-identity check, not a loosened assertion.
+      ```
+      $ python3 -m py_compile rig/report.py
+      EXIT=0
+      $ python3 rig/report.py --self-test
+        [PASS] all four table headers print on zero complete rows
+        [PASS] occupancy_table(rows, field) reports ONLY the requested channel ...
+        [PASS] green_restore_table lists exactly the five raw verdict/unscored counts ...
+
+      self-test: all cases passed
+      EXIT=0
+      ```
+- [ ] 7.10 (registered, not implemented this batch — deliberately out of scope) Add `--self-test` to
+      `rig/run-pipeline.sh`. A bash test harness is a different construction from a Python
+      `--self-test` flag and would exceed this batch's own budget; deferred rather than rushed.
+      **The recurrence this task exists to name**: the extracted-function pattern this stack has already
+      used three separate times to verify shell logic without a real `claude -p` call — task 6.6's
+      `check_prereg()`, PR7A's `read_back_init()`/`hash_paths()` — has been re-invented ad hoc in three
+      separate batches instead of being generalised into `run-pipeline.sh`'s own committed, flag-gated
+      `--self-test` that runs all three (and any future extracted function) in one place. That
+      re-invention, not any single missing test, is the exact recurrence ADR 0013 exists to catch. Next
+      batch should build a `--self-test` flag that sources or re-execs the extractable functions and runs
+      each of the three (plus any new ones) as one committed suite, rather than a fourth ad hoc script.
+
+**Regression, run exactly as required — both named datasets, byte-identical**: `tool-surface-v1`'s
+42-row projection and `failure-flood-v1`'s 3-row projection were both snapshotted before this PR's edits
+and re-derived with the final PR7C-bearing `derive.py`. Diffed field-by-field per `run_id`, excluding
+`schema_version`/`checker_digest`: **0 mismatches across 42/42 rows**, **0 pre-existing value changes
+across 3/3 rows**, **zero new fields on either dataset** (this PR adds no new row fields — it only adds a
+CLI flag and self-test functions, neither of which touches `build_row`/`build_row_failure_flood`'s own
+output shape).
+
+**No countable run was spent anywhere in this PR.** Every claim above was proven by a synthetic self-test
+against a `tempfile`-created fixture or by re-deriving already-committed raw captures — never a real
+`claude -p` call. A real (non-`--shakedown`) run remains the operator's own decision, unchanged from every
+prior PR's own statement of the same constraint.
+
+**Gate run, on the real working tree (staged before commit):**
+```
+$ bash -n rig/run-pipeline.sh
+EXIT=0
+$ python3 -m py_compile rig/derive.py
+EXIT=0
+$ python3 -m py_compile rig/report.py
+EXIT=0
+$ python3 rig/collect.py --self-test
+  self-test: all cases passed
+EXIT=0
+$ python3 rig/derive.py --self-test
+  self-test: all cases passed
+EXIT=0
+$ python3 rig/report.py --self-test
+  self-test: all cases passed
+EXIT=0
+$ ./hooks/pre-commit --all
+  redaction check: clean across 173 tracked files
+EXIT=0
+$ ./hooks/pre-commit --self-test
+  ok    clean tree, with an empty file and placeholder paths
+  ok    an absolute home path is reported
+  ok    an unreadable tracked file escalates instead of being skipped
+  self-test: all cases passed
+EXIT=0
+```
+
+**Line budget**: `git diff --numstat -- rig/derive.py rig/report.py` — `rig/derive.py` 344/3 (347
+authored), `rig/report.py` 104/3 (107 authored). **Authored total: 454**, well inside the 800-line
+ceiling this batch was given. No generated goldens are touched by this PR (neither `runs.jsonl` file
+changed — re-deriving produced byte-identical output, so nothing new was staged for either).
+
+**Out of scope, confirmed untouched**: `git diff --stat -- rig/run-pipeline.sh rig/collect.py
+hooks/pre-commit` empty — none of the three were touched. Task 7.10 above registers `run-pipeline.sh`'s
+own missing `--self-test` rather than implementing it here. The WARNING-level findings from the
+2026-08-17 verify-report (placeholder `STEP_TIMEOUT_S`, stale `axis_table.py:19-21` docstring) remain
+untouched, out of this batch's scope. No countable run was spent.
