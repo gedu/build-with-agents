@@ -1840,3 +1840,38 @@ per precedent.
 `design.md`, `run-pipeline.sh`'s `STEP_TIMEOUT_S`/`SUITE_TIMEOUT_S` placeholders — none touched. W-7
 through W-10 and the round-2 "What must happen before archive" items 3–9 remain open, deliberately, for a
 future batch. No countable run was spent.
+
+## PR7E — regressions introduced by PR7D's own remedy (verify round 3)
+
+Round 3's two blockers were both caused by `3f11150`, the commit that fixed round 2's blocker. Fixing a
+verified defect is itself a change that needs verification.
+
+- [x] 7.13 Re-freeze both `MANIFEST.sha256` files after the ADR renumbering edited comment lines inside
+      manifest-covered fixture files. A comment-only edit trips the tamper guard exactly as hard as a
+      payload edit, and it did: `run-pipeline.sh` exited 2 at preflight on BOTH fixtures with "refusing to
+      run against a tampered or edited fixture", so the rig was entirely unrunnable at `db9053b`.
+      Regenerated with `compute_manifest()` extracted verbatim from `rig/run-pipeline.sh:154-175`, never
+      re-implemented.
+      Verify: `diff <(compute_manifest "$R") "$R/MANIFEST.sha256"` — the runner's own recompute-compare —
+      empty on both fixtures. Ground truth confirmed untouched: answer-key files byte-unchanged
+      (`git diff --stat` empty), v2 case-table digest still `b15b8d16…5becb1`.
+- [x] 7.14 Renumber the three `0014` pointers that PR7D's sweep structurally could not find:
+      `rig/fixtures/failure-flood/{v1,v2}/runtime/jest.config.js:4` abbreviate the slug as
+      `decisions/0014-a-...md`, and `apply-progress.md:1183` was line-wrapped with `ADR` ending line 1182.
+      A sweep keyed on the full old filename, and a regex requiring `ADR 0014` on one line, could match
+      neither. **The complete sweep enumerates the bare `0014` token and classifies each hit by hand.**
+      All three cited Clause A, which `main`'s ADR 0014 does not have — so they resolved to a real file
+      lacking the cited clause, which fails silently rather than dangling.
+      Verify: bare-token sweep over the whole tree; every surviving hit is either `main`'s own ADR 0014 or
+      a preserved record of this collision.
+- [ ] 7.15 **`fixture_digest` records the present, not the run.** `build_row_failure_flood` derives it from
+      the live tree at derive time rather than from the run's own raw capture, so re-freezing a manifest
+      silently rewrote the field on three already-recorded runs: they now claim a fixture digest that did
+      not exist when they executed. Found while closing 7.13 — the three rows moved from the old MANIFEST
+      hash to the new one with no other field changing.
+      Harmless here (all three rows are `state=void, void_reason=shakedown`, so nothing numeric depends on
+      them) and **serious before any countable run**: this is the same class as CRITICAL-3's unpinned model,
+      a field that claims to record identity but follows the present. It also means the field cannot do the
+      one job it exists for — detecting that a fixture changed after a measurement.
+      Verify: a row's `fixture_digest` must come from its own capture, and re-deriving after an unrelated
+      fixture edit must leave already-recorded rows byte-identical.

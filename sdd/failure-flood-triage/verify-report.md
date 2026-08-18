@@ -9,10 +9,10 @@ sources: ["sdd/failure-flood-triage/spec.md", "sdd/failure-flood-triage/tasks.md
 
 ```yaml
 schema: gentle-ai.verify-result/v1
-evidence_revision: sha256:b6bf1d11b633cf765701e18748ae82483c705d17f0321ac77ec4b35a02d0d0a6
+evidence_revision: sha256:4158fa588486887be64da8d0ec5d716db3858d51c5fae3dbb268decdc1a6653d
 verdict: fail
-blockers: 1
-critical_findings: 1
+blockers: 2
+critical_findings: 2
 requirements: 24/31
 scenarios: 12/19
 test_command: python3 rig/derive.py --self-test
@@ -20,12 +20,616 @@ test_exit_code: 0
 test_output_hash: sha256:ec410c539bf625bd78adb5cdfd7097629b1d97d32a16679b456c4a3f7eb34741
 build_command: ./hooks/pre-commit --all
 build_exit_code: 0
-build_output_hash: sha256:fa1cb7af2c3423d538542fc5d5c74470bebc7a41d6749e16e09ea099a25c2ad1
+build_output_hash: sha256:7d6f2351063484f7fd0159aafb7e13b383f3ea7ffbf4732b772ae2fa406169be
 ```
 
 # Verification Report — failure-flood-triage
 
-## Round 2 — 2026-08-18. This section SUPERSEDES the 2026-08-17 verdict below
+## Round 3 — 2026-08-18. This section SUPERSEDES round 2 below
+
+Rounds 2 and 1 are retained verbatim under "Superseded". Their findings and their resolutions are
+the record; nothing is deleted. Where round 3 contradicts an earlier round, round 3 wins and says so.
+
+| Field | Value |
+|---|---|
+| Verified against | commit `db9053b`, branch `sdd/failure-flood-triage-planning`, tree clean at start, after every command, and at finish |
+| Batches under review since round 2 | `3f11150` (PR7D — CRITICAL-5 remedy + WARNING-11 fix), `db9053b` (merge of `main`) |
+| Branch position | **0 commits behind `main`** — re-derived, `git rev-list --count HEAD..main` = 0, `main..HEAD` = 31. Round 2's "3 behind" is now genuinely resolved |
+| Tracked files | 178 (was 173 at round 2) |
+
+**Method.** Nothing was carried forward on the strength of round 2 having verified it. Every gate was
+re-run under `main`'s **newer** `hooks/pre-commit`, both row sets were re-derived from raw captures at
+this commit, the mutation controls were re-injected, and the ADR 0009 scan was re-run independently
+over all 178 files. No countable run was spent: every observation below comes from a `--self-test`, a
+mutation of a copy outside the tree, a byte-identical re-derive, a preflight that exits before any
+model invocation, or git inspection.
+
+### Round 3 verdict
+
+**FAIL — two blockers, both introduced by `3f11150`, the commit that remedied CRITICAL-5.**
+
+| Severity | Count | Change from round 2 |
+|---|---|---|
+| CRITICAL | **2** (both new) | CRITICAL-1–4 remain closed; CRITICAL-5's namespace half closed, its citation half did not |
+| WARNING | **12** | 10 carried forward, 1 partially closed, 2 new |
+| SUGGESTION | **5** | 4 carried forward, 1 upgraded to WARNING, 1 new |
+
+The renumbering was correct in its reasoning and correct in nine of its twelve pointer decisions. It
+was **incomplete in three places, and it edited three frozen fixture files without re-freezing them.**
+The second of those is the one that matters: `rig/run-pipeline.sh` now refuses to start against either
+fixture. **The experiment this cycle exists to build cannot currently be run at all.**
+
+---
+
+## The two new blockers
+
+### CRITICAL-6 (NEW) — the renumbering edited three manifest-covered fixture files and did not regenerate `MANIFEST.sha256`; the runner now refuses to start on both fixtures
+
+`3f11150` changed one line in each of three files that live inside the frozen fixture surface:
+
+| File | Change |
+|---|---|
+| `rig/fixtures/failure-flood/v1/runtime/package.json` | `description`: `ADR 0014 Clause A` → `ADR 0015 Clause A` |
+| `rig/fixtures/failure-flood/v2/runtime/package.json` | same |
+| `rig/fixtures/failure-flood/v2/tools/generate-cases.py` | comment: `(ADR 0014 Clause A)` → `(ADR 0015 Clause A)` |
+
+Neither `MANIFEST.sha256` was regenerated. Both now fail:
+
+```
+$ (cd rig/fixtures/failure-flood/v1 && shasum -a 256 -c MANIFEST.sha256)
+runtime/package.json: FAILED
+shasum: WARNING: 1 computed checksum did NOT match          # exit 1
+
+$ (cd rig/fixtures/failure-flood/v2 && shasum -a 256 -c MANIFEST.sha256)
+runtime/package.json: FAILED
+tools/generate-cases.py: FAILED
+shasum: WARNING: 2 computed checksums did NOT match         # exit 1
+```
+
+**This is a regression against a property round 2 verified.** Round 2's non-regression table records
+"v1 `MANIFEST.sha256` | 12 files, **0 bad**" and "v2 | 23 files, **0 bad**". Re-checked at `3172930`
+(round 2's revision) in a scratch extraction: both clean. At `db9053b`: 1 bad and 2 bad.
+
+**The consequence is not cosmetic — the runner's own tamper guard is now permanently tripped.**
+`rig/run-pipeline.sh:408-415` recomputes the manifest at preflight and calls `die_cannot_run` on any
+mismatch. Proven two ways.
+
+First, by extracting `compute_manifest()` verbatim (`run-pipeline.sh:154-176`) and running the
+preflight's exact comparison:
+
+```
+v1: MISMATCH — runner preflight would die_cannot_run (exit 2)
+v2: MISMATCH — runner preflight would die_cannot_run (exit 2)
+```
+
+Second, live, with a full valid argument set (this exits at line 415, long before any `claude -p`
+invocation and before the first `mkdir` at line 442 — no run was created and no run was spent):
+
+| Invocation | Exit | Message |
+|---|---|---|
+| `s1 monolithic 99 --permission-mode bypassPermissions --model claude-sonnet-5 --shakedown` | **2** | `COULD NOT RUN: MANIFEST.sha256 mismatch under <repo>/rig/fixtures/failure-flood/v1 — refusing to run against a tampered or edited fixture.` |
+| `s2 …` (same flags) | **2** | same, for `…/v2` |
+
+`rig/runs/` digest identical before and after all probes; `git status --porcelain` empty throughout.
+
+**What is NOT damaged, stated so the remedy is not over-scoped.** The three edits are a JSON
+`description` string and a Python comment. No logic, no test content, no answer key, and no generated
+output changed:
+
+- `answer-key/s1.json` and `answer-key/s2.json` are byte-unchanged since `3172930`.
+- `s1` totals `(4, 32, 36)` and `s2` totals `(499, 2383, 2882)` — exact match, re-read this round.
+- `R0` cause counts 3 and 6 — exact match.
+- The case-table digest, regenerated into a scratch directory from the edited generator, is
+  `b15b8d16…5becb1` — **byte-identical to the frozen `answer-key/case-table.sha256`**. The generator's
+  edit was comment-only and provably changed no output.
+
+So `C`/`F0`/`S0`/`R0` are intact and R-F1.1's freeze holds in substance. What broke is the **freeze
+artifact**, and the guard cannot tell a comment from a payload — by design, and that design is
+correct. The remedy is to regenerate both `MANIFEST.sha256` files and record why in the same commit.
+
+**Why this blocks archive.** Archiving files a cycle whose entire deliverable is a runnable
+instrument, at a revision where the instrument refuses to run. Every remaining unverified item in this
+report — both hypotheses, R-F7.2's sampling escalation, R-F4.2's "partial credit fires at least once",
+R-F6.3's re-collect — is gated on a runner that currently exits 2 at preflight on both fixtures.
+
+### CRITICAL-7 (NEW) — three pointers were left at `0014` and now resolve to `main`'s unrelated ADR
+
+The renumbering rule the operator applied is correct: **a pointer is renumbered; a statement about the
+past is annotated and left standing.** Audited in both failure directions across all 59 tracked
+occurrences of the token `0014`. The rule was applied correctly at 12 sites and missed 3.
+
+| Surviving pointer | Text |
+|---|---|
+| `rig/fixtures/failure-flood/v1/runtime/jest.config.js:4` | `// repo's verification surface (decisions/0014-a-...md, Clause A). All paths` |
+| `rig/fixtures/failure-flood/v2/runtime/jest.config.js:4` | identical |
+| `sdd/failure-flood-triage/apply-progress.md:1183` | `0014 Clause A); no node_modules anywhere under <repo>…` |
+
+All three cite **Clause A**, which is this branch's ADR — now `0015`. All three now resolve to
+`main`'s `decisions/0014-a-public-guarantee-cannot-be-opt-in.md`, **which has no Clause A at all**
+(its sections are Context / Decision / Implementation status / The limit / Consequences /
+Alternatives). The abbreviated form `decisions/0014-a-...md` is worse than a dangling path: it still
+globs to exactly one file, so it resolves silently and wrongly rather than failing loudly.
+
+**Why all three survived, which is the reusable finding.** Task 7.11's done-note records its sweep as
+`rg -n "0014-a-fixtures-runtime"` and `fd "0014-a-fixtures-runtime"`. None of the three surviving
+sites contains that slug: two abbreviate it to `0014-a-...md`, and the third is a citation
+line-wrapped so that `ADR` ends line 1182 and `0014 Clause A)` begins line 1183. **A sweep keyed on
+the old full filename cannot find a citation that never spelled it out**, and a line-oriented sweep
+cannot find one split across a line boundary. The sweep that would have found all three is the one run
+here: enumerate every occurrence of the bare token `0014` and classify each by hand.
+
+**The opposite failure direction — a destroyed record — did not occur.** Checked site by site against
+`git show 3f11150`:
+
+| Site | Kind | Handling | Correct |
+|---|---|---|---|
+| `apply-progress.md` ×10 (`:27,57,249,392,516,576,701,914,1182,1946`) | pointer | renumbered | Yes |
+| `apply-progress.md:1951` ("`MAP.md` read 0001–0013 … though ADR 0014 already exists") | past-tense fact | left standing, annotation appended | Yes |
+| `tasks.md:1152` (same `MAP.md` claim) | past-tense fact | left standing, annotation appended | Yes |
+| `verify-report.md:876` (round 1's R-F11.1 row) | pointer | renumbered **and** annotated "(filed as `0014` at the time)" | Yes — best form |
+| `verify-report.md:758, :671, :1018` (round 1's ordering row, sources list, design-roster row) | pointer | renumbered, not annotated | Acceptable — each identifies a document, and `:758` carries commit `9eccf8d`, which is unambiguous |
+| `verify-report.md` CRITICAL-5 section (both ADRs named `0014`) | the record of the collision itself | left standing verbatim, resolution note appended after it | Yes — rewriting it would have destroyed the finding |
+| `MAP.md:43`, `rig/README.md:77-78`, ADR `0015` frontmatter + body blockquote | renumbering record | annotated | Yes |
+
+**No duplicate ADR number remains anywhere.** `git ls-tree -r --name-only HEAD -- decisions/` yields
+16 entries with 15 distinct four-digit prefixes and no repeat. `diff` against `main`'s `decisions/`
+shows exactly one line: `0015-a-fixtures-runtime-…` added, nothing removed, no collision. `MAP.md`'s
+`decisions/` row and both ADRs' `status:` fields agree (`0015` validated, `0014` draft).
+
+**Remedy note.** The two `jest.config.js` sites are inside the frozen fixture surface, so correcting
+them is the *same* commit as CRITICAL-6's manifest regeneration, not a second one.
+
+---
+
+## CRITICAL-5 — status after the remedy
+
+**Partially closed. Its namespace half is closed; its citation half is not.**
+
+| Half of CRITICAL-5 | Status |
+|---|---|
+| Two documents share the identifier `0014` | **CLOSED** — re-derived above; `main` keeps `0014`, this branch's ADR is `0015` |
+| Every citation resolves to the document it means | **NOT CLOSED** — 3 of 15 pointer sites still resolve to the wrong ADR (CRITICAL-7) |
+
+The operator's tie-break — publication beats chronology, because a public identifier is load-bearing
+for outside citers and an unpushed one owes nothing to anyone — is recorded in the ADR's own
+frontmatter and in a body blockquote, and is sound. Nothing in this round contests the decision; only
+its completeness.
+
+---
+
+## Round 1's four CRITICALs, re-derived AFTER the merge
+
+The merge (`db9053b`) touched shared files, so none of round 2's closures was assumed to survive it.
+
+**First, what the merge could and could not have moved.** Byte-identity against `3172930`:
+
+| File | vs `3172930` |
+|---|---|
+| `rig/derive.py` | **IDENTICAL** |
+| `rig/collect.py` | **IDENTICAL** |
+| `sdd/failure-flood-triage/design.md` | **IDENTICAL** |
+| `rig/fixtures/failure-flood/v2/tools/axis_table.py` | **IDENTICAL** |
+| `rig/run-pipeline.sh` | changed by exactly one line — the `ADR 0014 A` → `ADR 0015 A` comment |
+| `rig/report.py` | changed by `3f11150` only — the WARNING-11 fix |
+| `hooks/pre-commit` | replaced by `main`'s newer checker (+82/-17) |
+| `rig/results/**` | **unchanged since `3172930`** (`git diff --stat 3172930..HEAD -- rig/results/` empty) |
+
+**CRITICAL-1 — `R-F2.2` (`suite_state_cause`): still CLOSED.** Function at `derive.py:762`, wired at
+`:977-978` (`state="void"`, `void_reason="suite-state-mismatch"`, anomaly class added), published on
+the row at `:1053`. `derive.py --self-test` at this commit: **exit 0, 37 `[PASS]`, 0 `[FAIL]`.**
+Mutation control re-injected this round in a layout-preserving scratch copy:
+
+```
+baseline (scratch, layout preserved)            EXIT=0  PASS=37 FAIL=0
+--- [M1_suite_state_cause_always_injection]     EXIT=1  PASS=31 FAIL=6
+```
+
+Round 2's exact numbers reproduce.
+
+**CRITICAL-2 — `R-F3.2` (attribution scoring): still CLOSED.** `parse_root_cause_report` at `:700`,
+sentinel check at `:711`, `read_root_cause_report_handoff` at `:745`, wired at `:994-998`, published
+at `:1070`. Mutation control:
+
+```
+--- [M3_parse_root_cause_always_none]           EXIT=1  PASS=30 FAIL=7
+```
+
+**CRITICAL-3 — the model pin: still CLOSED, and the gates were re-run live.** All five argument shapes
+re-run at this commit, each exiting before any `claude` invocation:
+
+| Invocation | Exit | Message |
+|---|---|---|
+| no `--model` | **2** | `--model is required (ADR 0010, R-F7.1) — declare the exact model id/alias per invocation, never inherited` |
+| no `--permission-mode` | **2** | `--permission-mode is required (R-F7.4) — one of: acceptEdits auto bypassPermissions manual dontAsk plan` |
+| neither | **2** | the `--permission-mode` message |
+| `--model ""` | **2** | the `--model is required` message |
+| `--model` with no value | **2** | `--model requires a value` |
+
+`rig/runs/` digest identical before and after; tree clean. Mutation control on the void:
+
+```
+--- [M2_model_mismatch_void_disabled]           EXIT=1  PASS=36 FAIL=1
+    [FAIL] build_row_failure_flood: model_matches_declared=False -> state=void, void_reason=model-mismatch
+```
+
+**CRITICAL-4 — `R-F7.3` token breakdown: still CLOSED for the clause round 1 named.** Re-derived from
+the committed rows rather than read from a note — see the row-regression section below: all four
+components plus `tool_calls` are present at both the step and the run level. The literal "per turn"
+clause remains unmet (WARNING-9).
+
+**One methodological note, recorded because it changes how a future mutation harness must be built.**
+`derive.py --self-test` resolves `SURFACES_ROOT` from its own file location. A copy into a bare
+directory crashes with an uncaught `FileNotFoundError` at the 4 integration cases (exit 1, 33 `[PASS]`,
+0 `[FAIL]` — a non-zero exit with no `[FAIL]` line, which reads like a passing run to a grep-based
+harness). Mutation testing must preserve the `rig/` layout, as it did above. This is a property of the
+harness, not a defect in the deriver.
+
+---
+
+## Non-regression across PR1–PR6, re-derived at this commit
+
+| Item | Result |
+|---|---|
+| `tool-surface-v1` re-derive | `python3 rig/derive.py` exit 0 → rewrites `rig/results/tool-surface-v1/runs.jsonl` in place (`derive.py:1495-1499`); `git status` empty afterwards ⇒ **byte-identical** re-derive from the raw captures |
+| `failure-flood-v1` re-derive | same, exit 0, **byte-identical** |
+| `tool-surface-v1` row regression vs `fa49b35` | 42 → 42 rows, same `run_id` set; **0 fields added, 0 removed**; the only pre-existing field whose value changed on any row is `checker_digest` (42/42) — which necessarily changes on any `derive.py` edit, and which R-F5.3's own scenario excludes from the byte-identity claim. **Zero substantive mismatches** |
+| `failure-flood-v1` row regression vs `fa49b35` | 3 → 3 rows; 7 top-level fields added (`declared_model`, the four token components, `tool_calls`, `suite_state_cause`), 0 removed; inside `steps[]`: **5 keys added, 0 removed, 0 pre-existing key value changes**; top-level value changes limited to `checker_digest`, `schema_version` (1→3) and `steps` (additive only). **No pre-existing value changed** |
+| v1 `MANIFEST.sha256` | **1 BAD** — see CRITICAL-6 |
+| v2 `MANIFEST.sha256` | **2 BAD** — see CRITICAL-6 |
+| Case-table digest regenerated into scratch | `b15b8d16…5becb1` — **exact match** to the frozen file |
+| `s1`/`s2` totals | `(4, 32, 36)` and `(499, 2383, 2882)` — **exact match** |
+| `R0` cause counts | 3 and 6 — **exact match** |
+| The three committed rows | all `state=void`, `void_reason=shakedown`, `verdict=null`, `causes_claimed=null`, `causes_correct=null`. **No countable row exists** |
+| `rig/run.sh` untouched (R-F6.4) | `git diff --stat main...HEAD -- rig/run.sh` empty |
+| `rig/collect.py` untouched by the merge | `git diff --stat 3172930..HEAD` empty |
+| Tree state | clean at start, after every command, and at finish |
+
+**Nothing regressed except the two items in CRITICAL-6 and CRITICAL-7, both from `3f11150`.**
+
+---
+
+## Gate evidence — every command actually run in round 3, under `main`'s NEWER checker
+
+| Command | Exit | Output |
+|---|---|---|
+| `./hooks/pre-commit --all` | **0** | `redaction check: clean across 178 tracked files` |
+| `./hooks/pre-commit --self-test` | **0** | 4 cases pass (clean tree w/ placeholders, absolute home path reported, unreadable file escalates, missing pattern list escalates) |
+| `./check.sh` | **0** | `structure check: clean across 102 content files and 5 skill(s)` |
+| `python3 rig/collect.py --self-test` | **0** | 14 `[PASS]` |
+| `python3 rig/derive.py --self-test` | **0** | 37 `[PASS]`, 0 `[FAIL]` |
+| `python3 rig/report.py --self-test` | **0** | 3 `[PASS]` |
+| `generate-cases.py --self-test` | **0** | 3 `[PASS]`; totals 720/567/432/384/384/336 = 2,823; prints no ratio |
+| `bash -n` × 6 (`run-pipeline.sh`, `run.sh`, `hooks/pre-commit`, `check.sh`, `hooks/commit-msg`, `hooks/redaction-patterns.sh`) | 0 each | — |
+| `python3 -m py_compile` × 5 (`derive.py`, `report.py`, `collect.py`, `generate-cases.py`, `axis_table.py`) | 0 each | — |
+| `python3 rig/derive.py` (default) | 0 | 42 rows, byte-identical re-derive |
+| `python3 rig/derive.py --experiment failure-flood-v1` | 0 | 3 rows, all `state=void (shakedown)`, byte-identical re-derive |
+| `python3 rig/report.py --experiment failure-flood-v1` | 0 | excluded-row list plus 4 bare table headers |
+| `rig/run-pipeline.sh` × 5 argument-gate shapes | **2** each | see CRITICAL-3 |
+| `rig/run-pipeline.sh` × 2 valid-argument shapes | **2** each | MANIFEST mismatch — see CRITICAL-6 |
+| 3 × mutated `derive.py --self-test` (layout-preserving scratch) | **1** each | see CRITICAL-1/-2/-3 |
+| `shasum -a 256 -c MANIFEST.sha256` × 2 | **1** each | 1 bad, 2 bad |
+| `git status --porcelain` after all of the above | — | empty |
+
+**Round 2's `redaction check: clean` citations are now retroactively validated.** Round 2 correctly
+flagged that every prior citation in this stack was produced by the branch's **older**
+`hooks/pre-commit`, and listed `main`'s newer checker under "Not verified at all". Re-run here: the
+newer checker reports **clean across 178 tracked files, exit 0**, and its own `--self-test` passes 4
+cases including two escalation paths (an unreadable tracked file and a missing pattern list) that the
+older checker did not have. The gate citations in this stack now rest on the stricter checker.
+
+No test runner and no package manager exists in this repository (ADR 0013). "Run the suite" is not a
+verification surface here and none was invented.
+
+---
+
+## The nine frontmatter violations — re-derived, and the fix audited against `AGENTS.md`
+
+**The count is exactly right.** Current `check.sh` run against a scratch extraction of `3f11150`
+(pre-merge content, post-merge checker):
+
+```
+decisions/0015-…-runner.md: frontmatter: line 8 is not `key: value`      ×4 (lines 8-11)
+sdd/failure-flood-triage/tasks.md: frontmatter: line 8 is not `key: value` ×3 (lines 8-10)
+sdd/failure-flood-triage/tasks.md: sources: `[...` is not a list          ×1
+sdd/failure-flood-triage/verify-report.md: no frontmatter block: line 1 is not `---`  ×1
+                                                                  9 violation(s).
+```
+
+At `db9053b`: `./check.sh` exit **0**.
+
+**The fix to ADR `0015` destroyed no record.** The five-line `renumbered:` value was collapsed to
+`"from 0014 on 2026-08-18 — see the note in the body"`, and the full rationale — chronology, the
+publication tie-break, the unchanged ratification date — survives verbatim in the ADR's own body
+blockquote (`:13-18`). A shorter frontmatter value pointing at a longer body note is the right shape;
+frontmatter is a query interface (ADR 0004), not a place to hold an argument.
+
+**The frontmatter added to this report is correct per `AGENTS.md`, not merely gate-passing.** Checked
+field by field against the contract at `AGENTS.md:140-162`:
+
+| Field | Value | Contract rule | Verdict |
+|---|---|---|---|
+| `id` | `sdd/failure-flood-triage/verify-report` | path-like, stable, mirrors location | **Correct** |
+| `type` | `journal` | must be in the closed enum (`check.sh:133`); `spec.md` and `tasks.md` use the same value for the same artifact class | **Correct and consistent** |
+| `targets` | `[any]` | always a list; `[any]` when stack-independent | **Correct** |
+| `status` | `draft` | `draft` = unverified, not citable. A `fail` verdict must not be `validated` | **Correct** |
+| `verified` | `2026-08-18` | ISO date of last actual verification | **Correct** — round 3 ran the same day |
+| `sources` | 4 repo-relative paths | non-empty required only for `validated`; all four files exist on disk | **Correct** |
+
+Two residues, neither blocking, recorded as SUGGESTION-6: the frontmatter `sources` list (4 files) is
+narrower than the in-body round-2 metadata table's `sources` (which also names `decisions/0009`–`0013`
+and `0015`); and ADR `0015`'s `renumbered:` key sits outside `AGENTS.md`'s documented six-field
+schema. `check.sh` validates block shape plus the `type` and `status` enums, and has no key allow-list,
+so the extra key is tolerated rather than sanctioned.
+
+**But the fix has a cost that round 2 predicted and this round measured — see WARNING-13.**
+
+---
+
+## ADR 0009 — independently re-scanned over all 178 tracked files, and CLEAN
+
+Counts only. No forbidden value is written into this report at any point, including while describing
+what was searched for.
+
+| Category | Tracked files containing it |
+|---|---|
+| Instantiated home-directory absolute path | **0** |
+| Employer / organisation token | **0** |
+| Maintainer surname | **0** |
+| Full email address | **0** |
+| Dash-mangled home path (session scratch directory name) | **0** |
+| Private-tmp / session scratch root prefix | **0** |
+| Bare **first** name | 3 — `decisions/0006-*`, `journal/2026-08-04-*`, `journal/2026-08-05-knowledge-base-handoff.md`; **explicitly exempt** by ADR 0009's own scope note |
+
+Four tracked files match the home-path **prefix** with no account name after it — `AGENTS.md`,
+`decisions/0009-*`, `apply-progress.md`, and this report. All four are placeholder or shape
+descriptions, which ADR 0009 requires to remain documentable. Round 2's correction to round 1 on this
+point stands and is re-confirmed.
+
+The scan terms were derived programmatically from local git configuration rather than typed, so no
+instance passed through this session's own artifacts.
+
+**What the gate proves and what it does not.** `main`'s `hooks/redaction-patterns.sh` states its own
+limit: it covers absolute home paths and seven secret shapes, and **deliberately does not cover a
+private project or client name written as a bare word**, nor hostnames. So `clean across 178 tracked
+files` is evidence about the path and secret classes only; the identity-token result above comes from
+the independent scan, exactly as in round 2.
+
+---
+
+## Requirement trace — deltas from round 2
+
+No requirement changed status this round. The two new blockers are integrity and citation defects, not
+requirement gaps.
+
+| ID | Round 2 | Round 3 | Note |
+|---|---|---|---|
+| R-F1.1 | Met | **Met** | `C`/`F0`/`S0`/`R0` intact and byte-unchanged; the freeze *artifact* (`MANIFEST.sha256`) is broken, which is CRITICAL-6, not a requirement gap |
+| R-F11.1 | Met | **Met** | ADR exists, ratified, predates slice 3a. But it is mis-cited at three sites (CRITICAL-7) |
+| all others | — | unchanged | — |
+
+Totals: **24 of 31 requirements met**, 4 partial, 1 not-yet-applicable, 2 not verifiable here.
+Scenarios: **12 of 19** demonstrably covered. The remaining 7 need a countable run or a Jest run.
+
+---
+
+## No countable run has ever been made — what this cycle can and cannot claim
+
+This is a deliberate operator-held decision, not a defect, and it is **not** treated as an archive
+blocker here. But it bounds the claims this cycle is entitled to make, and the archive should carry
+that boundary explicitly rather than leave it to be inferred.
+
+`rig/results/failure-flood-v1/runs.jsonl` holds exactly 3 rows, all `state=void`,
+`void_reason=shakedown`, `verdict=null`, `causes_claimed=null`, `causes_correct=null`. `report.py`
+names all three in its excluded list and counts 0 of 3.
+
+**This cycle CAN claim, on measurement:**
+
+- A built, self-testing instrument: four `--self-test` surfaces, all exit 0, and the deriver's is a
+  proven control — three injected defects each produced exit 1 and the *specific* expected failing
+  case, not a blanket failure.
+- Ground truth measured and frozen before any prompt: `s1` = 4/32/36 with 3 causes, `s2` =
+  499/2,383/2,882 with 6 causes, both re-derived here.
+- **The stage-2 ratio target FAILED at ~83:1 against a ~433–500:1 target**, recorded as failed at
+  every load-bearing site rather than softened or retroactively swapped.
+- A 67× byte asymmetry between the two arms' inputs (370,911 B vs 5,504 B), measured.
+- Peak occupancy retro-derived over 42 already-paid-for captures, 42/42 on all six invariants.
+- A pre-registration gate proven to refuse, and required-argument gates proven to exit 2.
+
+**This cycle CANNOT claim, at any strength:**
+
+- Anything about **which harness is cheaper**, which is the question the experiment exists to answer.
+  N = 0 countable rows in every cell.
+- Either hypothesis (`hypotheses/0002-*`, `hypotheses/0003-*`). Both are pre-registered and untested.
+- R-F7.2's sampling escalation (never exercised), R-F4.2's "partial credit fires at least once" (never
+  fired), R-F6.3's re-collect-after-each-cluster (never executed), or the model pin end-to-end through
+  a real `claude -p`.
+- That the task-5.9 `cp` at `run-pipeline.sh:705-708` works, since no run has produced a
+  `root-cause-report.txt` (WARNING-12).
+
+**The honest one-line framing for the archive:** this cycle delivers a *built and self-verified
+instrument plus a measured, failed ratio target* — never a *comparative result*. Any later reader who
+finds a cost claim attributed to this cycle should treat it as unfounded.
+
+---
+
+## Issues — every open item with its round-3 status
+
+### CRITICAL
+
+**CRITICAL-6 — frozen `MANIFEST.sha256` broken on both fixtures; the runner refuses to start.**
+Blocks archive. Detail above.
+
+**CRITICAL-7 — three pointers left at `0014`, now resolving to `main`'s unrelated ADR.** Blocks
+archive. Detail above. Two of the three are the same commit as CRITICAL-6's remedy.
+
+### WARNING
+
+Carried forward from round 2, re-verified as still open at `db9053b`:
+
+**WARNING-2 — stale pre-failure ratio claim in committed code.** `axis_table.py:19-21` still reads
+"landing the aggregate in the ~2,600-3,000 / ~433-500:1 target band". File byte-identical to
+`3172930`. Verbatim unchanged.
+
+**WARNING-3 — `derive.py`'s R-A1.4 self-test section is empty for `failure-flood-v1`.** Re-run this
+round: `checker self-test (R-A1.4 — each detector must be observed to fire):` followed by nothing.
+
+**WARNING-4 — task 6.4's done-note describes report output today's data does not produce.** Re-run:
+four bare table headers, no bodies, and the described per-`(task_id, arm)` message is absent.
+
+**WARNING-5 — step/suite timeouts still labelled placeholders.** `run-pipeline.sh:84-89`:
+`STEP_TIMEOUT_S=180`, `SUITE_TIMEOUT_S=150`, still commented "Both PLACEHOLDERS pending task 5.7's
+real wall-clock measurement". Task 5.7 ran; they were not re-derived.
+
+**WARNING-6 — the run-axis field is `state`, not `run_state` (R-F2.1).** Re-confirmed on the committed
+rows: `run_state` absent on all 3; `state` and `suite_state` both present on all 3.
+
+**WARNING-7 — the frozen `S0` carries no `signature`, and two `_purpose` strings say it does.**
+Re-confirmed: both answer keys' `S0` key sets are exactly
+`['_purpose', 'identifier_set_digest', 'suite_state', 'totals']`, and both `_purpose` strings open
+with "frozen suite state + its normalized signature".
+
+**WARNING-8 — `design.md`'s ASCII diagram is stale in two places.** `:599` names an older
+`CAUSE <path>:<line> <cluster_ids>` format; `:608` names `result.result` as the scoring source. Both
+superseded by R-F3.1/R-F3.2 as implemented. `design.md` is byte-identical to `3172930`.
+
+**WARNING-9 — R-F7.3's literal "per turn" clause is unmet.** Components are per-role and per-run;
+per-turn remains a single derived occupancy total, the shape the requirement forbids.
+
+**WARNING-10 — a complete row with `model_matches_declared` absent passes silently.**
+`derive.py:883` is `if step.get("model_matches_declared") is False:` — a missing key yields `None`,
+which is not `False`, so no void fires. Not producible by today's runner and not present in any
+committed row; still has no downgrade backstop.
+
+**WARNING-11 — PARTIALLY CLOSED.** `report.py`'s false statement **is fixed**: `3f11150` rewrote both
+the docstring and the printed message to "no row here ever reached `state==complete`; R-F3.2 has
+nothing countable to score yet" — accurate, and it no longer reports task 5.9 as unimplemented. The
+residue is still open: `tasks.md:1290` under `## Blocked tasks` still reads that task 5.9 "remains
+**not implemented**", superseded only by later per-task notes and never by that section itself.
+
+**WARNING-12 — the threading half of task 5.9 is verified by reading only.** The `cp` at
+`run-pipeline.sh:705-708` is covered by `bash -n` and by reading; no run since PR7B has produced a
+`root-cause-report.txt`. Task **7.10** (`run-pipeline.sh --self-test`) is the only unchecked task in
+`tasks.md` (47 checked, 1 unchecked) and is explicitly registered as deliberately out of scope. Under
+the verify skill's decision gate an incomplete task is CRITICAL for a core task and WARNING for a
+cleanup task; 7.10 is a test-harness hardening task whose absence blocks no requirement, so it is
+recorded here rather than as a blocker.
+
+New in round 3:
+
+**WARNING-13 — `./check.sh` and `gentle-ai sdd-verify-validate` are now mutually exclusive for this
+file.** Round 1 raised this as SUGGESTION-5 and resolved it in the validator's favour; the merge
+resolved it in `check.sh`'s favour. Both gates are now hard and they contradict:
+
+| Gate | Requirement | Result on this file |
+|---|---|---|
+| `./check.sh` (`:110`) | line 1 must be `---` | frontmatter required |
+| `gentle-ai sdd-verify-validate` | first non-empty content must be a fenced `yaml` envelope | `Error: verify report admission denied: YAML front matter is unsupported` |
+
+Proven by execution: the committed file is **denied** by the validator; the same bytes with the
+frontmatter block stripped are **admitted** (`{"valid": true, "verdict": "fail"}`). `check.sh`'s only
+exemption is `EXCLUDED_PREFIX='rig/fixtures/'` — there is no per-file escape for `sdd/`.
+
+**How this round resolved it, stated rather than hidden.** The substantive report bytes were validated
+by running `sdd-verify-validate` against a frontmatter-stripped copy (admitted, `valid: true`,
+authoritative counts 31 requirements / 19 scenarios re-derived from `spec.md`), and the file was then
+persisted **with** frontmatter so `./check.sh` continues to exit 0 and the tree keeps matching its own
+rules. The deviation from the verify skill's "denied admission ⇒ zero writes" rule is deliberate and
+recorded here, because the denial is caused by a repo-mandated block and not by anything about the
+report's content. This needs an explicit operator decision before the next verify round; it does not
+block archiving this change.
+
+### SUGGESTION
+
+**SUGGESTION-1 — still open.** `tasks.md:651-652` claims `collect.py --self-test` passes "all **15**
+cases (a, b, c.1–c.4, d, e, f, g.1, g.2, h.1, h.2, i)". The enumeration holds 14 items and the command
+emits **14** `[PASS]` lines. Re-derived this round. Still the candidate second occurrence for
+`BACKLOG.md` entry 1 rule (b).
+
+**SUGGESTION-2 — still open.** `C` is frozen in both answer keys and read by no executable.
+
+**SUGGESTION-3 — still open.** The four failure-flood tables print bare headers with no
+`(no complete rows)` line, unlike the excluded-rows table's `or ["none"]`.
+
+**SUGGESTION-4 — still open.** `apply-progress.md:513` still asserts "~470:1 — inside the
+operator-confirmed ~433–500:1 band" at its own site, corrected 574 lines later.
+
+**SUGGESTION-5 — UPGRADED to WARNING-13.** It is no longer a latent tension; both gates are now
+installed and one of them fails.
+
+**SUGGESTION-6 — new.** Two frontmatter residues, neither gate-visible: this report's frontmatter
+`sources` (4 files) is narrower than its own in-body metadata table's `sources`; and ADR `0015`'s
+`renumbered:` key is outside `AGENTS.md`'s documented six-field schema, tolerated because `check.sh`
+has no key allow-list. Either document the key in `AGENTS.md` or move the fact into the body only.
+
+---
+
+## Not verified at all in round 3 — stated rather than assumed
+
+1. **Everything requiring a Jest run.** No package manager and no `node_modules`. Covers the clean
+   baselines (3.1/3.2), per-injection isolation signatures (4.1/4.3), the 2,882-passing amplified
+   clean run, and R-F9.1's empirical mutation (49/392).
+2. **Mutation controls M4 (`row input_tokens` zeroed) and M5 (`row tool_calls` dropped).** Not
+   re-injected this round — the anchor used for M4 did not match and no substitute was attempted.
+   Mitigated: `derive.py` is **byte-identical** to the revision where round 2 ran both and both fired,
+   so that verification transfers exactly.
+3. **`check_prereg()`'s `more_than_one_match` and `tracked_but_dirty` branches.** Not re-run.
+   `run-pipeline.sh` changed by one comment line since round 2, so round 1's five-branch verification
+   and round 2's byte-identity check both still carry.
+4. **Live-tamper transitions.** Current state re-derived; tamper transitions were not re-performed, to
+   avoid dirtying tracked fixture bytes.
+5. **Anything requiring a countable run** — and, at this revision, anything requiring a run at all,
+   since the runner exits 2 at preflight (CRITICAL-6).
+6. **Whether regenerating `MANIFEST.sha256` restores the runner.** Not attempted: the boundary for
+   this phase is report-only, and regenerating a frozen artifact is an apply-phase action.
+
+---
+
+## What must happen before archive
+
+| # | Action | Blocks archive |
+|---|---|---|
+| 1 | Regenerate both `rig/fixtures/failure-flood/{v1,v2}/MANIFEST.sha256` and re-prove the runner reaches past preflight on both fixtures | **Yes** |
+| 2 | Correct the three surviving `0014` pointers (`v1`/`v2` `runtime/jest.config.js:4`, `apply-progress.md:1183`) to `0015`; do the two fixture files in the same commit as item 1 | **Yes** |
+| 3 | Obtain an operator decision on the `check.sh` / `sdd-verify-validate` conflict (WARNING-13) | No — but before the next verify round |
+| 4 | Correct `tasks.md:1290`'s "task 5.9 remains not implemented" | No |
+| 5 | Correct `design.md:599` and `:608` to R-F3.1's actual format and source | No |
+| 6 | Either freeze a `signature` in both `S0` blocks or correct the two `_purpose` strings | No |
+| 7 | Re-derive `STEP_TIMEOUT_S`/`SUITE_TIMEOUT_S` from task 5.7's real wall clocks | No — but before the countable run |
+| 8 | Record R-F7.3's four components per turn, or amend the clause | No |
+| 9 | Add a downgrade backstop for a complete row with no declared-model comparison | No |
+| 10 | Correct `axis_table.py:19-21`, `tasks.md:651-652`, task 6.4's note, `apply-progress.md:513` | No |
+| 11 | Implement task 7.10 so the task-5.9 `cp` and the argument gates get a committed test | No |
+
+**Verdict: FAIL — two blockers, both created by the fix for the previous blocker.** Round 1's four
+CRITICALs remain closed and their closures survived the merge and fresh mutation testing. CRITICAL-5's
+namespace half is closed. The remaining work is small and mechanical — regenerate two manifests and
+correct three citations — but it is not optional: at this revision the instrument this cycle exists to
+build refuses to run.
+
+## Round 3 Key Learnings
+
+1. A rename that touches a frozen fixture must re-freeze it in the same commit; a comment-only edit
+   trips a tamper guard exactly as hard as a payload edit, because the guard cannot tell them apart
+   and should not try.
+2. A sweep keyed on an old full filename cannot find a citation that abbreviated it or wrapped it
+   across a line break, so the only complete renumbering audit enumerates the bare number token.
+3. A wrong pointer that still resolves to exactly one existing file is more dangerous than a dangling
+   one, because nothing fails and the reader lands on a document that simply lacks the clause cited.
+4. Two independently correct gates can become mutually exclusive when they meet in a merge, and the
+   conflict is invisible until both are run against the same file.
+5. Fixing the blocker a previous verification round found is itself a change that needs verification;
+   this round's only two blockers were introduced by the previous round's remedy.
+
+---
+---
+
+# Superseded — round 2, 2026-08-18
+
+**Superseded by round 3 above.** Retained verbatim below: its findings, and the resolutions
+they produced, are the record. Round 3 contradicts it in one place, stated there: CRITICAL-5's
+remedy is incomplete, and it introduced two new blockers.
+
+## Round 2 verdict as issued — 2026-08-18
 
 The 2026-08-17 report is retained verbatim under "Superseded — round 1". Its findings and their
 resolutions are the record; nothing in it is deleted. Where round 2 contradicts round 1, round 2

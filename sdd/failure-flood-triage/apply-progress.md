@@ -1180,7 +1180,7 @@ the general macOS `/tmp`→`/private/tmp` symlink behavior generically or use an
 placeholder, confirmed by `rg` for the actual scratch directory name (no match).
 
 **Redaction/ADR 0015 process.** All measurement ran in `mktemp` scratch directories outside `<repo>` (ADR
-0014 Clause A); no `node_modules` anywhere under `<repo>` (confirmed after cleanup). `rig/fixtures/failure-flood/v1/**`
+0015 Clause A); no `node_modules` anywhere under `<repo>` (confirmed after cleanup). `rig/fixtures/failure-flood/v1/**`
 was NOT edited beyond the two files this work unit's coordinator explicitly authorized
 (`answer-key/s1.json`, `MANIFEST.sha256`) — `v1/src`, `v1/tests`, `v1/runtime` remain byte-unchanged,
 proven above. Per PR4-i's own lesson (a `git checkout --` mistake that reverted an injection before

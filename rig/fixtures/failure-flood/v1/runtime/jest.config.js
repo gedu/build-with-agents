@@ -1,7 +1,7 @@
 'use strict';
 
 // This fixture's own Jest run — substrate under measurement, never this
-// repo's verification surface (decisions/0014-a-...md, Clause A). All paths
+// repo's verification surface (decisions/0015-a-...md, Clause A). All paths
 // are resolved from __dirname (this file's real location under runtime/),
 // never from process.cwd(), so the config works whether it is invoked from
 // runtime/ (npm test / npx jest) or from the fixture root — and keeps
