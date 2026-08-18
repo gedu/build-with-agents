@@ -1,0 +1,298 @@
+{
+  "task_id": "s2",
+  "tier": 2,
+  "fixture_note": "Stage 2 (task_id s2) on failure-flood/v2 (design.md section 8; spec R-F9.1-9.2). Corpus is the full amplified suite: 59 real base tests plus 2,823 generated cases (tools/generate-cases.py, answer-key/case-table.sha256), loaded via FAILURE_FLOOD_CASE_DIR (tests/_loadCases.ts) - 2,882 tests total (6 suites). F0/S0/R0 below are MEASURED by rig/collect.py against the real, injected, committed src/ with generated cases loaded - never the declared injection list (R-F1.1). Measured under normalizer_version 3 (task 4.3's own two fixes to rig/collect.py, both found by this measurement and applied before this freeze, per design.md:711's own instruction that 'a cause whose cluster count grows with case_count is a normalizer defect, not a key entry'): (1) Expected:/Received: cut widened to also match Jest's diff-prefixed summary line ('- Expected  - N'/'+ Received  + N'), closing an unbounded per-case cluster explosion measured on parseTransfers (146 failing cases -> 146 clusters before the fix, 3 after); (2) workspace_root now realpath(cwd), not abspath(cwd), closing an absolute-host-path leak into test_id/signature measured when the scratch workspace lived under a symlinked path (macOS's /tmp -> /private/tmp). v1's answer-key/s1.json was re-measured and rewritten under the same version-3 fix in this same work unit (its own MANIFEST.sha256 recomputed) rather than left silently stale, since the fix's version bump makes any version-2 measurement of a .toMatchObject()/.toEqual() failure incomparable.",
+  "C": {
+    "_purpose": "Clean-fixture baseline, zero failures under BOTH corpus conditions, proven fresh before injection (R-F1.3).",
+    "with_generated_cases": {
+      "suite_state": "ran",
+      "totals": {
+        "failed": 0,
+        "passed": 2882,
+        "suites_expected": 6,
+        "suites_reported": 6,
+        "tests": 2882
+      },
+      "identifier_set_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "base_only_no_generated_cases": {
+      "suite_state": "ran",
+      "totals": {
+        "failed": 0,
+        "passed": 59,
+        "suites_expected": 6,
+        "suites_reported": 6,
+        "tests": 66
+      },
+      "identifier_set_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "F0": {
+    "_purpose": "R-F1.1: measured, normalized failure set after all 6 injections together, with generated cases loaded - never the declared list. SHAPE DECISION (task 4.3, revised twice after measuring this file's own line cost - reported honestly rather than silently trimmed): design.md:241 specifies failure/1 as a per-failure {test_id, status, signature} triple, called 'deliberately minimal... at amplified scale there are thousands of these' - a per-failure list is licensed by the design. Attempt 1 wrote all 499 per-failure records literally (one compact line each): 1,309 lines for this file, 1,499 authored total against a 700-line ceiling. Attempt 2 dropped the per-failure list for the full `clusters` field instead - but that field (collect.py's own `public_clusters`, collection/1 schema) ITSELF carries `member_test_ids` per cluster, and two clusters here have 145 and 144 members: still 815 lines, still over budget, for a reason with nothing to do with case_count - it was the wrong artifact. design.md 9b defines a SEPARATE, already-bounded artifact for exactly this: 'a bounded clusters view... clusters, counts, one representative each... bounded by CLUSTER count, never by failure count' (clusters/1, produced by collect.py's own clusters_view(), the same artifact the diagnostician receives and the same one task 2.2/PR4-signature-scope-fix already established as the answer to 'how many lines does a cluster cost'). FINAL: F0.clusters below is that clusters/1 view (9 entries, no member_test_ids), not collection/1's own `clusters` field. Scoring itself is cluster-level, never per-failure (design.md section 4: 'causes_present counts distinct sites in R0; clusters_present counts the signatures they map to'), and design.md:711's own amplification-safety freeze is explicitly 'clusters-per-injection... in R0', not a failure enumeration. The exact failing test_id SET remains independently verifiable without being enumerated here: S0.identifier_set_digest is the sha256 over that exact sorted set (design.md section 4), so a re-run reproduces a byte-identical digest without this file listing any of the 499 test_ids.",
+    "schema": "clusters/1",
+    "collector": "jest-json@1",
+    "normalizer_version": 3,
+    "totals": {
+      "failed": 499,
+      "passed": 2383,
+      "suites_expected": 6,
+      "suites_reported": 6,
+      "tests": 2882
+    },
+    "clusters": [
+      {
+        "cluster_id": "c1",
+        "count": 145,
+        "distinct_test_files": [
+          "../tests/balanceOfCall.test.ts"
+        ],
+        "representative_test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 0: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef12345678\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef12345678\"",
+        "signature": "464f20bcf079be21",
+        "signature_text": "Error: expect(received).toBe(expected) // Object.is equality"
+      },
+      {
+        "cluster_id": "c2",
+        "count": 144,
+        "distinct_test_files": [
+          "../tests/parseTransfers.test.ts"
+        ],
+        "representative_test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 0",
+        "signature": "fa149f8182fc2048",
+        "signature_text": "Error: expect(received).toEqual(expected) // deep equality"
+      },
+      {
+        "cluster_id": "c3",
+        "count": 99,
+        "distinct_test_files": [
+          "../tests/isValidEthereumAddress.test.ts"
+        ],
+        "representative_test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 144: isValidEthereumAddress(\"0x1234567890ABCDEF1234567890ABCDEF12345678\") -> true",
+        "signature": "eee64871f44abb2b",
+        "signature_text": "Error: expect(received).toBe(expected) // Object.is equality"
+      },
+      {
+        "cluster_id": "c4",
+        "count": 45,
+        "distinct_test_files": [
+          "../tests/formatTokenAmount.test.ts"
+        ],
+        "representative_test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 103: formatTokenAmount(\"13\", 2) -> \"0.13\"",
+        "signature": "fcc39172aca77e8a",
+        "signature_text": "Error: expect(received).toBe(expected) // Object.is equality"
+      },
+      {
+        "cluster_id": "c5",
+        "count": 41,
+        "distinct_test_files": [
+          "../tests/applyKeypadInput.test.ts"
+        ],
+        "representative_test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 156: applyKeypadInput(\"0.\", \"0\", 0) -> \"0.\"",
+        "signature": "607220f5cf3e52b9",
+        "signature_text": "Error: expect(received).toBe(expected) // Object.is equality"
+      },
+      {
+        "cluster_id": "c6",
+        "count": 22,
+        "distinct_test_files": [
+          "../tests/confirmSeed.test.ts"
+        ],
+        "representative_test_id": "../tests/confirmSeed.test.ts::isConfirmCorrect (amplified)::case 546",
+        "signature": "65a9e5f9e5eef040",
+        "signature_text": "Error: expect(received).toBe(expected) // Object.is equality"
+      },
+      {
+        "cluster_id": "c7",
+        "count": 1,
+        "distinct_test_files": [
+          "../tests/parseTransfers.test.ts"
+        ],
+        "representative_test_id": "../tests/parseTransfers.test.ts::parseTransfers::matches the account address case-insensitively",
+        "signature": "04933d1bde59e977",
+        "signature_text": "Error: expect(received).toBe(expected) // Object.is equality"
+      },
+      {
+        "cluster_id": "c8",
+        "count": 1,
+        "distinct_test_files": [
+          "../tests/parseTransfers.test.ts"
+        ],
+        "representative_test_id": "../tests/parseTransfers.test.ts::parseTransfers::maps an incoming transfer (to === account)",
+        "signature": "7f2043443e4b144b",
+        "signature_text": "Error: expect(received).toMatchObject(expected)"
+      },
+      {
+        "cluster_id": "c9",
+        "count": 1,
+        "distinct_test_files": [
+          "../tests/balanceOfCall.test.ts"
+        ],
+        "representative_test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf::produces a 0x + 8 selector + 64 data hex string",
+        "signature": "a9adcb00410c9db2",
+        "signature_text": "Error: expect(received).toHaveLength(expected)"
+      }
+    ]
+  },
+  "S0": {
+    "_purpose": "R-F2.2: frozen suite state + its normalized signature (with generated cases loaded - the corpus F0 is measured against), for later suite_state_cause classification. identifier_set_digest is the sha256 over the exact sorted set of 499 failing test_ids - the integrity proof for F0's exact failing SET without F0 needing to enumerate it (see F0._purpose's shape decision).",
+    "suite_state": "ran",
+    "identifier_set_digest": "a2fa993bd9ab35d06d5c75f10529885f9cbbf5786d9a0ca6a2dab1ef1e2990b1",
+    "totals": {
+      "failed": 499,
+      "passed": 2383,
+      "suites_expected": 6,
+      "suites_reported": 6,
+      "tests": 2882
+    }
+  },
+  "R0": [
+    {
+      "cause_site": "src/applyKeypadInput.ts:28",
+      "cause_label": "boundary/off-by-one in the decimal-cap comparison ('>=' relaxed to '>', allowing one extra fractional digit past maxDecimals) - recorded, never graded",
+      "cluster_ids": [
+        "c5"
+      ],
+      "isolated_clusters": [
+        {
+          "cluster_id": "c5",
+          "isolated_failing_count": 41,
+          "representative_test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 156: applyKeypadInput(\"0.\", \"0\", 0) -> \"0.\""
+        }
+      ]
+    },
+    {
+      "cause_site": "src/balanceOfCall.ts:3",
+      "cause_label": "off-by-one in the address left-pad width (ADDRESS_PADDING 64 narrowed to 63), corrupting the calldata length/content for every encodeBalanceOf call - recorded, never graded",
+      "cluster_ids": [
+        "c1",
+        "c9"
+      ],
+      "isolated_clusters": [
+        {
+          "cluster_id": "c1",
+          "isolated_failing_count": 145,
+          "representative_test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 0: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef12345678\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef12345678\""
+        },
+        {
+          "cluster_id": "c9",
+          "isolated_failing_count": 1,
+          "representative_test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf::produces a 0x + 8 selector + 64 data hex string"
+        }
+      ]
+    },
+    {
+      "cause_site": "src/confirmSeed.ts:15",
+      "cause_label": "index/position-mapping defect in isConfirmCorrect - CONFIRM_POSITIONS' position value replaced by the loop's own index when calling isPickCorrect - recorded, never graded",
+      "cluster_ids": [
+        "c6"
+      ],
+      "isolated_clusters": [
+        {
+          "cluster_id": "c6",
+          "isolated_failing_count": 22,
+          "representative_test_id": "../tests/confirmSeed.test.ts::isConfirmCorrect (amplified)::case 546"
+        }
+      ]
+    },
+    {
+      "cause_site": "src/formatTokenAmount.ts:23",
+      "cause_label": "off-by-one in the cents-scaling exponent (Math.max(decimals - 2, 0) narrowed to Math.max(decimals - 1, 0)), corrupting the displayed cents by a factor of ~10 whenever decimals >= 2 and the true cents value is non-zero - recorded, never graded",
+      "cluster_ids": [
+        "c4"
+      ],
+      "isolated_clusters": [
+        {
+          "cluster_id": "c4",
+          "isolated_failing_count": 45,
+          "representative_test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 103: formatTokenAmount(\"13\", 2) -> \"0.13\""
+        }
+      ]
+    },
+    {
+      "cause_site": "src/isValidEthereumAddress.ts:1",
+      "cause_label": "boundary/off-by-one in the address-length regex ({40} widened to {41}), rejecting every valid 40-hex-char address and accepting some invalid 41-hex-char ones - recorded, never graded",
+      "cluster_ids": [
+        "c3"
+      ],
+      "isolated_clusters": [
+        {
+          "cluster_id": "c3",
+          "isolated_failing_count": 99,
+          "representative_test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 144: isValidEthereumAddress(\"0x1234567890ABCDEF1234567890ABCDEF12345678\") -> true"
+        }
+      ]
+    },
+    {
+      "cause_site": "src/parseTransfers.ts:34",
+      "cause_label": "direction/fee-association mapping defect - account address no longer lowercased before the case-insensitive-by-design comparison against transfer.to - recorded, never graded",
+      "cluster_ids": [
+        "c2",
+        "c7",
+        "c8"
+      ],
+      "isolated_clusters": [
+        {
+          "cluster_id": "c2",
+          "isolated_failing_count": 144,
+          "representative_test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 0"
+        },
+        {
+          "cluster_id": "c7",
+          "isolated_failing_count": 1,
+          "representative_test_id": "../tests/parseTransfers.test.ts::parseTransfers::matches the account address case-insensitively"
+        },
+        {
+          "cluster_id": "c8",
+          "isolated_failing_count": 1,
+          "representative_test_id": "../tests/parseTransfers.test.ts::parseTransfers::maps an incoming transfer (to === account)"
+        }
+      ]
+    }
+  ],
+  "measured_vs_declared": {
+    "_purpose": "R-F1.1: the declared injection list MUST NEVER be used as ground truth. R-F9.2: the achieved ratio MUST be measured and reported per run, never assumed. Recorded here exactly as measured on 2026-08-12, not adjusted to hit any target.",
+    "injected_causes_declared": 6,
+    "causes_present_in_R0": 6,
+    "clusters_present_in_F0": 9,
+    "total_failing_cases_measured_with_generated_cases": 499,
+    "total_tests_measured_with_generated_cases": 2882,
+    "achieved_yield_percent_with_generated_cases": 17.3144,
+    "achieved_ratio_against_6_causes": "499:6 (~83.17:1 per cause)",
+    "base_corpus_no_generated_cases": {
+      "_purpose": "The 59-real-test corpus alone (generated case tables absent - FAILURE_FLOOD_CASE_DIR unset), reported for comparison per this task's own instruction, not used as F0/S0 (which are measured against the full amplified corpus, the actual stage-2 fixture).",
+      "totals": {
+        "failed": 11,
+        "passed": 48,
+        "suites_expected": 6,
+        "suites_reported": 6,
+        "tests": 66
+      },
+      "failing_cases": 11,
+      "clusters": 8
+    },
+    "stage2_target_per_spec_decision_b_and_task_3_3": {
+      "generated_cases_target_range": "2,600-3,000 (~433-500:1 against 6 causes) - target was for GENERATED cases, not FAILING cases (see spec.md:80-85, tasks.md:367-375's own correction)",
+      "generated_cases_achieved": 2823,
+      "note": "This target was about the count generate-cases.py emits, not the count that fails through an injected cause - conflating the two was task 3.3's own corrected mistake. The number this target does NOT set is measured below."
+    },
+    "achieved_vs_target_finding": "The real measured stage-2 yield is 17.3144% (499 failing / 2882 total tests), giving an achieved case:cause ratio of 499:6 (~83.2:1), NOT the ~433-500:1 order of magnitude spec.md Decision B / task 3.3 aimed for. This is measured, not reached: no injection or axis-table value was adjusted to move this number (R-F9.2, R-F1.1). The gap has a structural, per-cause explanation, not a uniform one: balanceOfCall's ADDRESS_PADDING off-by-one breaks essentially every encodeBalanceOf case regardless of input (145/145 encode cases fail), while applyKeypadInput's/confirmSeed's boundary defects only break narrow input slices for the same structural reason task 4.2 already recorded for v1 (most generated cases don't reach the exact boundary the injected comparison moved). Per-module achieved yield: applyKeypadInput 41/720 (5.7%), confirmSeed 22/567 (3.9%), parseTransfers 146/432 (33.8%), formatTokenAmount 45/384 (11.7%), isValidEthereumAddress 99/384 (25.8%), balanceOfCall 146/336 (43.5%) - a 7.5x spread between the lowest and highest, none of them near the ~48x amplification multiplier itself. The earlier ~57:1 estimate (tasks.md:367-375, extrapolated from a scratch isValidEthereumAddress mutation never committed as the real cause) was also not what was measured; both estimates undershot different directions for different modules, which is the point of measuring rather than assuming either.",
+    "normalizer_defects_found_and_fixed_in_this_work_unit": [
+      {
+        "defect": "Expected:/Received: cut only matched Jest's unprefixed scalar summary line, never its diff-prefixed structural form",
+        "measured_symptom": "parseTransfers isolated with cases loaded: 146 failing cases -> 146 distinct clusters (cluster count grew 1:1 with case_count)",
+        "fix": "widened _EXPECTED_RECEIVED_RE to allow an optional leading diff-marker character",
+        "version_bump": "NORMALIZER_VERSION 2 -> 3",
+        "re_measured": "parseTransfers isolated with cases loaded: 146 failing cases -> 3 clusters (bounded, matching the other 5 causes' non-growing shape)",
+        "self_test_case": "collect.py --self-test case (h), both directions h.1/h.2"
+      },
+      {
+        "defect": "workspace_root = os.path.abspath(cwd) does not resolve symlinks, so a symlinked scratch cwd (e.g. macOS /tmp -> /private/tmp) leaked an absolute host path into test_id/distinct_test_files/signature",
+        "measured_symptom": "combined run's distinct_test_files read '../../../../private/tmp/<host-scratch-path>/tests/balanceOfCall.test.ts' instead of '../tests/balanceOfCall.test.ts'",
+        "fix": "workspace_root = os.path.realpath(cwd)",
+        "version_bump": "none - path-resolution robustness, not an algorithm change; does not invalidate any prior byte-value comparison on a non-symlinked path",
+        "re_measured": "combined run's distinct_test_files clean ('../tests/balanceOfCall.test.ts') on the identical symlinked scratch path",
+        "self_test_case": "collect.py --self-test case (i), both directions (fixed value clean, old abspath behaviour shown to differ)"
+      }
+    ],
+    "masking_finding": "No masking measured across the 6 causes, in either corpus condition: isolated failing-case sums (499 with generated cases, 11 without) are EXACTLY equal to their respective combined-run totals (499, 11), and every isolated cluster's count and signature are byte-identical to its counterpart inside the combined run (re-verified per cluster, not assumed). This fixture's 6 modules remain import-free by construction (task 3.2's own independence check, unchanged), so no cross-module masking was structurally possible; within-module over-split (parseTransfers' 3 clusters for 1 cause) is measured and recorded in R0's cluster_ids, per design.md:449-450's already-absorbed many-to-one mapping - unchanged in kind from v1's own over-split, just now 3 heads instead of 2."
+  }
+}

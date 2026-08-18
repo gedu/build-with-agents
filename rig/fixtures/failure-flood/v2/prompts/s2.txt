@@ -1,0 +1,7 @@
+This project's automated test suite has failing tests. Investigate the failures, determine their root causes in the source code, and fix them.
+
+If you work out a set of root causes and a plan to fix them, but you do not apply the fixes yourself in this session, write that plan as plain text to a file named `fix-plan.txt` at the root of your working directory. If a `fix-plan.txt` file already exists at the root of your working directory when you start, use it as your starting point: apply one fix at a time and re-run the test suite after each one, since an earlier fix may already resolve failures you have not reached yet — do not apply the remaining fixes blind against your first look at the plan.
+
+Before you finish, write a file named `root-cause-report.txt` at the root of your working directory, in exactly this format: the first line is the literal text `ROOT-CAUSE-REPORT v1`; every following non-blank line names one root-cause location you identified, in the exact form `<relative-path>:<line-number>`, one location per line, and nothing else in the file.
+
+Do not modify any test files.
