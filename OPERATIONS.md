@@ -37,9 +37,11 @@ only some sessions need belongs behind a read-on-demand pointer rather than in a
 | Check the whole tree, not just a diff | `./hooks/pre-commit --all` | Before any push, and after any bulk edit |
 | Check commit messages that are already written | `./hooks/commit-msg --range <A> <B>` | Before pushing from a checkout where the hooks were never installed |
 | Check the structural invariants | `./check.sh` | After writing or editing any content `.md`, and after adding a skill |
+| Find out what is open | `./open-work.sh` | No, and it is not a gate. It is the cheapest way to not rediscover something this repo already recorded — read it when a session starts |
 | Change `hooks/pre-commit` or `hooks/commit-msg` | that file's `--self-test` | Yes. Each gate carries its own test (ADR 0013) |
 | Change `hooks/redaction-patterns.sh` | **both** hooks' `--self-test` | Yes. One list, two readers |
 | Change `check.sh` | `./check.sh --self-test` | Yes, same reason |
+| Change `open-work.sh` | `./open-work.sh --self-test` | Yes. Its cases assert the printed output, not only the exit code — for a generator the exit code is not the product |
 | Change shell | `sh -n <file>`, or `bash -n` for `setup.sh` and `hooks/pre-commit` | Yes. There is still no test *runner*, by decision — ADR 0013 |
 | Change Python | `python3 -m py_compile <file>` | Yes, same reason |
 | Change `rig/collect.py` | `python3 rig/collect.py --self-test` | Yes. The collector carries its own test, same flag-gated shape as `hooks/pre-commit --self-test` (ADR 0013) |
@@ -125,6 +127,34 @@ under `rig/fixtures/` is out of scope by design; those files imitate a foreign p
 What it does **not** check: whether an `ASK.md` entry is any good, `targets` membership, and whether a
 `sources` entry resolves. `./check.sh --help` carries the full list and the reason for each.
 
+### `./open-work.sh` — not a gate, and the exit codes say so
+
+The generated index of open work (ADR 0016, `draft`). It reads six structural sources — `BACKLOG.md`
+entries, `hypotheses/`, `gaps/`, `decisions/` at `status: draft`, `sdd/` outside `sdd/archive/`, and
+`## What is not settled` sections — and prints them to stdout. It writes nothing to disk, so there is
+no generated file to gitignore and nothing that can go stale between runs.
+
+| Exit | Meaning | What you must do |
+|---|---|---|
+| 0 | The index was produced | Read it. Open work is not an error, so there is no exit 1 here |
+| 2 | **Could not run** | **Treat as a failure, not an empty index.** An unreadable declared source, no content files, or not a git repository |
+
+Two things to actually read rather than skim:
+
+- **`absent` is not `0`.** A source that does not exist prints `absent`. A deleted directory and a
+  directory with nothing open are good news and bad news respectively, and they must not render the
+  same — the rule `./hooks/commit-msg --range` already holds by printing its scanned count including
+  zero.
+- **The COVERAGE block states what the index cannot see.** It reports how many content files were
+  scanned and how many carry `status: draft`, which is deliberately *not* an entry source: it covers
+  more than half the repository and therefore ranks nothing. A convention nobody has written down yet
+  is invisible to this index, and those counts are the only warning you get.
+
+It does not rank, and that is the decision rather than a gap — the problem it answers is "what is
+open", not "what should I do first". It also prints no path from outside the repository, because this
+output is meant to be pasted into a session or an issue and ADR 0009 applies to anything that leaves
+the machine.
+
 ### There is no CI. Every command above is yours to run
 
 ADR 0014 decided this repository needs a server-side copy of these checks and records why it is
@@ -153,7 +183,7 @@ each committed executable (ADR 0013), and running the thing and reading its real
 verification surface. A claim that something works must be backed by output you actually produced.
 
 Note which shell: `setup.sh` and `hooks/pre-commit` are `bash`; `hooks/commit-msg`, `check.sh` and
-`hooks/redaction-patterns.sh` are POSIX `sh`, so `sh -n` is the right check for those three.
+`hooks/redaction-patterns.sh` and `open-work.sh` are POSIX `sh`, so `sh -n` is the right check for those four.
 
 ## Producing a measurement
 
