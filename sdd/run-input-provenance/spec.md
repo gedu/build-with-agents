@@ -46,14 +46,45 @@ entirely" and "void one row" as inconsistent positions on the same failure.
 
 ### Decision 1 — `void_reason` string and pre-scheme marker form
 
-**The dedicated `void_reason` for a Face A provenance mismatch is `"answer-key-mismatch"`.** It follows
-the file's own existing `<face>-mismatch` naming convention (`surface-mismatch`, `permission-mode-mismatch`,
-`model-mismatch`, `suite-state-mismatch` — all verified present at `rig/derive.py:473-474`, `:856-857`,
-`:860-861`, `:884-885`, `:977-978`), stays visually and lexically distinct from `surface-mismatch` per
-settled decision 4, and every existing mismatch reason in this file is *also* added to `anomaly_classes`
-as the same string (verified: every `void_reason = "...-mismatch"` assignment in `derive.py` is paired
-with an `anomaly_classes.add(...)` of the identical string). `"answer-key-mismatch"` follows that same
-paired convention rather than inventing a new one.
+**Two `void_reason` strings for the whole provenance class, never one per face:
+`"input-provenance-mismatch"` and `"input-provenance-missing"`. The face is carried in
+`anomaly_classes`, not in the state.**
+
+| `void_reason` | Fires when |
+|---|---|
+| `input-provenance-mismatch` | a recorded digest is present and disagrees with the live value |
+| `input-provenance-missing` | the row cannot say what it was scored against at all |
+
+| `anomaly_classes` member | Meaning |
+|---|---|
+| `answer-key-drift` / `fixture-drift` / `surface-preimage-drift` | which face disagreed, under the single mismatch reason |
+| `pre-scheme-provenance` | `input_provenance_version` absent — the capture predates this scheme |
+| `provenance-capture-incomplete` | version present, a promised digest `null` — the capture claimed to record and did not |
+
+**Corrected during gatekeeping, and the correction is worth reading.** This spec's first pass chose a
+per-face reason, `"answer-key-mismatch"`, on the grounds that `derive.py`'s existing reasons are named
+`<face>-mismatch` and each is paired with an identical `anomaly_classes` member. Both observations are
+true and verified (`rig/derive.py:473-474`, `:856-857`, `:860-861`, `:884-885`, `:977-978`). They are
+simply not the deciding consideration. `design.md` §4 reached the opposite conclusion, and design's
+conclusion is right — **though not for the reason design gives.**
+
+Design argued that per-face reasons "inflate the vocabulary every consumer must implement", citing
+`report.py` as already naming voids by reason. That rationale was flagged in design's own risk list as
+asserted-not-verified, and it does not survive verification: `rig/report.py` is **reason-agnostic**. It
+collects whatever string it finds (`classes.add(r["void_reason"])`, `:125-126`) and interpolates it
+(`:163`, `:335`). No enum, no hardcoded list, no per-reason branch. Three new reasons would cost
+`report.py` nothing.
+
+**The argument that actually decides it was made by neither artifact: a single mismatch reason removes
+a whole class of ordering hazard.** `answer-key/` sits inside `compute_manifest()`'s walked set, so one
+edit to `answer-key/prereg.json` disagrees on the answer-key digest *and* the fixture digest at once.
+Under per-face reasons the single `void_reason` slot must pick a winner, which means defining a
+precedence rule and discarding the other face's finding. Under one reason plus drift classes, **both
+faces record their own drift and nothing has to be discarded** — the row says `input-provenance-mismatch`
+with `["answer-key-drift", "fixture-drift"]`, which is the complete truth rather than a chosen half.
+Design's split of `mismatch` from `missing` is kept for design's own stated reason, which does survive:
+collapsing them would produce a correct refusal carrying a false stated cause, the shape
+`exploration.md` §2 records as already having occurred three times in this rig.
 
 **The pre-scheme marker is an `anomaly_classes` member, not a dedicated field or a `void_reason`
 override: `"pre-scheme-provenance"`.** The three existing rows' `void_reason` slot is already occupied
@@ -69,13 +100,12 @@ naturally beside `shakedown`.
 and its data-flow diagram. Changing design would cost more for no gain, so this spec aligns to design's
 spelling rather than the reverse. One string, one spec, one design.
 
-**A second, general `void_reason` also exists and is distinct from `"answer-key-mismatch"`.**
-`"answer-key-mismatch"` (above) is scoped to Face A specifically: a row whose recorded answer-key digest
-disagrees with the live one. `"input-provenance-missing"` (R-P5) is the reason for a different, broader
-condition: an otherwise-`complete` row that cannot say what it was scored against **at all**, because it
-carries no positive marker that it was captured under this scheme in the first place, or because that
-marker is present but the digest it promised is `null`. The two reasons are never conflated: one names a
-detected disagreement, the other names the absence of anything to compare.
+**The two reasons are never conflated.** `"input-provenance-mismatch"` names a *detected disagreement*:
+something was recorded, and it no longer matches. `"input-provenance-missing"` (R-P5) names the *absence
+of anything to compare*: an otherwise-`complete` row that cannot say what it was scored against at all,
+either because it carries no positive marker that it was captured under this scheme, or because the
+marker is present and the digest it promised is `null`. Those two are different findings about a row and
+they keep different strings; the *face* that drifted is never one of those strings.
 
 ### Decision 2 — Answer-key digest recording point
 
@@ -135,13 +165,18 @@ back unchanged by `derive.py`). The runner MUST NOT resolve which file carries t
 rule stays in `derive.py:665-667` and in no second place (Decision 2).
 
 **R-P2.2** Because the recorded set overlaps `MANIFEST.sha256`'s own coverage of `answer-key/`, a single
-edit to `answer-key/prereg.json` or `answer-key/case-table.sha256` mismatches **both** the answer-key
-digest (R-P3) and the fixture digest (R-P7). The spec MUST therefore define a deterministic reason
-precedence and the implementation MUST follow it, so the same edit never produces a different
-`void_reason` depending on check order. **Fixture-digest mismatch takes precedence**, because it names
-the broader condition — the fixture as a whole moved — and the answer-key digest mismatch is then a
-consequence of it rather than an independent finding. This is the same downgrade-only, first-check-wins
-discipline R-P3.2 states; naming the order here is what keeps it from being an accident of line order.
+edit to `answer-key/prereg.json` or `answer-key/case-table.sha256` disagrees on **both** the answer-key
+digest (R-P3) and the fixture digest (R-P7). Under Decision 1's single mismatch reason this MUST NOT be
+resolved by a precedence rule. The row MUST record `void_reason="input-provenance-mismatch"` once, and
+`anomaly_classes` MUST contain **both** `"answer-key-drift"` and `"fixture-drift"` — every face that
+actually disagreed, never only the first one checked.
+
+**R-P2.2a** An earlier draft of this spec required a deterministic precedence between a per-face
+answer-key reason and a per-face fixture reason. That requirement is **withdrawn**, and the reason it
+was withdrawn is a requirement in its own right: a precedence rule is only necessary when the
+`void_reason` slot is forced to choose between two true findings, and choosing means discarding one. The
+implementation MUST NOT reintroduce a per-face reason and then a precedence rule to arbitrate it. Order
+of checks MUST NOT be observable in the recorded outcome for this case.
 
 #### Scenario: A run's recorded digest covers its own fixture root only
 
@@ -150,19 +185,19 @@ discipline R-P3.2 states; naming the order here is what keeps it from being an a
 - THEN the run's own record carries a digest computed over `v1/answer-key/`, and no file under
   `rig/fixtures/failure-flood/v2/answer-key/` contributes to it
 
-#### Scenario: One edit does not produce two different reasons depending on check order
+#### Scenario: One edit records both drifts, and no face's finding is discarded
 
 - GIVEN a run recorded against fixture root `v2`, whose `answer-key/prereg.json` is edited afterwards
-- WHEN the row is re-derived, so that both the fixture digest and the answer-key digest mismatch
-- THEN `void_reason` is the fixture-digest reason, deterministically, and never varies with the order
-  the two checks happen to run in
+- WHEN the row is re-derived, so that both the fixture digest and the answer-key digest disagree
+- THEN `void_reason` is `"input-provenance-mismatch"`, and `anomaly_classes` contains BOTH
+  `"answer-key-drift"` and `"fixture-drift"` — the outcome is identical whichever check runs first
 
 ### R-P3 — Face A: a drifted answer key voids the row, it is never silently rescored as trustworthy
 
-**R-P3.1** At derive time, the system MUST recompute the digest of the current on-disk
-`answer-key/<task_id>.json` for a row's `task_id` and compare it to the digest recorded on that row per
-R-P2. A mismatch MUST set `state=void, void_reason="answer-key-mismatch"` (Decision 1) and add
-`"answer-key-mismatch"` to `anomaly_classes` — never `"surface-mismatch"`, and never a refusal to derive
+**R-P3.1** At derive time, the system MUST recompute the digest of the current on-disk `answer-key/`
+directory for the row's own fixture root and compare it to the digest recorded on that row per R-P2. A
+disagreement MUST set `state=void, void_reason="input-provenance-mismatch"` and add
+`"answer-key-drift"` to `anomaly_classes` (Decision 1) — never `"surface-mismatch"`, and never a refusal to derive
 the whole file (that distinction is R-P12's). This check MUST run before `verdict`, `integrity_guard_pass`,
 `causes_claimed`, and `causes_correct` are computed from the (potentially drifted) answer key, so a
 mismatched row's scoring fields are never populated from an untrusted key and reported as if trustworthy
@@ -179,8 +214,8 @@ discipline every existing read-back check in `derive.py` already follows (`:839-
 - GIVEN a run recorded with a digest of `answer-key/s1.json` as it existed at run time
 - WHEN `answer-key/s1.json`'s on-disk bytes change before the next derive, and the row would otherwise
   be `state=complete`
-- THEN the re-derive produces `state=void, void_reason="answer-key-mismatch"`, and
-  `"answer-key-mismatch"` is in `anomaly_classes`
+- THEN the re-derive produces `state=void, void_reason="input-provenance-mismatch"`, and
+  `"answer-key-drift"` is in `anomaly_classes`
 
 #### Scenario: An unrelated answer key changing does not touch this row
 
@@ -192,23 +227,25 @@ discipline every existing read-back check in `derive.py` already follows (`:839-
 
 - GIVEN a row already `state=void, void_reason="surface-mismatch"` from an earlier check
 - WHEN the answer-key digest comparison runs
-- THEN `void_reason` MUST remain `"surface-mismatch"`, never overwritten by `"answer-key-mismatch"`
+- THEN `void_reason` MUST remain `"surface-mismatch"`, never overwritten by
+  `"input-provenance-mismatch"`
 
 ### R-P4 — `derive.py` stays a total function: no answer-key shape may raise mid-derive
 
 **R-P4.1** `ak["F0"]["failures"]` (`rig/derive.py:981`) and `ak["R0"]` (`rig/derive.py:1071`) MUST NOT
 be direct subscripts. An answer key missing either `F0.failures` or `R0` MUST be treated as a scoring
-input this deriver cannot trust, not as a crash: the row MUST void with `void_reason="answer-key-mismatch"`
-(the same reason as R-P3 — a malformed or incomplete answer key IS an instance of "this row's inputs do
-not match a scoreable answer key," not a separate class needing its own reason) rather than raise
-`KeyError`.
+input this deriver cannot trust, not as a crash: the row MUST void with
+`void_reason="input-provenance-mismatch"` and `"answer-key-drift"` in `anomaly_classes` — the same
+reason and class as R-P3, because a malformed or incomplete answer key IS an instance of "this row's
+inputs do not match a scoreable answer key," not a separate finding — rather than raise `KeyError`.
 
 #### Scenario: A malformed answer key voids the row instead of crashing the whole derive
 
 - GIVEN an answer key file for `task_id=s1` whose JSON is missing the `R0` key entirely
 - WHEN derive runs over a run directory for `s1`
-- THEN the `s1` row is produced with `state=void, void_reason="answer-key-mismatch"`, no exception
-  propagates, and every other run directory's row is still derived and written to the output file
+- THEN the `s1` row is produced with `state=void, void_reason="input-provenance-mismatch"` and
+  `"answer-key-drift"` in `anomaly_classes`, no exception propagates, and every other run directory's
+  row is still derived and written to the output file
 
 ### R-P5 — WARNING-14: two absences, distinguished by a positive marker, neither one forgiven
 
@@ -313,6 +350,14 @@ comparand is frozen per run: a frozen comparand recorded at run time is either p
 own recording) or its absence is itself informative, and MUST NOT be conflated with "the comparison was
 attempted and passed."
 
+**R-P6.3** A frozen comparand that disagrees with the row's own `surface_sha256` MUST record
+`void_reason="input-provenance-mismatch"` with `"surface-preimage-drift"` in `anomaly_classes`
+(Decision 1). The pre-existing `"surface-mismatch"` reason keeps its own meaning and is NOT reused for
+provenance drift: it says *the tool surface the model saw disagreed with the expected surface*, which is
+a statement about the run, while `surface-preimage-drift` says *the preimage moved after the run*, which
+is a statement about the fixture. Collapsing them would produce a correct refusal with a false stated
+cause — the shape this rig has already recorded three times.
+
 #### Scenario: A frozen comparand still detects surface drift after this change
 
 - GIVEN a run recorded with a frozen surface-preimage digest matching the preimage at run time
@@ -325,6 +370,12 @@ attempted and passed."
 **R-P7.1** `fixture_digest` (`rig/derive.py:611-617`, `:1016`) MUST be recorded at run time as the run's
 own digest of the fixture manifest it ran against, rather than remaining the present-derived value
 re-read from the live tree on every derive.
+
+**R-P7.1a** A recorded fixture digest that disagrees with the live manifest MUST record
+`void_reason="input-provenance-mismatch"` with `"fixture-drift"` in `anomaly_classes` (Decision 1).
+**This sub-requirement exists because an earlier draft left it unstated**: R-P2.2 referred to "the
+fixture-digest reason" while no requirement had named one, so the string would have been invented at
+implementation time. Named here rather than assumed.
 
 **R-P7.2** Any report or artifact under this change that cites R-F5.3 (from the archived
 `failure-flood-triage` spec) MUST state explicitly that R-F5.3's byte-identical re-derive check verifies
@@ -383,20 +434,21 @@ checkmark).
 ### R-P10 — Each new detector MUST be proven able to fire, not merely proven not to break
 
 **R-P10.1** Per ADR 0013 and the existing `derive.py` self-test precedent, every detector this spec
-introduces or changes (R-P3's answer-key-mismatch void, R-P4's malformed-answer-key void, R-P5's `None`
+introduces or changes (R-P3's answer-key-drift void, R-P4's malformed-answer-key void, R-P5's `None`
 distinction, R-P6's frozen-comparand mismatch) MUST have a `--self-test` case that constructs an input
 proving the detector actually fires on a deliberately mismatched/malformed input — not only a case
 showing it passes on clean input. This mirrors the existing `_self_test_build_row_model_mismatch()`
 pattern (`rig/derive.py:1238-1275`), which proves both the mismatch case AND the no-false-positive case
 for an old capture.
 
-#### Scenario: The answer-key-mismatch detector is proven to fire, not just proven silent on clean input
+#### Scenario: The answer-key-drift detector is proven to fire, not just proven silent on clean input
 
 - GIVEN a self-test case constructing a run whose recorded digest deliberately does not match the
   current on-disk answer key
 - WHEN `--self-test` runs
-- THEN it asserts `state == "void"` and `void_reason == "answer-key-mismatch"` for that constructed case,
-  and FAILS the self-test if the detector does not produce that outcome
+- THEN it asserts `state == "void"`, `void_reason == "input-provenance-mismatch"`, and
+  `"answer-key-drift" in anomaly_classes` for that constructed case, and FAILS the self-test if the
+  detector does not produce that outcome
 
 **R-P10.2** `_self_test_build_row_model_mismatch()`'s case 3 (`rig/derive.py:1260-1270`) — currently
 labelled `"model_matches_declared absent/None (old capture) -> never falsely voids"` and asserting
@@ -475,8 +527,9 @@ normally, per `derive.py`'s existing total-function contract.
 - GIVEN one run directory whose recorded answer-key digest mismatches the current on-disk key, and three
   other run directories whose digests all match
 - WHEN `derive.py` runs and `run_self_tests()` passes
-- THEN the mismatched run's row is `state=void, void_reason="answer-key-mismatch"`, and the three other
-  rows derive to whatever state their own inputs produce, unaffected
+- THEN the mismatched run's row is `state=void, void_reason="input-provenance-mismatch"` with
+  `"answer-key-drift"` in `anomaly_classes`, and the three other rows derive to whatever state their own
+  inputs produce, unaffected
 
 ## Non-Goals
 
@@ -490,9 +543,14 @@ normally, per `derive.py`'s existing total-function contract.
 
 ## Key Learnings
 
-1. Every existing mismatch `void_reason` in `derive.py` is paired with an identical `anomaly_classes`
-   member — `"answer-key-mismatch"` (Decision 1) follows that same pairing rather than inventing a new
-   convention.
+1. **Corrected during gatekeeping, and the correction outranks the observation that caused it.** Every
+   existing mismatch `void_reason` in `derive.py` is paired with an identical `anomaly_classes` member —
+   true, verified, and not the deciding consideration. A per-face reason forces the single `void_reason`
+   slot to choose between two true findings whenever one edit drifts two faces, and choosing means
+   discarding one. One reason plus per-face drift classes records both. `rig/report.py` turned out to be
+   reason-agnostic (`:125-126`, `:163`, `:335`), so the vocabulary-cost argument that `design.md` §4 gave
+   for the same conclusion does not hold — the conclusion survives on a different argument than either
+   artifact stated.
 2. **Corrected during gatekeeping.** The first pass chose a per-consumed-key digest on precision
    grounds. The deciding constraint is not precision but where a rule lives: the runner is bash and sees
    one fixture root, so per-key would reimplement `derive.py:665-667`'s `task_id`-not-filename rule in a

@@ -158,9 +158,24 @@ on every row, `:1073`):
 | `pre-scheme-provenance` | `input_provenance_version` absent — the capture predates this scheme |
 | `provenance-capture-incomplete` | version present, a digest `null` — the capture claimed to record and did not |
 
-Rejected: a per-face `void_reason`. Three reasons for one class inflates the vocabulary every
-consumer must implement, and `report.py` already names voids by reason — the face belongs in the
-diagnosis, not the state.
+Rejected: a per-face `void_reason`. The face belongs in the diagnosis, not the state.
+
+**Corrected during gatekeeping — this decision stands, its original justification does not.** The
+argument first given here was that three reasons "inflate the vocabulary every consumer must implement,
+and `report.py` already names voids by reason." That was listed in this design's own risk section as
+asserted-not-verified, and verification refuted it: `rig/report.py` is **reason-agnostic**. It collects
+whatever string a row carries (`classes.add(r["void_reason"])`, `:125-126`) and interpolates it (`:163`,
+`:335`). There is no enum, no hardcoded list, no per-reason branch, so three reasons would have cost
+`report.py` nothing.
+
+The decision survives on a stronger argument that neither this design nor `spec.md` originally stated:
+`answer-key/` sits inside `compute_manifest()`'s walked set, so a single edit to
+`answer-key/prereg.json` disagrees on the answer-key digest **and** the fixture digest at once. A
+per-face reason forces the one `void_reason` slot to choose between two true findings, which means
+defining a precedence rule and discarding the loser. One reason plus `answer-key-drift` / `fixture-drift`
+records both, and the outcome stops depending on which check ran first. `spec.md` R-P2.2/R-P2.2a carry
+this, and R-P2.2a explicitly forbids reintroducing a per-face reason plus a precedence rule to arbitrate
+it.
 
 ## 5. Backward compatibility: `input_provenance_version` is the positive marker, and this is where WARNING-14 could reappear
 
