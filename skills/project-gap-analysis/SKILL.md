@@ -3,7 +3,7 @@ id: skills/project-gap-analysis
 type: skill
 targets: [any]
 status: draft
-verified: 2026-08-11
+verified: 2026-08-20
 sources: ["AGENTS.md", "MAP.md", "decisions/0009-redaction-is-a-repo-wide-rule.md", "decisions/0011-rig-produces-evidence-not-truth.md", "gaps/README.md", "theory/agents/capability-load-cost.md", "theory/agents/instruction-provenance.md", "theory/agents/tool-surface-design.md", "theory/llm/context-degradation-at-length.md", "theory/loops/reading-and-running-find-different-defects.md", "theory/loops/verifier-availability.md", "theory/orchestration/delegation-and-context-boundaries.md"]
 ---
 
@@ -196,6 +196,11 @@ why it does not project onto a target project.
 - **Demand** — for each `absent` or `partial`, what block would have closed it. Phrased as a
   capability, not as a file name you have already decided on.
 
+`targets` follows the **findings**, not the project. Use `[any]` unless a finding genuinely depends
+on the stack — none of the seven checks reads application source, so that is the usual case even when
+the project is emphatically a React one. The stack belongs in *Project class*, where it describes what
+was analysed, rather than in a field a query will read as "this finding applies to React".
+
 ## What a gap record may and may not cause
 
 **One record never justifies building a block.** A single project's gaps are evidence about that
@@ -239,6 +244,7 @@ answer lives here, in the file nothing supersedes.
 |---|---|---|---|---|
 | 1 | 2026-08-11 | React Native + Expo mobile wallet, timeboxed, agent-built | `gaps/0001-rn-expo-wallet-timeboxed.md` | **Yes, with two gaps in the skill itself** — see below |
 | 2 | 2026-08-12 | Large open-source React Native app, 6 years, hundreds of contributors | `gaps/0002-expensify-app.md` | **Yes, with two more gaps** — and the demand rule fired for the first time |
+| 3 | 2026-08-20 | Open-source cloud security platform, 10 years, Python monorepo with a React UI | `gaps/0003-prowler.md` | **Yes, with two more gaps** — and the first project analysed whose agent practice was already mature |
 
 Run 1 produced a complete record with all seven checks decided and no unstatable findings. Two
 things the skill did not cover, both found by running it and both now fixed above:
@@ -269,6 +275,28 @@ both now fixed above:
 resolved to an existing draft skill rather than to a new block — which is the outcome the rule is
 supposed to produce when the answer already exists.
 
-Promotion to `status: validated` needs recorded runs, not a better rationale. Two runs, both of which
-changed the skill, is evidence that it executes and evidence that it is not settled. Record failures
+Run 3 was chosen for a property the first two could not supply: a project whose agent practice is
+**already mature**. A project that lacks everything tells you little, because every check fails for
+the same reason. Two more gaps, both now fixed above:
+
+- **Run 2's own fix was applied in one file and not the other.** Run 2 added the public-source
+  exception here, and `gaps/README.md` went on stating the opposite rule in bold — while `0002` sat
+  in that directory naming a public repository. Nobody noticed for eight days, because nothing reads
+  both files at once. Run 3 could not write a named record under a README forbidding one, which is
+  the only reason it surfaced. **A rule changed in a skill must be changed in the file that states it
+  as a rule, in the same commit.** The contradiction is now recorded in `gaps/README.md` rather than
+  silently repaired: the shape is more instructive than the fix.
+- **The output shape said nothing about `targets`.** Runs 1 and 2 both analysed React Native
+  projects and used the project's stack, so the question never came up. Run 3's findings are entirely
+  stack-independent, and copying the precedent would have claimed a dependency that is not there.
+  Now stated in *Output shape* below.
+
+**A `present` verdict is a finding, not a blank.** Three of run 3's seven came out at or above what
+the backing `theory/` doc asks for, and one of those is a pattern this repo could not have designed
+from its own material. A skill that only records absences would have thrown all three away and
+reported a project with two problems.
+
+Promotion to `status: validated` needs recorded runs, not a better rationale. Three runs, every one of
+which changed the skill, is evidence that it executes and evidence that it is not settled. The rate is
+not falling: run 3 found as many gaps as run 1. Record failures
 with the same care as successes: a skill that only records its wins has a habit, not a criterion.
