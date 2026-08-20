@@ -3,7 +3,7 @@ id: gaps/index
 type: index
 targets: [any]
 status: draft
-verified: 2026-08-12
+verified: 2026-08-20
 sources: ["AGENTS.md", "MAP.md", "decisions/0009-redaction-is-a-repo-wide-rule.md", "decisions/0011-rig-produces-evidence-not-truth.md", "decisions/0012-a-hypothesis-is-never-citable.md", "skills/project-gap-analysis/SKILL.md"]
 ---
 
@@ -14,7 +14,7 @@ Gap analyses of existing projects, measured against this repo's validated practi
 
 Produced by `skills/project-gap-analysis`. One file per analysis, `NNNN-<slug>.md`.
 
-Two analyses recorded. One demand has reached two occurrences and resolved to an existing draft skill rather than to a new block; nothing has been built here yet.
+Three analyses recorded. One demand has reached three occurrences and resolved to an existing draft skill rather than to a new block; a second is at one. Nothing has been built here yet.
 
 ## No project is identifiable here
 
@@ -22,6 +22,27 @@ Every file in this directory was written by reading a project that is not this o
 repository is public. **No gap record may carry a repository, product, client, team, service or host
 name, or any path outside this repo.** A project is described by its class — stack, rough size, what
 it is for — and never by its identity.
+
+### The one exception: a public source is named
+
+**This paragraph was missing for eight days and this file said the opposite of what the directory
+did.** `skills/project-gap-analysis` grew the exception during its run 2 and `MAP.md` already
+described this directory as *"private projects de-identified, public sources named"*, while `0002`
+sat here naming a public repository — against the rule stated directly above it. Found by run 3,
+which could not write a named record under a README that forbade one. Recorded rather than quietly
+fixed, because the shape is the point: a rule updated in one file and not in the file that states it
+is a rule that now argues with itself, and the second reader is the one who pays.
+
+A public open-source repository is **named**, exactly as `research/` names its sources.
+De-identifying one protects nothing — the class description identifies it to anyone who cares — and
+it makes every claim in the record unverifiable to a reader who could otherwise open the repository
+and check it.
+
+The limit is narrow, and `skills/project-gap-analysis` carries it in full: public means *the practice
+being analysed is already published*. Not that the company is well known, not that someone made the
+code available to you, and not that a repository is public while the finding concerns something it
+did not publish. When in doubt the default rule above wins, because a wrong call is not correctable
+after a push.
 
 `hooks/pre-commit` does not protect this directory. It blocks absolute home paths and known secret
 shapes; a private name written as a bare word is exactly the class ADR 0009 records as
