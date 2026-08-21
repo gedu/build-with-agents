@@ -190,6 +190,17 @@ manifest_workspace_paths() {
   compute_manifest "$1" | awk '{print $2}' | grep -E '^(src|tests|runtime)/' | sort
 }
 
+# answer_key_paths <fixture-root> — relpaths under answer-key/ ONLY, same
+# filter-by-prefix pattern as manifest_workspace_paths() above, derived from
+# compute_manifest()'s own output — never a second manifest algorithm and
+# never a directory walk of its own (run-input-provenance spec R-P2.1: the
+# runner MUST NOT resolve which file carries a row's task_id, so it hashes
+# the whole answer-key/ set for its one fixture root, exactly the same way
+# it never resolves which src/ file matters before hashing that set either).
+answer_key_paths() {
+  compute_manifest "$1" | awk '{print $2}' | grep -E '^answer-key/' | sort
+}
+
 # hash_paths <workspace-root> — one sha256 over exactly the explicit relpath
 # list piped in on stdin, one per line — never a fresh directory listing.
 # Identical combining convention to rig/run.sh:122-141's hash_fixture_files
@@ -648,6 +659,16 @@ if [ "$COMPUTED_MANIFEST" != "$COMMITTED_MANIFEST" ]; then
   die_cannot_run "MANIFEST.sha256 mismatch under $FIXTURE_ROOT — refusing to run against a tampered or edited fixture."
 fi
 
+# ---- Face A: answer-key set digest (run-input-provenance task 1.3, R-P2.1) -
+# Recorded over bytes now PROVEN frozen by the recompute-compare gate just
+# above — the same "record after the freeze is proven" convention every
+# other digest below already follows. Filters compute_manifest()'s own
+# output by prefix (answer_key_paths(), the same pattern
+# manifest_workspace_paths() already uses) rather than a second manifest
+# algorithm; hashed against FIXTURE_ROOT itself since answer-key/ is never
+# materialised into a per-step workspace (design.md 9a).
+RECORDED_ANSWER_KEY_DIGEST="$(answer_key_paths "$FIXTURE_ROOT" | hash_paths "$FIXTURE_ROOT")"
+
 # ---- Hard Ordering Gate, layer 2 (pre-registration) ---------------------
 # tasks.md "Hard Ordering Gate": "Preflight refuses (exit 2)... any
 # non-shakedown invocation unless hypotheses/0002-*.md and hypotheses/0003-*.md
@@ -1066,6 +1087,7 @@ CODE_COMMIT="$CODE_COMMIT" DECLARED_PERMISSION_MODE="$PERMISSION_MODE" DECLARED_
 STATE="$ARM_STATE" VOID_REASON="$ARM_VOID_REASON" ABORT_REASON="$ABORT_REASON" DIRTY_OK_USED="$DIRTY_OK" \
 SHAKEDOWN_USED="$SHAKEDOWN" WORKSPACE_FILE_COUNT="$WORKSPACE_FILE_COUNT" \
 RO_SUBSTRATE_VIOLATION="$RO_SUBSTRATE_VIOLATION" DIAGNOSTICIAN_SRC_VIOLATION="$DIAGNOSTICIAN_SRC_VIOLATION" \
+RECORDED_ANSWER_KEY_DIGEST="$RECORDED_ANSWER_KEY_DIGEST" \
 python3 <<'PY'
 import json, os
 
@@ -1086,6 +1108,16 @@ arm = {
     "case_table_digest": env["CASE_TABLE_DIGEST"] or None,
     "case_count": int(env["CASE_COUNT"] or 0),
     "prereg_digest": env["PREREG_DIGEST"] or None,
+    # run-input-provenance task 1.4 (R-P2, R-P5.1): the POSITIVE marker that
+    # this run was captured under the provenance scheme, plus Face A's own
+    # digest of the answer-key/ set it was scored against — same lifetime as
+    # PREREG_DIGEST/CASE_TABLE_DIGEST above, threaded through to this one
+    # write. `recorded_fixture_digest` and each step's own
+    # `recorded_surface_preimage_sha256` are the OTHER two faces this schema
+    # bump (derive.py v4) already names; they stay unset here until Sibling
+    # 2/3 wire them in — never invented ahead of the code that computes them.
+    "input_provenance_version": 1,
+    "recorded_answer_key_digest": env["RECORDED_ANSWER_KEY_DIGEST"] or None,
     "declared_permission_mode": env["DECLARED_PERMISSION_MODE"],
     "declared_model": env["DECLARED_MODEL"],
     "workspace_file_count": int(env["WORKSPACE_FILE_COUNT"]),

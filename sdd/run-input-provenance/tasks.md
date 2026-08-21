@@ -101,7 +101,7 @@ first and stops there MUST NOT be reported as satisfying this spec — R-P9.2 na
 
 Depends on: nothing. Blocks: Sibling 2, Sibling 3.
 
-- [ ] 1.1 **Record the resolved void_reason conflict, rewritten rather than deleted** — the same
+- [x] 1.1 **Record the resolved void_reason conflict, rewritten rather than deleted** — the same
       "record the inversion, don't erase the evidence" discipline task 1.9 applies to the committed
       self-test. This file's own prior draft correctly flagged spec.md and design.md as disagreeing and
       blocking; that flag has since been resolved upstream (`43f5281`, see the section above) in favor
@@ -112,8 +112,10 @@ Depends on: nothing. Blocks: Sibling 2, Sibling 3.
       the observation that caused the original flag. This is no longer a gate on tasks 1.5 onward —
       those tasks already implement the settled vocabulary directly.
       Verify: structural readback — the three points above are present in the apply-progress note.
+      Done: recorded in `sdd/run-input-provenance/apply-progress.md`'s "The resolved conflict, carried
+      forward" section — all three points present.
 
-- [ ] 1.2 Add `answer_key_set_digest(root)` to `rig/derive.py`, mirroring `fixture_digest_at()`'s shape
+- [x] 1.2 Add `answer_key_set_digest(root)` to `rig/derive.py`, mirroring `fixture_digest_at()`'s shape
       (`rig/derive.py:611-617`) — a digest over the answer-key relpaths under one fixture root only,
       never the merged `load_failure_flood_answer_keys()` dict (`:646-668`). Wire it into `main()`'s
       `digests` block (`:1473-1476`) as `digests["answer_key"]`, built **only when an experiment
@@ -121,8 +123,13 @@ Depends on: nothing. Blocks: Sibling 2, Sibling 3.
       (`:1079-1089`) gains no key.
       Verify: `python3 -m py_compile rig/derive.py`; the `tool-surface-v1` registry entry is
       byte-unchanged (`git diff` against that dict literal is empty).
+      Done: `answer_key_set_digest()` added next to `fixture_digest_at()`, reproducing `hash_paths()`'s
+      convention (sorted "sha256(content)  relpath" lines, joined, hashed). Wired via a new
+      `"answer_key_digest"` key on the `FAILURE_FLOOD_EXPERIMENT` registry entry only; `main()` builds
+      `digests["answer_key"]` behind `reg.get("answer_key_digest")`. `py_compile` clean;
+      `tool-surface-v1`'s registry dict literal byte-unchanged (verified by diff).
 
-- [ ] 1.3 In `rig/run-pipeline.sh`, after the MANIFEST recompute-compare gate (`:645-649`) — bytes now
+- [x] 1.3 In `rig/run-pipeline.sh`, after the MANIFEST recompute-compare gate (`:645-649`) — bytes now
       proven frozen — compute `recorded_answer_key_digest`: pipe the answer-key relpaths from
       `compute_manifest`'s own output (`:168` already walks `answer-key`) through the existing
       `hash_paths()` (`:215`), the same pattern `manifest_workspace_paths()` (`:189-191`) already uses
@@ -131,13 +138,21 @@ Depends on: nothing. Blocks: Sibling 2, Sibling 3.
       Hold the result in a shell variable with the same lifetime as `PREREG_DIGEST`/`CASE_TABLE_DIGEST`
       (until the `arm.json` write at `:1103`).
       Verify: `bash -n rig/run-pipeline.sh`.
+      Done: new `answer_key_paths()` helper added beside `manifest_workspace_paths()` (same
+      filter-by-prefix pattern); `RECORDED_ANSWER_KEY_DIGEST` computed right after the MANIFEST gate via
+      `answer_key_paths "$FIXTURE_ROOT" | hash_paths "$FIXTURE_ROOT"`. `bash -n` clean. Cross-language
+      agreement verified by hand: python's `answer_key_set_digest(v1)` and this bash pipeline both
+      produce `571e083d27aaef0a63cee3b26de97b14ac8eccdab02dfbe3535aba83728cb7b6` over the real committed
+      v1 answer-key set.
 
-- [ ] 1.4 Add `input_provenance_version: 1` and `recorded_answer_key_digest` to the `arm.json` writer's
+- [x] 1.4 Add `input_provenance_version: 1` and `recorded_answer_key_digest` to the `arm.json` writer's
       env-threading block (`:1060-1068`) and its `arm = {...}` dict (`:1080-1102`), the same way
       `PREREG_DIGEST`/`CASE_TABLE_DIGEST` are already threaded.
       Verify: `bash -n rig/run-pipeline.sh`.
+      Done: `RECORDED_ANSWER_KEY_DIGEST` threaded into the arm.json writer's env block; `arm = {...}`
+      gains `"input_provenance_version": 1` and `"recorded_answer_key_digest"`. `bash -n` clean.
 
-- [ ] 1.5 In `build_row_failure_flood`, insert the provenance gate **before** the existing per-step
+- [x] 1.5 In `build_row_failure_flood`, insert the provenance gate **before** the existing per-step
       read-back loop (`:851-886`), inside the `if state == "complete":` block (`:850`), as three
       sequential passes (R-P5.5, downgrade-only — pass 1 must fully resolve before pass 2 is reached,
       and pass 2 before pass 3; **within pass 3, check order is never observable in the outcome**,
@@ -159,8 +174,18 @@ Depends on: nothing. Blocks: Sibling 2, Sibling 3.
       NOT run, and MUST NOT fire, against a row an earlier check already voided (R-P3.2) — same
       discipline as the existing checks at `:839-841`, `:850-862`, `:976-978`.
       Verify: `python3 -m py_compile rig/derive.py`.
+      Done, with one deliberate deviation from this task's literal wording, recorded rather than
+      silently made: R-P5.2's own text requires the **pre-scheme annotation** (`"pre-scheme-provenance"`)
+      to fire on an already-void row (proven by the three shakedown rows, R-P8) while the **state
+      transition** stays downgrade-only — that is a stricter rule than "insert everything inside one
+      `if state == 'complete':` block." Implemented as: the marker-absence check always runs and always
+      annotates, gating only its own state transition on `state == "complete"`; the null-digest check
+      (pass 2) and the accumulate-then-decide mismatch check (pass 3) are nested inside their own
+      `elif state == "complete":`, so they never annotate or transition an already-void row (R-P3.2).
+      This is a stricter, not a looser, reading of the task — self-test case h (task 1.10) is the proof
+      this split is required: a naive single-block version fails it.
 
-- [ ] 1.6 Fix the two unguarded subscripts (R-P4.1): `ak["F0"]["failures"]` (`:981`) and `len(ak["R0"])`
+- [x] 1.6 Fix the two unguarded subscripts (R-P4.1): `ak["F0"]["failures"]` (`:981`) and `len(ak["R0"])`
       (`:1071`) become `.get()`-based, following the existing precedent at `:987-994` (no answer key →
       scored fields stay `None`, row not voided). A malformed key (missing `F0.failures` or `R0`) adds
       `"answer-key-drift"` to task 1.5's `drifted` set, reaching the same
@@ -168,23 +193,37 @@ Depends on: nothing. Blocks: Sibling 2, Sibling 3.
       separate class needing its own reason." `causes_present` MUST become
       `len(ak["R0"]) if ak and "R0" in ak else None`, never `0` — absence is not a count (design §3).
       Verify: `python3 -m py_compile rig/derive.py`.
+      Done: both subscripts are `.get()`-based now (`ak.get("F0", {}).get("failures", [])`,
+      `len(ak["R0"]) if ak and "R0" in ak else None`); a malformed key (missing `F0.failures` or `R0`)
+      joins task 1.5's `drifted` set inside the provenance gate. Mutation-proven: disabling this check
+      in a scratch copy reverts to the direct `ak["R0"]` subscript and raises `KeyError` mid-derive on
+      self-test case f — confirming the totality fix is load-bearing, not decorative.
 
-- [ ] 1.7 Change the `is False` downgrades to not-`True` at `:859` (`permission_mode_matches_declared`)
+- [x] 1.7 Change the `is False` downgrades to not-`True` at `:859` (`permission_mode_matches_declared`)
       and `:883` (`model_matches_declared`) — R-P5.4. A `None` read back from a row whose
       `input_provenance_version` is present now voids with the existing reason
       (`"permission-mode-mismatch"` / `"model-mismatch"`). Task 1.5's gate already voided any row with
       no `input_provenance_version` before this loop is reached, so this change cannot double-punish a
       pre-scheme row (R-P5.5) — it fires only for a scheme-aware capture.
       Verify: `python3 -m py_compile rig/derive.py`.
+      Done: both sites changed to `is not True`. Mutation-proven for BOTH sites individually — reverting
+      either one alone to `is False` in a scratch copy turns exactly one self-test case red (the
+      model-mismatch case for `:883`, and a newly-added case for `:859` — see task 1.9/1.10's done-notes
+      for the gap that second one closed) and leaves every other case green, proving the two checks are
+      independently exercised.
 
-- [ ] 1.8 Bump `FAILURE_FLOOD_SCHEMA_VERSION` 3 → 4 (`:621`), with a comment following the file's own
+- [x] 1.8 Bump `FAILURE_FLOOD_SCHEMA_VERSION` 3 → 4 (`:621`), with a comment following the file's own
       convention (`:39-45`'s v2→v3 comment) naming every field this bump adds:
       `input_provenance_version`, `recorded_answer_key_digest`, `recorded_fixture_digest` (null until
       Sibling 3), and each model step's `recorded_surface_preimage_sha256` (null until Sibling 2). No
       migration code, no read of the old `schema_version` value to special-case a row (R-P11.1).
       Verify: `python3 -m py_compile rig/derive.py`.
+      Done: bumped to 4 with a comment naming all four fields (the two this batch populates,
+      `input_provenance_version` and `recorded_answer_key_digest`, plus the two named-but-not-yet-wired
+      `recorded_fixture_digest` and per-step `recorded_surface_preimage_sha256`), stacked above the
+      existing v2→v3 comment rather than replacing it. No migration code; re-derive rewrites every row.
 
-- [ ] 1.9 **Rewrite (never delete) `_self_test_build_row_model_mismatch()`'s case 3** (`:1260-1270`) —
+- [x] 1.9 **Rewrite (never delete) `_self_test_build_row_model_mismatch()`'s case 3** (`:1260-1270`) —
       R-P10.2. It currently asserts `model_matches_declared: None → state == "complete"`, labelled
       *"old capture — never falsely voids"*; that pinned the defect (WARNING-14 point 1). Rewritten:
       construct the same fixture with no `input_provenance_version`, assert
@@ -193,8 +232,15 @@ Depends on: nothing. Blocks: Sibling 2, Sibling 3.
       `model_matches_declared: None`, assert `state == "void", void_reason == "model-mismatch"`.
       Verify: `rig/derive.py --self-test` — both cases print `PASS`; deleting either one leaves half of
       WARNING-14 unproven, per R-P10.2's own scenario.
+      Done: case 3 rewritten in place (never deleted) to assert the pre-scheme void; case 4 added
+      asserting the provenance-intact `model-mismatch` void. A FIFTH case was also added here, beyond
+      this task's own scope, closing a gap mutation-testing found: R-P5.4 and design.md sec 9 both name
+      "both sites" (`permission_mode_matches_declared` AND `model_matches_declared`), but only the model
+      site had a proving case. Case 5 proves the permission-mode site the same way. Mutation-proven:
+      reverting `:883` alone to `is False` turns only case 4 red; reverting `:859` alone to `is False`
+      turns only case 5 red; the real file is byte-identical after each mutation cycle.
 
-- [ ] 1.10 Add a new self-test function, `_self_test_build_row_answer_key_provenance()`, registered in
+- [x] 1.10 Add a new self-test function, `_self_test_build_row_answer_key_provenance()`, registered in
       `run_self_test()`'s roster (`:1420-1428`) alongside the existing seven, built on
       `_self_test_make_ff_run_dir` (`:1216-1235`) extended to carry `input_provenance_version` and
       `recorded_answer_key_digest` in its synthetic `arm.json`. Cases (ADR 0013 — every detector must
@@ -222,13 +268,30 @@ Depends on: nothing. Blocks: Sibling 2, Sibling 3.
         `void_reason == "shakedown"`, gain `"pre-scheme-provenance"` (R-P8's proof, using a synthetic
         fixture shaped like the real rows, not the real rows themselves).
       Verify: `rig/derive.py --self-test` — all eight cases print `PASS`.
+      Done: all eight cases (a-h) implemented exactly as specified and PASS. Each mutation-proven able
+      to fire: the digest-mismatch check (b), the pre-scheme annotation (d, h), the null-digest check
+      (e), and the malformed-key check (f) were each deliberately broken in a scratch copy of
+      `rig/derive.py` (never the committed file) and confirmed to turn exactly the case(s) that check
+      protects red, with every other case staying green and the real file byte-identical afterward
+      (`git status`/`sha256sum` checked before and after every mutation cycle). Case c is proven by
+      construction (per-root indexing) rather than by editing a real fixture file, per the task's own
+      instruction.
 
-- [ ] 1.11 Re-derive `rig/results/failure-flood-v1/runs.jsonl` from the raw captures already under
+- [x] 1.11 Re-derive `rig/results/failure-flood-v1/runs.jsonl` from the raw captures already under
       `rig/runs/failure-flood-v1/` (no new run). Confirm the three rows still read
       `state=void, void_reason=shakedown`, now gain `"pre-scheme-provenance"` in `anomaly_classes`, and
       `input_provenance_version`/`recorded_answer_key_digest`/`recorded_fixture_digest` are `null`.
       Verify: `python3 rig/derive.py --experiment failure-flood-v1`; inspect the three rows by hand;
       confirm no row acquired `state=complete` (R-P1.1).
+      Done: re-derived. All three rows: `state=void, void_reason=shakedown` (unchanged),
+      `anomaly_classes == ["pre-scheme-provenance"]` exactly, `schema_version == 4`,
+      `input_provenance_version`/`recorded_answer_key_digest`/`recorded_fixture_digest` all `null`. N
+      stays 0 — no row acquired `state=complete`. `tool-surface-v1` was also re-derived (unavoidable —
+      `checker_digest` is stamped on both experiments from `derive.py`'s own file bytes, R-P11.2) and its
+      42-row projection (excluding only `checker_digest`) is byte-identical to the pre-change file, with
+      `schema_version` unchanged at 3 and `build_row`'s registry entry byte-unchanged — this is 4.1's own
+      check, run early because editing `derive.py` forced the re-derive regardless; the full cross-cutting
+      pass still belongs to 4.x.
 
 ---
 
