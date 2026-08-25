@@ -299,6 +299,62 @@ Depends on: nothing. Blocks: Sibling 2, Sibling 3.
 
 Depends on: Sibling 1. Blocks: Sibling 3.
 
+- [ ] 2.0 **Face A's digest computation is unproven, and its cross-language pin was never built.**
+      Found by independent orchestrator mutation-proof after Sibling 1 was committed (`0637d68`), not
+      by the apply phase. **Close this before any further Face-A behaviour is trusted.**
+
+      **What is proven, and what is not.** Seven independent mutations of Sibling 1's provenance gate
+      each turn `rig/derive.py --self-test` red, so the *comparison* logic is well proven. But replacing
+      `answer_key_set_digest()`'s entire body with `return "constant"` leaves **all 43 cases green**.
+      Every self-test derives its expected digest by calling `answer_key_set_digest()` itself
+      (`derive.py:1373`, `:1406`, `:1466`, `:1519`, `:1613-1614`), so both sides of every comparison
+      move together and the function's own computation is proven zero ways.
+
+      **This is this cycle's own defect pattern, recursed.** The reason R-F5.3 cannot detect fixture
+      drift is that it re-reads the same live manifest and agrees with itself. A self-test that computes
+      both sides of its comparison with the function under test cannot detect that the function is
+      wrong, for exactly the same reason. Noting it here so the parallel is not lost: the fix for the
+      instrument and the fix for the instrument's own test are the same idea.
+
+      **The cross-language pin was verified, but not committed — and that is the distinction that
+      matters.** Task 1.3's done-note is honest and correct: it records that Python's
+      `answer_key_set_digest(v1)` and bash's `answer_key_paths | hash_paths` pipeline both produce
+      `571e083d27aaef0a63cee3b26de97b14ac8eccdab02dfbe3535aba83728cb7b6` over the real committed v1
+      answer-key set. Nobody skipped the check. **It was done by hand, once, and nothing committed will
+      catch the two sides drifting apart afterwards** — which is precisely the recurrence ADR 0013 exists
+      to catch, and the exact shape task 7.10 was created to stop: a verification performed ad hoc and
+      never turned into a committed test. Task 2.1 already requires a real pin for Face C's pair;
+      Sibling 1's pair asked only for "verified by hand", so this is a **planning gap, not an apply
+      failure**.
+
+      Convenient consequence: the constant design asked to pin with **already exists** — it is in task
+      1.3's done-note above. This task is committing it, not discovering it.
+
+      `design.md`'s risk list named the obligation: *"Two cross-language digest agreements are created
+      (answer-key set, surface preimage), each pinned by a shared literal constant. A pin failure is the
+      finding, not a thing to 'fix' on the failing side."* The runner records in bash
+      (`answer_key_paths()` → `hash_paths()`, `run-pipeline.sh:200-201`); the deriver compares in Python
+      (`answer_key_set_digest()`, `derive.py:620-646`). `answer_key_paths()` has no `--self-test` case of
+      any kind; the only answer-key cases the runner suite carries today are task 7.10's
+      `compute_manifest` ones.
+
+      **Why it is not theoretical.** If the two sides differ by so much as a trailing newline, then on
+      the first real countable run *every* row voids with `answer-key-drift` — a correct-looking refusal
+      whose stated cause is false. That is the fourth occurrence of the shape this rig keeps producing,
+      and the one `design.md` §4 cited when it refused to collapse `mismatch` into `missing`.
+
+      Verify, three parts:
+      1. A `derive.py --self-test` case builds a synthetic fixture root, digests it, mutates one
+         answer-key file's **bytes**, re-digests, and asserts the two differ — the same shape task 7.10
+         already committed for `compute_manifest` and `hash_paths` in `run-pipeline.sh --self-test`.
+         Mutation-prove it: `return "constant"` in `answer_key_set_digest()` must now turn the suite red.
+      2. A `run-pipeline.sh --self-test` case covers `answer_key_paths()` — that it selects exactly
+         `answer-key/` relpaths from one root, excludes every other manifest subdirectory, and is sorted.
+      3. **The pin**: one synthetic fixture root, digested by both sides, asserted equal. It may live on
+         either side, but it must actually execute both implementations rather than compare each to a
+         hardcoded string. Per design's own wording, a later failure of this pin is a finding to report,
+         never something to "fix" on whichever side looks wrong.
+
 - [ ] 2.1 Add `preimage_digest()` to `rig/run-pipeline.sh`, reproducing `load_surface()` +
       `surface_digest()`'s exact convention (`rig/derive.py:89-99`): dedupe + sort, `# harness:` header
       and blank lines excluded, `sha256` of the joined, sorted, newline-set. This is the **one
