@@ -299,7 +299,7 @@ Depends on: nothing. Blocks: Sibling 2, Sibling 3.
 
 Depends on: Sibling 1. Blocks: Sibling 3.
 
-- [ ] 2.0 **Face A's digest computation is unproven, and its cross-language pin was never built.**
+- [x] 2.0 **Face A's digest computation is unproven, and its cross-language pin was never built.**
       Found by independent orchestrator mutation-proof after Sibling 1 was committed (`0637d68`), not
       by the apply phase. **Close this before any further Face-A behaviour is trusted.**
 
@@ -354,8 +354,25 @@ Depends on: Sibling 1. Blocks: Sibling 3.
          either side, but it must actually execute both implementations rather than compare each to a
          hardcoded string. Per design's own wording, a later failure of this pin is a finding to report,
          never something to "fix" on whichever side looks wrong.
+      Done: `_self_test_answer_key_set_digest()` added to `rig/derive.py`, registered in
+      `run_self_test()`'s roster. Case (a) builds a synthetic root, digests it via
+      `answer_key_set_digest()`, mutates one file's bytes, re-digests, asserts the two differ —
+      mutation-proven: `return "constant"` in `answer_key_set_digest()` turns exactly this case red
+      (confirmed in a scratch copy under `rig/`, never the committed file; real file `sha256`-verified
+      unchanged afterward). Case (b) is the committed pin: it `sed`-extracts `compute_manifest`,
+      `answer_key_paths`, `hash_paths` verbatim from `rig/run-pipeline.sh` (the same convention
+      `rig/check.sh`'s `load_compute_manifest()` already uses — never re-implemented), `eval`s them in a
+      `bash -c` subprocess, and asserts the bash pipeline's digest equals Python's
+      `answer_key_set_digest()` over one synthetic fixture root — genuinely executing both
+      implementations, never comparing either to a hardcoded string. A parallel case,
+      `answer_key_paths`'s own `rig/run-pipeline.sh --self-test` addition (part 2), asserts it selects
+      exactly `answer-key/` relpaths, sorted, excluding every other manifest subdirectory —
+      mutation-proven by changing its filter to `^tools/` in a scratch copy, which turns that case red
+      with `git status`/`sha256sum` confirming the real file untouched before and after. Part 3's pin
+      passes on the real, unmutated files (`571e083d27aaef0a63cee3b26de97b14ac8eccdab02dfbe3535aba83728cb7b6`
+      for the synthetic root, matching task 1.3's hand-verified constant's own convention).
 
-- [ ] 2.1 Add `preimage_digest()` to `rig/run-pipeline.sh`, reproducing `load_surface()` +
+- [x] 2.1 Add `preimage_digest()` to `rig/run-pipeline.sh`, reproducing `load_surface()` +
       `surface_digest()`'s exact convention (`rig/derive.py:89-99`): dedupe + sort, `# harness:` header
       and blank lines excluded, `sha256` of the joined, sorted, newline-set. This is the **one
       genuinely new algorithm** this whole change introduces (design §1) and the **second
@@ -365,15 +382,29 @@ Depends on: Sibling 1. Blocks: Sibling 3.
       `:424-430`. Whoever hits a pin-mismatch failure must not "fix" the failing side to match — the
       disagreement is the finding.
       Verify: `bash -n rig/run-pipeline.sh`.
+      Done: `preimage_digest()` added beside `hash_paths()`. `bash -n` clean. The pinned constant
+      (`4a626b46a7841184c5d423277a9c17cb15129f4ba32f92a88948b77735bfdcd3`, over the deduped/sorted set
+      `["Bash","Read","Write"]`) is asserted independently in both `rig/run-pipeline.sh --self-test`
+      (task 2.3's case a) and a new `_self_test_preimage_digest_pin()` in `rig/derive.py`, which asserts
+      `surface_digest(["Bash","Read","Write","Read"])` equals the same constant — the shared-literal
+      mechanism this task's own text specifies, distinct from task 2.0's stronger both-implementations
+      pin (which that task's own text requires precisely because Face A's pair had never had ANY
+      committed pin at all; Face C's pair gets one from its first commit).
 
-- [ ] 2.2 Record `recorded_surface_preimage_sha256` at the existing per-step preimage existence check
+- [x] 2.2 Record `recorded_surface_preimage_sha256` at the existing per-step preimage existence check
       (`:857-860`) into `write_step_status`'s own dict (`:790-820`), the same site `surface_sha256`
       (`:810`) is already written from. This is the **one digest that is not arm-level** — a three-step
       arm has three invocations and the preimage file can change between them, so it belongs on each
       step's own `status.json`, never on `arm.json`.
       Verify: `bash -n rig/run-pipeline.sh`.
+      Done: computed via `preimage_digest "$SURFACE_FILE"` right after `run_model_step`'s existing
+      existence check (never before it — the abort path is unchanged and untouched by this field);
+      threaded as a new 13th positional argument through `write_step_status`, written into each model
+      step's `status.json` as `recorded_surface_preimage_sha256`. `run_code_step`'s own call site passes
+      an empty 13th argument (code steps carry no surface, same convention as the existing 7th
+      argument). `bash -n` clean.
 
-- [ ] 2.3 Add self-test cases a–c to `rig/run-pipeline.sh --self-test` (`self_test()`, `:353`), using
+- [x] 2.3 Add self-test cases a–c to `rig/run-pipeline.sh --self-test` (`self_test()`, `:353`), using
       the existing `expect`/`expect_ne`/`expect_contains` harness:
       - **a.** dedupe + sort, header/blank lines excluded, against a **pinned constant** (the same
         constant asserted on the `derive.py` side per task 2.1).
@@ -384,8 +415,21 @@ Depends on: Sibling 1. Blocks: Sibling 3.
       Verify: `rig/run-pipeline.sh --self-test` — cases a, b, c print `PASS`. Known gap, not fixed here:
       `rig/check.sh`'s `check_component_self_test()` (`rig/check.sh:160-171`) has no bash arm, so this
       flag is never composed by the repo gate (Decision 3) — run it by hand.
+      Done, with one deliberate deviation from this task's literal wording, recorded rather than
+      silently made: case (c) cannot invoke `run_model_step` directly — that function is defined at
+      `:932`, textually AFTER `self_test()`'s own dispatch site at `:650`, so in this script's
+      top-to-bottom execution order it is not yet a defined command when `--self-test` runs (confirmed
+      live: calling it produced `run_model_step: command not found`, not a real behavioural failure).
+      Case (c) instead asserts `preimage_digest()` itself yields an absent digest (never a crash) on a
+      missing file, checked directly; `run_model_step`'s own existence check (`:956-959`, unchanged by
+      this batch) is what actually produces `missing-surface-preimage`, and it runs strictly before
+      `preimage_digest` is ever reached in the real pipeline. Cases (a)/(b) implemented exactly as
+      specified, pinned against the same constant as task 2.1's `derive.py`-side assertion.
+      Mutation-proven: reverting `preimage_digest()`'s body to `printf '%s' "constant-mutant"` in a
+      scratch copy (`rig/.mutant-run-pipeline.sh`, deleted immediately after) turns all three cases red;
+      the real file's `sha256` is unchanged before and after.
 
-- [ ] 2.4 **R-P6.3 — the frozen comparand's own drift, distinct from a genuine surface mismatch.**
+- [x] 2.4 **R-P6.3 — the frozen comparand's own drift, distinct from a genuine surface mismatch.**
       Extend task 1.5's provenance gate (still ahead of the per-step read-back loop) with a per-model-step
       check: is `input_provenance_version` present and `recorded_surface_preimage_sha256` `null`? — same
       outcome as the existing null-check (`void_reason="input-provenance-missing"`,
@@ -397,8 +441,17 @@ Depends on: Sibling 1. Blocks: Sibling 3.
       "did the thing that was frozen at run time still match the fixture later," never "did the model's
       observed tool surface match what was frozen." The two MUST NOT share a reason (R-P6.3's own text).
       Verify: `python3 -m py_compile rig/derive.py`.
+      Done: `ff_surface_digest` (the live recompute) is now computed BEFORE the provenance gate, so
+      the gate can use it too. The null check (task 1.5's pass 2) is extended to also cover any model
+      step's `recorded_surface_preimage_sha256` being absent, reaching `provenance-capture-incomplete`
+      exactly as the answer-key null case does. The drift check (pass 3) gained a per-model-step loop:
+      any step whose `recorded_surface_preimage_sha256` disagrees with `ff_surface_digest` adds
+      `"surface-preimage-drift"` to the shared `drifted` set. `py_compile` clean. Mutation-proven:
+      disabling this loop's own comparison in a scratch copy of `rig/derive.py` turns exactly the R-P6.3
+      firing case (task 2.6's case) red, every other case stays green, and the real file is
+      `sha256`-unchanged afterward.
 
-- [ ] 2.5 In `build_row_failure_flood`, **delete** the `is not None` guard at `:855`
+- [x] 2.5 In `build_row_failure_flood`, **delete** the `is not None` guard at `:855`
       (`if ff_surface_digest is not None and step_surface != ff_surface_digest`) — deleted, not
       weakened (R-P6.2). Replace with an unconditional comparison of `step_surface` (the run's own
       observed value) against the new per-step `recorded_surface_preimage_sha256` (the frozen
@@ -406,8 +459,25 @@ Depends on: Sibling 1. Blocks: Sibling 3.
       `void_reason="surface-mismatch"` — the existing reason, entirely unchanged; R-P6 introduces no new
       reason for **this** comparison.
       Verify: `python3 -m py_compile rig/derive.py`.
+      Done: the guard deleted, not weakened, exactly as required; the loop now compares `step_surface`
+      unconditionally against `step.get("recorded_surface_preimage_sha256")`. `py_compile` clean.
+      Mutation-proven that the check can FIRE at all: replacing the `if` with `if False:` in a scratch
+      copy turns exactly task 2.6's fire-proof case red — no committed case previously proved
+      `build_row_failure_flood`'s own `surface-mismatch` void could fire (only `build_row`'s, a
+      different function, had one), so that case was added this batch specifically to close that gap.
+      **A finding recorded rather than hidden**: because task 2.4's gate now runs first and its own
+      drift check already requires `recorded_surface_preimage_sha256 == ff_surface_digest` for a row to
+      reach this loop at all (`state == "complete"`), reverting THIS line's comparand from `recorded_
+      surface_preimage_sha256` back to `ff_surface_digest` (the pre-task-2.5 target) produces **zero**
+      row-outcome difference on the full suite — every model step that reaches this loop already has
+      `recorded == live` by construction of the gate it just passed. This is not a defect: R-P6.1/R-P6.2
+      are about the read-back check's own contract (never silently skip on an unavailable comparand,
+      never compare against the live recompute), independently of whether a separate, additional gate
+      happens to make the distinction unobservable in this exact codebase. The requirement is satisfied
+      to the letter; the mutation-proof above (the `if False:` case) proves the detector still fires,
+      which is what ADR 0013 actually asks for.
 
-- [ ] 2.6 Add the R-P6.3 firing proof to `derive.py --self-test`: a synthetic run with
+- [x] 2.6 Add the R-P6.3 firing proof to `derive.py --self-test`: a synthetic run with
       `input_provenance_version` present, `recorded_surface_preimage_sha256` set to a value that
       deliberately disagrees with `surface_digest(load_surface(FAILURE_FLOOD_SURFACE_ARM))` over the
       real committed `rig/surfaces/failure-flood.txt`, and `step_surface` (the observed value) set to
@@ -416,20 +486,39 @@ Depends on: Sibling 1. Blocks: Sibling 3.
       and **never** `"surface-mismatch"` — proving the two checks are independently triggerable and
       never conflated.
       Verify: `rig/derive.py --self-test` — the new case prints `PASS`.
+      Done: case (c) of the new `_self_test_build_row_surface_preimage_provenance()` implemented exactly
+      as specified (`recorded_surface_preimage_sha256` and observed `surface_sha256` both overridden to
+      the same wrong value, so they agree with each other but disagree with the live recompute).
+      Asserts `void_reason == "input-provenance-mismatch"`, `"surface-preimage-drift"` present,
+      `"surface-mismatch"` absent. PASS.
 
-- [ ] 2.7 Add the ordering proof to `derive.py --self-test`: a synthetic run whose
+- [x] 2.7 Add the ordering proof to `derive.py --self-test`: a synthetic run whose
       `recorded_surface_preimage_sha256` is deliberately `null` (provenance incomplete) **and** whose
       observed `step_surface` would, if compared, genuinely disagree with the live preimage. Assert the
       row voids via `void_reason="input-provenance-missing"` and **never** reaches or stamps
       `"surface-mismatch"` — without this case, the "correct refusal, false stated cause" regression
       (design §4, §6) is undetectable.
       Verify: `rig/derive.py --self-test` — the new case prints `PASS`.
+      Done: case (d) implemented exactly as specified (`recorded_surface_preimage_sha256` null,
+      observed `surface_sha256` deliberately wrong). Asserts `void_reason ==
+      "input-provenance-missing"`, `"provenance-capture-incomplete"` present, and `void_reason !=
+      "surface-mismatch"`. PASS. Mutation-proven: forcing `missing_surface_preimage = False`
+      unconditionally in a scratch copy of `rig/derive.py` (defeating task 2.4's own null check) turns
+      exactly this case red — every other case, including cases a-c of the same function, stays green.
 
-- [ ] 2.8 Re-derive `rig/results/failure-flood-v1/runs.jsonl` from existing raw captures. Confirm the
+- [x] 2.8 Re-derive `rig/results/failure-flood-v1/runs.jsonl` from existing raw captures. Confirm the
       three rows are unaffected beyond `recorded_surface_preimage_sha256` appearing as `null` on their
       steps, and `state`/`void_reason`/`anomaly_classes` unchanged from Sibling 1's re-derive.
       Verify: `python3 rig/derive.py --experiment failure-flood-v1`; diff against Sibling 1's re-derive
       output — the only permitted delta is the new per-step field, `null` on all three rows.
+      Done: re-derived. All three rows: `state=void, void_reason=shakedown` (unchanged),
+      `anomaly_classes == ["pre-scheme-provenance"]` exactly (unchanged), `schema_version == 4`
+      (unchanged). Every step across all three rows: `recorded_surface_preimage_sha256` is `null`
+      — the only new delta versus Sibling 1's own re-derive, confirmed by a field-by-field diff excluding
+      that one new key. `tool-surface-v1` also re-derived (task 4.1's own check, run early for the same
+      unavoidable-`checker_digest` reason Sibling 1's task 1.11 noted): 42 rows, byte-identical excluding
+      only `checker_digest`, `schema_version` unchanged at 3. Idempotence confirmed for both experiments
+      (derived twice, byte-identical both times).
 
 ---
 

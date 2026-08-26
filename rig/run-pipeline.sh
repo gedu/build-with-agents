@@ -240,6 +240,32 @@ print(hashlib.sha256("\n".join(lines).encode()).hexdigest())
 PY
 }
 
+# preimage_digest <preimage-file> — Face C's own digest (run-input-provenance
+# spec R-P6, design.md secs 1/9): the ONE genuinely new algorithm this whole
+# change introduces. Reproduces rig/derive.py's load_surface() + surface_digest()
+# convention exactly — dedupe + sort, `# harness:` header and blank lines
+# excluded, sha256 of the joined newline-set — so a run's own recorded
+# comparand and the deriver's live recompute can only ever disagree by
+# drifting apart, never by starting from two different conventions (the same
+# reason answer_key_set_digest() reproduces hash_paths() rather than inventing
+# a second one). Prints an EMPTY string, never a hash of the empty set and
+# never a crash, when the file has no tool lines at all or does not exist —
+# WARNING-14's own shape at the recording end: absence must read as absence,
+# never as a value that happens to be a real digest of nothing.
+preimage_digest() {
+  python3 - "$1" <<'PY'
+import hashlib, sys
+
+path = sys.argv[1]
+try:
+    lines = open(path).read().splitlines()
+except FileNotFoundError:
+    lines = []
+names = sorted(set(l.strip() for l in lines if l.strip() and not l.startswith("#")))
+print(hashlib.sha256("\n".join(names).encode()).hexdigest() if names else "")
+PY
+}
+
 # check_prereg <fixture-root> — Hard Ordering Gate layer 2
 # (answer-key/prereg.json's `check` block, task 4.4). Prints prereg_digest
 # and exits 0 on pass; prints the EXACT prereg.json-named reason to stderr
@@ -534,6 +560,44 @@ src/a.ts
 tests/a.test.ts" "$ws" \
     "manifest_workspace_paths: exactly src/, tests/, runtime/ — sorted, never tools/, answer-key/ or prompts/"
 
+  # -- answer_key_paths (run-input-provenance task 2.0 part 2 — the gate-
+  # keeping finding that Face A's own runner-side helper had no case of its
+  # own beyond task 7.10's compute_manifest ones) ---------------------------
+  local ak
+  ak="$(answer_key_paths "$tmp/fixture")"
+  expect "answer-key/s1.json" "$ak" \
+    "answer_key_paths: exactly answer-key/ relpaths — sorted, never src/, tests/, runtime/, tools/ or prompts/"
+
+  # -- preimage_digest (run-input-provenance task 2.1 — Face C's own new
+  # algorithm) --------------------------------------------------------------
+  # a. dedupe + sort, `# harness:` header and blank lines excluded, against a
+  # PINNED CONSTANT — the same constant is asserted independently by
+  # rig/derive.py --self-test over the equivalent surface_digest() input
+  # (task 2.1's own cross-language pin). A later disagreement between the
+  # two is the finding to report, never something to "fix" on either side.
+  printf '# harness: v1\n\nBash\nRead\nWrite\nRead\n\n' >"$tmp/preimage.txt"
+  expect "4a626b46a7841184c5d423277a9c17cb15129f4ba32f92a88948b77735bfdcd3" \
+    "$(preimage_digest "$tmp/preimage.txt")" \
+    "preimage_digest: dedupe + sort, header/blank lines excluded (pinned constant, shared with derive.py --self-test)"
+
+  # b. no tool lines at all -> an ABSENT digest (empty string), never a hash
+  # of the empty set read back as if it were a real value — WARNING-14's own
+  # shape at the recording end.
+  printf '# harness: v1\n\n' >"$tmp/preimage-empty.txt"
+  expect "" "$(preimage_digest "$tmp/preimage-empty.txt")" \
+    "preimage_digest: no tool lines -> empty/absent, never a hash of the empty set"
+
+  # c. a missing preimage file yields an absent digest from preimage_digest
+  # itself, never a crash — checked directly here rather than through
+  # run_model_step's own existence check (:956-959), which cannot be called
+  # from this suite (it is defined AFTER this suite's own --self-test
+  # dispatch point in this file's top-to-bottom execution order). That
+  # existence check is unchanged by this batch, runs strictly before
+  # preimage_digest is ever reached, and is what actually produces
+  # missing-surface-preimage — provenance recording never masks that abort.
+  expect "" "$(preimage_digest "$tmp/does-not-exist.txt")" \
+    "preimage_digest: a missing preimage file yields an absent digest, never a crash (run_model_step's own existence check runs first and is unchanged)"
+
   rm -rf "$tmp"
 
   if [ "$failed" -eq 0 ]; then
@@ -803,9 +867,14 @@ write_step_status() {
   # shape, for anything already reading that one field)
   # $12 model_actual — read back exactly the same way permission_mode_actual
   # is (ADR 0010, R-F7.1); empty for a code step, which never invokes `claude`.
+  # $13 recorded_surface_preimage_sha256 (run-input-provenance R-P6, task
+  # 2.2) — the ONE provenance face that is per-step, not arm-level: a
+  # three-step arm has three invocations and the preimage file can change
+  # between them. Empty for a code step, the same convention as $7.
   ROLE="$2" KIND="$3" EXIT_CODE="$4" WALL_MS="$5" SUBSTRATE_CHANGED="$6" \
   SURFACE_SHA256="$7" PERMISSION_MODE_ACTUAL="$8" TIMED_OUT="${9:-0}" \
   SRC_CHANGED="${10:-0}" RO_CHANGED="${11:-0}" MODEL_ACTUAL="${12:-}" \
+  RECORDED_SURFACE_PREIMAGE_SHA256="${13:-}" \
   DECLARED_PERMISSION_MODE="$PERMISSION_MODE" DECLARED_MODEL="$MODEL" \
   STATUS_FILE="$1/status.json" \
   python3 <<'PY'
@@ -829,6 +898,7 @@ data = {
     "src_changed": env["SRC_CHANGED"] == "1",
     "ro_changed": env["RO_CHANGED"] == "1",
     "surface_sha256": env["SURFACE_SHA256"] or None,
+    "recorded_surface_preimage_sha256": env["RECORDED_SURFACE_PREIMAGE_SHA256"] or None,
     "declared_permission_mode": env["DECLARED_PERMISSION_MODE"],
     "permission_mode_actual": actual,
     "permission_mode_matches_declared": (actual == env["DECLARED_PERMISSION_MODE"]) if actual else None,
@@ -879,6 +949,12 @@ run_model_step() {
     ABORT_REASON="missing-surface-preimage:$SURFACE_FILE"
     return 0
   fi
+  # Face C's own frozen comparand (R-P6.1) — taken here, at the same
+  # existence check that already guards this file, over bytes already
+  # proven present. Never the step's own OBSERVED surface (that is $surf,
+  # below, read back from the invocation's own init event).
+  local recorded_surface_preimage_sha256
+  recorded_surface_preimage_sha256="$(preimage_digest "$SURFACE_FILE")"
   local prompt_text
   prompt_text="$(cat "$prompt_file")"
   if [ "$role" = "apply" ] && [ -f "$RUN_DIR/steps/02-diagnose/handoff/fix-plan.txt" ]; then
@@ -961,7 +1037,7 @@ run_model_step() {
     cp "$ws/root-cause-report.txt" "$dir/handoff/root-cause-report.txt"
   fi
 
-  write_step_status "$dir" "$role" model "$exit_code" $((end_ms - start_ms)) "$substrate" "$surf" "$perm" "$timed_out" "$src_changed" "$ro_changed" "$model_actual"
+  write_step_status "$dir" "$role" model "$exit_code" $((end_ms - start_ms)) "$substrate" "$surf" "$perm" "$timed_out" "$src_changed" "$ro_changed" "$model_actual" "$recorded_surface_preimage_sha256"
   [ "$timed_out" -eq 1 ] && { ABORT_REASON="timeout"; return 0; }
   return 0
 }
@@ -1004,7 +1080,7 @@ run_code_step() {
 
   # Tokens are recorded 0, not absent (design.md sec 2: "keeps the 'zero
   # model tokens' claim read back rather than asserted").
-  write_step_status "$dir" "$role" code "$exit_code" $((end_ms - start_ms)) "$substrate" "" "" 0 "$src_changed" "$ro_changed" ""
+  write_step_status "$dir" "$role" code "$exit_code" $((end_ms - start_ms)) "$substrate" "" "" 0 "$src_changed" "$ro_changed" "" ""
   # collector-error (design.md Decision 3: run-axis void, never a suite
   # state) is collect.py's own exit 2.
   [ "$exit_code" -eq 2 ] && { ABORT_REASON="collector-error"; return 0; }
