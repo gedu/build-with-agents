@@ -15,7 +15,8 @@ without ever bringing that project's identity into a public repository.
 This is goal (c) in `AGENTS.md`. Its output is also the demand signal for goal (b): `blocks/` gets
 built from gaps that recurred, never from gaps that were imagined.
 
-`status: draft` — not yet run end to end. See **Recorded runs**.
+`status: draft` — three recorded runs, every one of which changed this skill. It executes, and it
+is not settled: run 3 found as many gaps as run 1. See **Recorded runs**.
 
 ## The rule this skill exists to prevent
 
