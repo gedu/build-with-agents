@@ -723,6 +723,20 @@ if [ "$COMPUTED_MANIFEST" != "$COMMITTED_MANIFEST" ]; then
   die_cannot_run "MANIFEST.sha256 mismatch under $FIXTURE_ROOT — refusing to run against a tampered or edited fixture."
 fi
 
+# ---- Face B: fixture digest (run-input-provenance task 3.1, R-P7.1) -------
+# sha256 of MANIFEST.sha256's own bytes, taken over bytes the recompute-
+# compare gate just above has already proven match the live tree — the same
+# one-liner idiom LOCKFILE_SHA256 below uses, applied here instead of
+# invented fresh. This needs no cross-language pin (unlike Face A's
+# answer_key_paths|hash_paths pair and Face C's preimage_digest): both sides
+# are the exact same "sha256 of one file's bytes" idiom design.md sec 1
+# already uses for LOCKFILE_SHA256, so there is no sort-order or
+# newline-joining convention that could drift apart between them.
+# rig/derive.py's own fixture_digest_at() is this digest's deriver-side
+# twin, unchanged by this cycle (design.md sec 1: "already this exact
+# value").
+RECORDED_FIXTURE_DIGEST="$(python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$MANIFEST_FILE")"
+
 # ---- Face A: answer-key set digest (run-input-provenance task 1.3, R-P2.1) -
 # Recorded over bytes now PROVEN frozen by the recompute-compare gate just
 # above — the same "record after the freeze is proven" convention every
@@ -1164,6 +1178,7 @@ STATE="$ARM_STATE" VOID_REASON="$ARM_VOID_REASON" ABORT_REASON="$ABORT_REASON" D
 SHAKEDOWN_USED="$SHAKEDOWN" WORKSPACE_FILE_COUNT="$WORKSPACE_FILE_COUNT" \
 RO_SUBSTRATE_VIOLATION="$RO_SUBSTRATE_VIOLATION" DIAGNOSTICIAN_SRC_VIOLATION="$DIAGNOSTICIAN_SRC_VIOLATION" \
 RECORDED_ANSWER_KEY_DIGEST="$RECORDED_ANSWER_KEY_DIGEST" \
+RECORDED_FIXTURE_DIGEST="$RECORDED_FIXTURE_DIGEST" \
 python3 <<'PY'
 import json, os
 
@@ -1188,12 +1203,13 @@ arm = {
     # this run was captured under the provenance scheme, plus Face A's own
     # digest of the answer-key/ set it was scored against — same lifetime as
     # PREREG_DIGEST/CASE_TABLE_DIGEST above, threaded through to this one
-    # write. `recorded_fixture_digest` and each step's own
-    # `recorded_surface_preimage_sha256` are the OTHER two faces this schema
-    # bump (derive.py v4) already names; they stay unset here until Sibling
-    # 2/3 wire them in — never invented ahead of the code that computes them.
+    # write. `recorded_fixture_digest` (task 3.1, R-P7.1) is Face B's own
+    # identity digest, the same lifetime and write. Each model step's own
+    # `recorded_surface_preimage_sha256` is Face C's — per-step, not
+    # arm-level, written into status.json instead (task 2.2).
     "input_provenance_version": 1,
     "recorded_answer_key_digest": env["RECORDED_ANSWER_KEY_DIGEST"] or None,
+    "recorded_fixture_digest": env["RECORDED_FIXTURE_DIGEST"] or None,
     "declared_permission_mode": env["DECLARED_PERMISSION_MODE"],
     "declared_model": env["DECLARED_MODEL"],
     "workspace_file_count": int(env["WORKSPACE_FILE_COUNT"]),

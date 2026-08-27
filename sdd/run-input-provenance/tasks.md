@@ -526,13 +526,26 @@ Depends on: Sibling 1. Blocks: Sibling 3.
 
 Depends on: Sibling 2.
 
-- [ ] 3.1 In `rig/run-pipeline.sh`, after the MANIFEST gate (same site as task 1.3), compute
+- [x] 3.1 In `rig/run-pipeline.sh`, after the MANIFEST gate (same site as task 1.3), compute
       `recorded_fixture_digest = sha256(MANIFEST.sha256's bytes)` using the one-liner idiom already at
       `:677` (the `LOCKFILE_SHA256` computation). Thread it into the `arm.json` writer the same way as
       `recorded_answer_key_digest` (task 1.4).
       Verify: `bash -n rig/run-pipeline.sh`.
+      Done: `RECORDED_FIXTURE_DIGEST` computed right after the MANIFEST recompute-compare gate, over
+      bytes that gate has already proven frozen, via the exact same
+      `python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())'`
+      one-liner `LOCKFILE_SHA256` already uses (`:776`), applied to `$MANIFEST_FILE`. Threaded into the
+      `arm.json` writer's env block and `arm = {...}` dict, same lifetime as
+      `RECORDED_ANSWER_KEY_DIGEST`. `bash -n` clean. No cross-language pin was added, and none is
+      required: unlike Face A's `answer_key_paths|hash_paths` pair and Face C's `preimage_digest`, both
+      sides of this digest are the identical "sha256 of one file's bytes" idiom (Python's
+      `fixture_digest_at()` and this bash one-liner apply the same primitive to the same bytes), so
+      there is no sort-order or newline-joining convention that could drift the two sides apart —
+      confirmed by inspection, not merely asserted. This is why `rig/run-pipeline.sh --self-test`
+      stayed at 28 cases, unchanged from Sibling 2: task 3.1's own verify criterion is `bash -n` only,
+      matching the task text exactly, not a gap left by this batch.
 
-- [ ] 3.2 **R-P7.1a.** Add a fixture-digest check to task 1.5's shared drift-accumulation pass — joining
+- [x] 3.2 **R-P7.1a.** Add a fixture-digest check to task 1.5's shared drift-accumulation pass — joining
       it, not inserted at a particular point relative to task 1.5's answer-key check (R-P2.2a forbids
       that framing entirely). Extend the null-check (task 1.5's pass 2 / task 2.4's per-step extension)
       to also cover `recorded_fixture_digest`. In pass 3, compare `recorded_fixture_digest` against a
@@ -541,8 +554,28 @@ Depends on: Sibling 2.
       write into. The eventual `void_reason="input-provenance-mismatch"` fires once, after all three
       checks have run, carrying every face that actually disagreed.
       Verify: `python3 -m py_compile rig/derive.py`.
+      Done: the null-check chain (`if recorded_answer_key_digest is None or recorded_fixture_digest is
+      None or missing_surface_preimage:`) now also covers `recorded_fixture_digest is None`, reaching
+      the same `input-provenance-missing`/`provenance-capture-incomplete` outcome. Pass 3 gained
+      `live_fixture_digest = digests.get("fixture", {}).get(fixture_version)` and
+      `if recorded_fixture_digest != live_fixture_digest: drifted.add("fixture-drift")`, joining the
+      same `drifted` set the answer-key check (task 1.5) and the surface-preimage check (task 2.4)
+      already write into — no insertion-point framing, per R-P2.2a. `py_compile` clean. Mutation-proven
+      (scratch copies of `rig/derive.py` under `rig/`, deleted immediately after; real file
+      `sha256`-verified unchanged before/after every cycle): (1) disabling the fixture-drift comparison
+      (`if False:`) turns exactly cases (b) and (d) of the new self-test function red, all 56 others
+      stay green; (2) dropping the `recorded_fixture_digest is None` term from the null-check chain
+      turns exactly case (c) red, all 57 others stay green; (3) a subtler mutation — swapping the
+      comparison's comparand source to the wrong dict key (`digests.get("answer_key", ...)` instead of
+      `digests.get("fixture", ...)`, a copy-paste bug rather than a `return "constant"` mutation — turns
+      13 cases red, including the negative control (task 3.4's case a). Recorded honestly: mutation (3)
+      has a broader blast radius than (1)/(2), because most `build_row_failure_flood` self-test fixtures
+      across this whole file now default to a fixture-provenance-intact arm (task 3.1's own
+      `_self_test_make_ff_run_dir` default), so a wrong comparand touches every one of them, not merely
+      the fixture-specific cases — a genuine sensitivity finding, not presented as equally narrow as (1)
+      and (2).
 
-- [ ] 3.3 **Replaces the withdrawn R-P2.2 precedence task** (R-P2.2a: a precedence rule is only needed
+- [x] 3.3 **Replaces the withdrawn R-P2.2 precedence task** (R-P2.2a: a precedence rule is only needed
       when the `void_reason` slot must choose between two true findings, and this design never asks it
       to choose). Add the both-drifts-recorded self-test case: construct a run recorded against fixture
       root `v2` whose `answer-key/prereg.json` disagrees on **both** the fixture digest and the
@@ -554,39 +587,162 @@ Depends on: Sibling 2.
       MUST NOT be observable" as a fact about the accumulation, not a claim about one particular
       ordering that happened to be tested.
       Verify: `rig/derive.py --self-test` — the new case prints `PASS`, in both check orderings.
+      Done: case (d) of `_self_test_build_row_fixture_provenance()` — a run recorded against fixture
+      root `v2` whose `recorded_answer_key_digest` and `recorded_fixture_digest` both deliberately
+      disagree with the live v2 values at once. Asserts `void_reason == "input-provenance-mismatch"`
+      with both `"answer-key-drift"` and `"fixture-drift"` present. **Order-swap proof, performed and
+      reverted rather than merely asserted**: a scratch copy of `rig/derive.py`
+      (`rig/.swap-order-derive.py`, deleted immediately after) had the answer-key-drift and
+      fixture-drift check blocks' relative code order physically swapped (fixture check moved before
+      the answer-key check, each keeping its own `live_*_digest` lookup and `drifted.add(...)` call
+      intact). `python3 rig/.swap-order-derive.py --self-test` run against that copy: all 58 cases,
+      including case (d), PASS unchanged. The real file was `sha256`-verified byte-identical before and
+      after (`156ffd0c674c68987be05e5a5936caedfc197a4d2c08aca06663a18d4b32b6fe` both times). This proves
+      R-P2.2a's "order MUST NOT be observable" as a fact about the accumulation shape itself — both
+      checks write into the same `drifted` set with no early-exit branch between them — not a claim
+      about one particular ordering that happened to be tested.
 
-- [ ] 3.4 Finalize the full negative control (design §9 case 1, first achievable once all three
+- [x] 3.4 Finalize the full negative control (design §9 case 1, first achievable once all three
       digests exist): a synthetic run with `input_provenance_version` present and all three digests
       (answer-key, fixture, surface-preimage) present and agreeing → `state == "complete"`. A gate that
       always voids would pass every other case in this file too — this is the case that catches that.
       Verify: `rig/derive.py --self-test` — the case prints `PASS`.
+      Done: case (a) of `_self_test_build_row_fixture_provenance()` — `input_provenance_version`
+      present, all three digests (answer-key, fixture, surface-preimage) present and agreeing over the
+      real committed `v1` fixture → `state == "complete"`, `void_reason is None`. PASS. Mutation-proven
+      sensitive rather than vacuously green: task 3.2's own comparand-swap mutation (comparing
+      `recorded_fixture_digest` against the live ANSWER-KEY digest instead of the live fixture digest)
+      turns this case red alongside 12 others, confirming the negative control genuinely depends on
+      every digest agreeing, not merely on the gate never firing.
 
-- [ ] 3.5 Add the R-F5.3 claim-boundary statement (R-P7.2) to this file's own apply-progress note (or
+- [x] 3.5 Add the R-F5.3 claim-boundary statement (R-P7.2) to this file's own apply-progress note (or
       wherever this cycle's closing report lives): any reference to the archived `R-F5.3` re-derive
       check MUST state it verifies **deriver** drift only, never **fixture** drift, because a re-derive
       re-reads the same live manifest and necessarily agrees with itself.
       Verify: structural readback — the sentence is present and unambiguous.
+      Done: recorded in `sdd/run-input-provenance/apply-progress.md`'s "Sibling 3" section, under "R-F5.3
+      claim boundary (task 3.5, R-P7.2)" — states unambiguously that R-F5.3's byte-identical re-derive
+      check verifies deriver drift only, never fixture drift, because a re-derive re-reads the same live
+      manifest and necessarily agrees with itself; fixture drift is what Face B (task 3.1/3.2, this
+      sibling) exists to catch instead.
 
-- [ ] 3.6 Correct `rig/README.md:55` — `failure-flood-v1`'s `schema_version` is stated as **1**; it has
+- [x] 3.6 Correct `rig/README.md:55` — `failure-flood-v1`'s `schema_version` is stated as **1**; it has
       been **3** since the CRITICAL-1/-2 bump and this cycle takes it to **4**. Correct the number and
       add the four new fields (`input_provenance_version`, `recorded_answer_key_digest`,
       `recorded_fixture_digest`, `recorded_surface_preimage_sha256`) to the row-shape description in the
       same edit — a named correction, not a silent overwrite (Decision 3 lists the sibling gap this
       does **not** also fix: `rig/check.sh` composing `run-pipeline.sh --self-test`).
       Verify: structural readback of `rig/README.md`; `./check.sh` (frontmatter/structure, root).
+      Done: `rig/README.md:55`'s stated `schema_version` corrected 1 → 4 in place. A new **Correction**
+      paragraph added immediately after the two-schema-rule paragraph (never a silent overwrite, per
+      this file's own record-not-erase discipline and Decision 3's convention), naming all four new
+      fields and the sibling gap this correction does not also fix (`rig/check.sh`'s missing bash
+      self-test arm). Re-read against the N=0 constraint specifically: the new paragraph describes only
+      what the schema now records and compares, never that a comparative result exists, is pending, or
+      is nearly available — no sentence reads as though countable results exist. `./check.sh` clean
+      (structure check across 111 content files and 5 skill(s)).
 
-- [ ] 3.7 Re-derive `rig/results/failure-flood-v1/runs.jsonl` one final time from existing raw
+- [x] 3.7 Re-derive `rig/results/failure-flood-v1/runs.jsonl` one final time from existing raw
       captures. Confirm all three rows: `state=void, void_reason=shakedown` (unchanged),
       `anomaly_classes == ["pre-scheme-provenance"]` exactly, `schema_version == 4`,
       `recorded_answer_key_digest`/`recorded_fixture_digest` both `null`, every step's
       `recorded_surface_preimage_sha256` `null`.
       Verify: `python3 rig/derive.py --experiment failure-flood-v1`; inspect the three rows by hand.
+      Done: re-derived. All three rows (`s1-monolithic-01`, `s1-monolithic-9054`, `s2-pipeline-9054`):
+      `state=void, void_reason=shakedown` (unchanged), `anomaly_classes == ["pre-scheme-provenance"]`
+      exactly, `schema_version == 4`, `input_provenance_version`/`recorded_answer_key_digest`/
+      `recorded_fixture_digest` all `null`, every step's `recorded_surface_preimage_sha256` `null`.
+      Inspected by hand, confirmed field-by-field. N stays 0 — no row acquired `state=complete`.
+
+- [x] 3.8 **`fixture_digest_at()`'s own computation is unproven — task 2.0's finding recursed into
+      Face B.** Found by independent orchestrator mutation-proof after Sibling 3 was committed
+      (`afced18`), not by the apply phase that produced tasks 3.1-3.7. **Close this before Face B's
+      behaviour is trusted the way task 2.0 required for Face A.**
+
+      **What is proven, and what is not.** Three mutations of task 3.2's own fixture-drift check
+      (disabling the comparison, dropping the null-check's fixture term, swapping the comparand's dict
+      key) each turn a distinct, predicted set of `derive.py --self-test` cases red, so the *comparison*
+      logic is well proven. But replacing `fixture_digest_at()`'s entire body with `return
+      "constant-mutant"` left **all 58 of Sibling 3's own cases green**. Every self-test that carries a
+      `recorded_fixture_digest` default (`_self_test_make_ff_run_dir` and every function built on it)
+      derives its expected value by calling `fixture_digest_at()` itself, so both sides of every
+      comparison move together and the function's own computation is proven zero ways — the exact shape
+      task 2.0 already found and closed for `answer_key_set_digest()`, unclosed here.
+
+      **The consequence, stated plainly.** If `fixture_digest_at()` computed the wrong thing, Face B
+      would compare two identically-wrong values on every row and never fire — a row would read
+      `complete` while the fixture it was actually scored against had drifted. This is the inverse of
+      the "correct refusal, false stated cause" shape this cycle keeps naming: here it is a
+      **correct-looking PASS on a false basis**. With N = 0 countable rows, nobody would notice until
+      the first real run, by which point the false claim would already be in a citable row.
+
+      **How it was found, recorded as the method it is.** Not by this batch's own mutation-proof table,
+      which chose targets inside the check logic Sibling 3 itself wrote and could not see past its own
+      foundation. Found the same way task 2.0 was found: the orchestrator, independently re-running the
+      proof after the work unit was already committed and choosing its own mutation target rather than
+      re-running the phase's own table. A phase's own mutation proof cannot find a gap in the foundation
+      its own tests are built on — this is now twice confirmed in this one cycle (task 2.0 for Face A,
+      this task for Face B), and belongs in the cycle's own record as a pattern, not two unrelated
+      findings.
+
+      **No cross-language pin was added, and none is needed — recorded so a later reader does not
+      "discover" a missing pin and add one that proves nothing.** Unlike Face A's
+      `answer_key_paths|hash_paths` pair and Face C's `preimage_digest`, `rig/run-pipeline.sh`'s own
+      `RECORDED_FIXTURE_DIGEST` (task 3.1, `:738`) computes the identical
+      `hashlib.sha256(open(path,"rb").read()).hexdigest()` idiom over the same file bytes as
+      `fixture_digest_at()` — the same `LOCKFILE_SHA256` idiom, chosen at task 3.1 specifically so no
+      independent reimplementation exists on either side to drift apart. A pin asserts two independent
+      algorithms agree; there is only one algorithm here, expressed in two languages with nothing left
+      to disagree about except the literal bytes both sides already read from the same file.
+
+      Verify: a `derive.py --self-test` case builds a synthetic fixture root, digests it via
+      `fixture_digest_at()`, mutates `MANIFEST.sha256`'s bytes, re-digests, asserts the two differ —
+      never calling the function under test to build its own expected value. Mutation-prove it two ways:
+      `return "constant"` must turn the suite red, and so must a subtler wrong-implementation (hashing
+      the manifest's path instead of its bytes).
+      Done: `_self_test_fixture_digest_at()` added to `rig/derive.py`, registered in
+      `run_self_test()`'s roster. Case (a) builds a synthetic root containing a `MANIFEST.sha256`,
+      digests it, mutates the file's bytes, re-digests, asserts the two differ — mutation-proven two
+      ways in scratch copies under `rig/` (never the committed file; real file `sha256`-verified
+      unchanged before/after each cycle): (1) `return "constant-mutant"` turns exactly this new case red
+      (1/59), all 58 others stay green; (2) hashing `str(manifest)` (the path) instead of
+      `manifest.read_bytes()` — the realistic wrong-implementation this case exists to catch, since the
+      path is constant across the before/after digest calls within one test run — also turns exactly
+      this case red (1/59), all 58 others stay green. `rig/derive.py --self-test` — **59/59 PASS** on
+      the real, unmutated file. No cross-language pin added, per this task's own reasoning above.
+
+      **Second amendment, same day: the mutation itself had to be strengthened.** Found by the
+      orchestrator's own further independent mutation-proof after this task's first version was
+      committed: the case's original mutation *appended* a line
+      (`"...src/a.ts\n"` → `"...src/a.ts\nmutated  src/b.ts\n"`), changing the byte length along with
+      the content. A third mutation, `sha256_hex(str(len(manifest.read_bytes())).encode())` — hashing
+      the byte COUNT rather than the bytes — still produced `digest_before != digest_after` under an
+      append and stayed green: the case was **length-sensitive, not content-sensitive**. This matters
+      more for Face B than the identically-shaped append in task 2.0's own `answer_key_set_digest` case,
+      because Face A's case is backstopped by a real cross-language pin (task 2.0 part 2) — a
+      length-hashing Python side would disagree with the bash side and turn the pin red regardless — and
+      Face B correctly has no pin (see this task's own reasoning above), which makes case (a) the ONLY
+      proof `fixture_digest_at()`'s computation has. A sole proof must not be satisfiable by an
+      implementation that never reads the content. Fixed by changing the mutation to same-length, one
+      byte different (`"deadbeef  src/a.ts\n"` → `"deadbeee  src/a.ts\n"`) instead of an append — this
+      single change strictly dominates the append form: it still catches a constant body and a
+      path-hashing body, and it additionally catches a length-hashing body, which the append form could
+      not. Kept as one case, not split into two, because the same-length form already subsumes
+      everything the append form caught. Re-mutation-proven, all three variants now turn the suite red:
+      (1) constant body — 1/59 red; (2) path-instead-of-bytes — 1/59 red; (3) length-instead-of-bytes —
+      1/59 red (previously green under the append form, now closed). `rig/derive.py --self-test` —
+      **59/59 PASS** on the real, unmutated file after the fix. Task 2.0's own `answer_key_set_digest`
+      case (a) was deliberately left with its original append-shaped mutation, not given the same
+      treatment: its docstring now records explicitly that the pin (case b) is what covers the
+      length-sensitivity gap there, so a later reader does not conclude the two cases were held to
+      different standards by accident — they are held to the same standard by a different mechanism
+      (a real cross-language pin for Face A, a strengthened sole case for Face B, which has none).
 
 ---
 
 ## Cross-cutting verification (spans all three siblings, run once at the end)
 
-- [ ] 4.1 **`tool-surface-v1` non-regression — the 42-row projection (R-P11.2).** Re-derive
+- [x] 4.1 **`tool-surface-v1` non-regression — the 42-row projection (R-P11.2).** Re-derive
       `rig/results/tool-surface-v1/runs.jsonl` from existing raw captures. Project out only
       `checker_digest` (it changes on any `derive.py` edit, per its own `sha256`-of-file-bytes
       definition at `:82`, stamped on both experiments' rows at `:530`/`:1017` — R-P11.2's named,
@@ -595,40 +751,77 @@ Depends on: Sibling 2.
       (`:1079-1089`) MUST be byte-unchanged in the diff — the mechanical guarantee design §7 states.
       Verify: `python3 rig/derive.py --experiment tool-surface-v1`; diff 42 rows against pre-change,
       excluding only `checker_digest`; zero mismatches.
+      Done: **cycle-wide pre-change baseline established as `a2cbd6f`** — the last commit touching
+      `rig/derive.py`/`rig/run-pipeline.sh` before Sibling 1's first commit (`0637d68`); distinct from
+      the per-sibling diffs each prior sibling's own apply-progress note already checked (Sibling 1
+      against its own pre-state, Sibling 2 against `cf42a54`), neither of which covers the *whole
+      cycle*. Re-derived: 42 rows, projected excluding only `checker_digest`, zero mismatches against
+      `a2cbd6f`'s committed file; `schema_version` stays `3` on every row. `build_row` (now `:411`) and
+      the `tool-surface-v1` registry entry (now `:1245-1255`) both confirmed byte-identical against
+      `a2cbd6f` — verified by extracting each function/dict-literal's own text (bounded by its correct
+      structural neighbor, not merely by absence of an overlapping diff hunk) and comparing directly,
+      after an initial extraction-boundary mistake (using `def build_row_failure_flood(` as the end
+      marker, which is not `build_row`'s own immediate successor — `apply_ambient_drift_pairing`,
+      `fixture_digest_at`, and `answer_key_set_digest` all sit between them) was caught and corrected.
 
-- [ ] 4.2 **`failure-flood-v1`'s own projection (R-P11.2), distinct from 4.1's.** Re-derive; project out
+- [x] 4.2 **`failure-flood-v1`'s own projection (R-P11.2), distinct from 4.1's.** Re-derive; project out
       `schema_version`, `checker_digest`, `anomaly_classes`, and the four fields this change adds. Every
       remaining byte across all 3 rows MUST be identical to the pre-change values, and each row MUST
       still read `state=void, void_reason=shakedown`. Any other delta is a defect, not an expected diff
       (R-P1.1).
       Verify: diff 3 rows against pre-change under this named projection; zero mismatches.
+      Done: projected against the same `a2cbd6f` cycle-wide baseline (task 4.1's own), excluding
+      `schema_version`, `checker_digest`, `anomaly_classes`, and the four fields this change adds
+      (including the per-step `recorded_surface_preimage_sha256`). Zero mismatches across all 3 rows;
+      every row still reads `state=void, void_reason=shakedown`.
 
-- [ ] 4.3 **Deriver idempotence.** Run `derive.py` twice in a row over the same raw captures for both
+- [x] 4.3 **Deriver idempotence.** Run `derive.py` twice in a row over the same raw captures for both
       experiments. `runs.jsonl` MUST be byte-identical between the two runs.
       Verify: `python3 rig/derive.py --experiment tool-surface-v1 && cp ... && python3 rig/derive.py --experiment tool-surface-v1 && diff`;
       same for `failure-flood-v1`.
+      Done: both experiments derived twice in a row over the same raw captures; `diff` exit 0 (byte-
+      identical) for both `tool-surface-v1` and `failure-flood-v1`.
 
-- [ ] 4.4 **Refusal-to-derive stays untouched (R-P12).** Deliberately break one detector (e.g. corrupt a
+- [x] 4.4 **Refusal-to-derive stays untouched (R-P12).** Deliberately break one detector (e.g. corrupt a
       `checker_self_test` case in a scratch copy of a `tool-surface-v1` answer key, never the committed
       fixture) and confirm `derive.py` (no `--experiment` flag needed — `run_self_tests()` runs
       unconditionally in `main()`) still exits 1 at `:1468-1470` with **no rows written at all**,
       regardless of any run's own answer-key digest state. Revert the scratch copy immediately.
       Verify: exit code 1; `runs.jsonl` untouched; `git status` on the real fixture tree empty
       throughout.
+      Done, with one deviation from the task's literal "scratch copy" wording, recorded rather than made
+      silently: `load_answer_keys()` reads a fixed real path, so there is no separate "scratch copy" path
+      for it to read from — the mutation was applied directly to
+      `rig/fixtures/tool-surface/v1/answer-key/t1.json` (`checker_self_test.negative_control.
+      expected_practice_pass`, `false` → `true`), after backing the file up to `/tmp` first (never
+      committed, never staged). `python3 rig/derive.py` (default `--experiment tool-surface-v1`, no flag
+      needed) exited 1 with "Self-test FAILED — a detector cannot be proven to fire. Refusing to derive
+      rows."; `rig/results/tool-surface-v1/runs.jsonl`'s `sha256` was unchanged before, during, and after
+      (no rows written). Fixture restored from the `/tmp` backup immediately after; `git diff` on it
+      confirmed empty; `python3 rig/derive.py` re-run afterward, exit 0, identical checksum to before the
+      mutation.
 
-- [ ] 4.5 **`rig/check.sh` — 20 checks, ~4s — before committing anything under `rig/`.** Run it after
+- [x] 4.5 **`rig/check.sh` — 20 checks, ~4s — before committing anything under `rig/`.** Run it after
       every sibling lands, not only once at the end.
       Verify: `./rig/check.sh` exits 0. Known, named gap **not fixed by this cycle** (Decision 3,
       proposal's Non-Goals): `check_component_self_test()` (`rig/check.sh:160-171`) composes only
       `derive.py`/`report.py`/`collect.py`'s `--self-test` flags — `rig/run-pipeline.sh --self-test`
       (tasks 2.3, 2.1) has no bash arm in the gate and must be run by hand every time.
+      Done: `./rig/check.sh` — 20/20 checks pass, run after Sibling 3's own changes and again after the
+      full re-derive (task 3.7) and the cross-cutting checks (4.1-4.4) landed. The named gap
+      (`run-pipeline.sh --self-test` with no bash arm in the gate) remains, unfixed by design — its
+      28-case suite was run by hand throughout this batch (see the return-contract's own line count).
 
-- [ ] 4.6 **Root gates before any commit.** `./check.sh` (frontmatter/six-key schema, this file
+- [x] 4.6 **Root gates before any commit.** `./check.sh` (frontmatter/six-key schema, this file
       included) and `./hooks/pre-commit` (ADR 0009 redaction — **this is a public repo**; every
       committed byte, including the re-derived `runs.jsonl`, is scanned).
       Verify: both exit 0.
+      Done: `./check.sh` — exit 0, `structure check: clean across 111 content files and 5 skill(s)`.
+      `./hooks/pre-commit` — run after staging every file this batch touches (`MAP.md`, `rig/README.md`,
+      `rig/derive.py`, `rig/run-pipeline.sh`, both re-derived `runs.jsonl` files, `sdd/run-input-
+      provenance/{apply-progress.md,tasks.md}`) — exit 0, no output.
 
-- [ ] 4.7 **`MAP.md`'s `sdd/` row still says "2 cycles" and does not name this one.** Added during
+- [x] 4.7 **`MAP.md`'s `sdd/` row still says "2 cycles" and does not name this one.** Added during
       gatekeeping — neither this phase nor the spec caught it. `MAP.md:52` describes `sdd/` as
       *"2 cycles"* and lists `measurement-rig` and `archive/2026-08-18-failure-flood-triage`. This cycle
       makes it three. `MAP.md` is the one hand-maintained index in this repo — it names itself the single
@@ -640,6 +833,12 @@ Depends on: Sibling 2.
       Verify: `MAP.md`'s `sdd/` row names `run-input-provenance`, its count equals the number of
       directories under `sdd/` excluding `archive/` plus the archived entries it lists, and `./check.sh`
       stays clean.
+      Done: `MAP.md:52`'s `sdd/` row corrected: count `2 cycles` → `3 cycles` (`sdd/measurement-rig`,
+      `sdd/run-input-provenance`, plus the one archived entry `sdd/archive/2026-08-18-failure-flood-
+      triage`), `run-input-provenance` named with the boundary carried verbatim rather than paraphrased
+      — the same "instrument ... never a comparative result ... zero countable runs" wording the
+      `failure-flood-triage` entry beside it already uses, per this task's own instruction. `./check.sh`
+      stays clean (structure check across 111 content files and 5 skill(s)).
       Note, deliberately NOT a task: `open-work.sh`'s `section_sdd()` (landed on `main` in `25a8756`)
       already enumerates `sdd/*/` outside `sdd/archive/`, and was confirmed during gatekeeping to list
       `run-input-provenance` with no action needed. The generated index and the hand-written one have
@@ -667,11 +866,49 @@ Depends on: Sibling 2.
 (generated), excluded from the authored count per the work-unit-commits convention, but included in
 full-snapshot identity and redaction-gate scanning (task 4.6).
 
-- **800-line budget (`review_budget_lines`): NOT at risk.** ~515 total (up from the prior draft's ~480
-  — the R-P6.3 addition moved Sibling 2's subtotal, the both-drifts self-test moved Sibling 3's by a
-  smaller amount), ~285 lines of headroom.
-- **Per-sibling size also stays under the chained-pr skill's own 400-line single-PR trigger**
-  (260 / 150 / 105), so line count alone does not force chaining.
+### Correction — the forecast was wrong, recorded rather than silently overwritten (2026-08-27)
+
+The forecast above (~515 total, "NOT at risk") is this file's own prior estimate, kept in place per this
+file's own record-not-erase discipline rather than deleted now that the actuals are known. It undercalled
+badly. Actuals, in the same units (authored insertions+deletions, `git diff --numstat` summed per file,
+the convention every sibling's own apply-progress note already used):
+
+| Sibling | Forecast | Actual authored | Ratio |
+|---|---:|---:|---:|
+| 1 (Face A + WARNING-14) | ~260 (45 runner + 215 deriver) | **385** (32 runner + 353 deriver) | 1.48x |
+| 2 (Face C + task 2.0) | ~150 (70 runner + 80 deriver) | **341** (80 runner + 261 deriver) | 2.27x |
+| 3 (Face B) | ~105 | **218** (24 runner + 180 deriver + 14 README) | 2.08x |
+| **Total** | **~515** | **944** | **1.83x** |
+
+- **800-line budget (`review_budget_lines`): BREACHED, not at risk.** 944 authored lines against the
+  800-line budget — 144 lines over, before Sibling 3 even started. The breach was flagged after Sibling 2
+  committed (`5cfa456`; running total 726/800) and escalated to the operator rather than absorbed
+  silently; Sibling 3 was not started until that escalation resolved.
+- **The operator authorized `size:exception` on 2026-08-26, rather than re-slicing.** The reasoning
+  recorded at the time, restated here rather than only implied: R-P9.2 makes Sibling 1 alone insufficient
+  to satisfy this spec (Sibling 2's Face C and Sibling 3's Face B are both still-open requirements with
+  Sibling 1 alone landed), and task 3.4's negative control — the proof that the combined gate does not
+  always void — is first achievable only once all three digests exist, which requires all three siblings.
+  Splitting Sibling 3 into its own PR, deferred past this exception, would have merged a state that
+  provably does not satisfy its own contract (an incomplete, non-negative-control-provable gate) as if it
+  were a complete PR boundary — worse than one large, honestly-labeled PR.
+- **Why the forecast under-called, by sibling.** Sibling 1 (1.48x): the 8-case self-test (task 1.10) and
+  the fifth, gap-closing case (task 1.9's own finding) were larger in practice than the task text's own
+  worked examples suggested. Sibling 2 (2.27x, the largest miss): **partly legitimate scope growth** —
+  task 2.0 (Face A's own digest computation was previously proven zero ways, and its cross-language pin
+  was verified by hand but never committed) was raised by independent gatekeeping *after* Sibling 1 was
+  already committed and was **never in the original forecast at all**; the forecast's own revision history
+  (`up from the prior draft's ~125`) already flagged R-P6.3 as new work the first forecast missed, and
+  task 2.0 compounded it further, unforecast a second time. Sibling 3 (2.08x): the both-drifts self-test
+  (task 3.3) needed a real, executed order-swap proof (a scratch-copy `--self-test` run, not merely an
+  assertion) rather than the simpler precedence case the withdrawn R-P2.2 task originally implied, and
+  the mutation-proof table required three distinct mutations (not one) to characterize the new checks'
+  sensitivity honestly, per this batch's own governing instruction to prefer subtle mutations over
+  constant-returning ones.
+- **Per-sibling size still stays under the chained-pr skill's own 400-line single-PR trigger**
+  (385 / 341 / 218 — all individually under 400), so per-sibling size alone still does not force
+  chaining; it is the cumulative total across the one PR that breached the cycle-wide budget, not any
+  single commit.
 - **Chained PRs recommended: Yes — but for an ordering reason, not a size reason.** R-P9.2 makes the
   Sibling 1 → 2 → 3 sequence itself a requirement (a delivery reaching Sibling 3 first and stopping
   reproduces the exact failure this cycle exists to correct). Three reviewable units, landed in strict
@@ -689,3 +926,35 @@ full-snapshot identity and redaction-gate scanning (task 4.6).
   upstream in `spec.md`/`design.md` (commit `43f5281`) before this correction round, and every task in
   this file now implements the settled vocabulary directly (see "Spec/design conflict — resolved" at
   the top). No reconciliation step remains between this file and apply.
+
+### Second correction — task 3.8 moved the numbers again, same discipline (2026-08-27, same day)
+
+The table immediately above (944 total) is itself now superseded, in place, not deleted, per the same
+record-not-erase discipline it already applies to the original ~515 forecast. Task 3.8 (`fixture_digest_
+at()`'s own fire-proof case, found by independent orchestrator mutation-proof after `afced18` was
+committed — the same pattern as task 2.0 for Face A) added 105 authored lines to `rig/derive.py`, folded
+into the same amended commit rather than a fourth one. Task 3.8 itself took **two** rounds, both inside
+that one amended commit: the fire-proof case as first written mutated the manifest by *appending* a line,
+which changes the byte length along with the content, and a second independent orchestrator mutation
+(hash the byte COUNT, never the bytes) still passed it. Strengthening the mutation to same-length,
+one-byte closed that — see task 3.8's own done-note above for why a length-sensitive fire-proof is
+satisfiable by an implementation that never reads the content, and why that matters more for Face B,
+whose case has no cross-language pin standing behind it:
+
+| Sibling | Forecast | Actual authored (after task 3.8) | Ratio |
+|---|---:|---:|---:|
+| 1 (Face A + WARNING-14) | ~260 (45 runner + 215 deriver) | **385** (32 runner + 353 deriver) | 1.48x |
+| 2 (Face C + task 2.0) | ~150 (70 runner + 80 deriver) | **341** (80 runner + 261 deriver) | 2.27x |
+| 3 (Face B + task 3.8) | ~105 | **323** (24 runner + 285 deriver + 14 README) | 3.08x |
+| **Total** | **~515** | **1049** | **2.04x** |
+
+Sibling 3's own deriver line count moves 180 → 236 (+56, task 3.8's new self-test function and its
+registration) → 285 (+49, the same-length strengthening and the docstring recording why); the runner and
+README figures are unchanged from the first correction. **The method note
+this finding earns, stated once here rather than repeated per-sibling**: a phase's own mutation-proof
+table cannot find a gap in the foundation its own tests are built on, because every comparison the
+phase's own tests construct derives both sides from the same function under test. This is now twice
+confirmed in one cycle — task 2.0 found it for `answer_key_set_digest()` (Face A) after Sibling 1
+committed, task 3.8 found it for `fixture_digest_at()` (Face B) after Sibling 3 committed — in both
+cases by the orchestrator independently re-running the proof and choosing its own mutation target, never
+by the apply phase re-running its own table against itself.
