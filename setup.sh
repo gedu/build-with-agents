@@ -39,6 +39,7 @@ Flags:
               .git/hooks/commit-msg -> ../../hooks/commit-msg  (same gate, commit message)
   --all       every tool above, plus --hooks
   --dry-run   report the actions without touching the filesystem
+  --self-test run this script's own tests (ADR 0013) and exit; writes only to a temp dir
   --help      this message
 
 Notes:
@@ -311,6 +312,191 @@ sync_gitignore() {
   say "write .gitignore managed block (${#final[@]} entries)"
 }
 
+# --- self-test ---------------------------------------------------------------
+#
+# ADR 0013: a committed executable carries its own test, exposed as a flag on that
+# executable. Run `./setup.sh --self-test` after editing this file. It is not run
+# automatically — that expectation lives in OPERATIONS.md.
+#
+# What it covers is the safety contract in the header, and only the failures that
+# are SILENT. A run that prints "Done." while it has overwritten a committed file,
+# retargeted someone else's symlink, or written an unanchored .gitignore entry that
+# untracks a real file, is the failure worth a test. Output wording is not.
+#
+# Every case builds a throwaway repo under `mktemp -d` holding a copy of this
+# script, so nothing here reads or writes the repository it ships in.
+
+ST_FAILS=0
+ST_TMPDIRS=""
+ST_DIR=""
+ST_RC=0
+
+st_pass() { printf '  PASS  %s\n' "$1"; }
+st_fail() { printf '  FAIL  %s\n' "$1" >&2; ST_FAILS=$((ST_FAILS + 1)); }
+
+st_cleanup() {
+  local d
+  for d in $ST_TMPDIRS; do
+    [ -n "$d" ] && [ -d "$d" ] && rm -rf "$d"
+  done
+}
+
+# st_sandbox — fresh throwaway repo with a copy of this script. Sets ST_DIR.
+# Deliberately not a command substitution: that runs in a subshell, and the
+# temp-directory list it appended to would be discarded, leaking every sandbox.
+st_sandbox() {
+  ST_DIR="$(mktemp -d)"
+  ST_TMPDIRS="$ST_TMPDIRS $ST_DIR"
+  mkdir -p "$ST_DIR/skills/example" "$ST_DIR/hooks"
+  printf 'root instructions\n' >"$ST_DIR/AGENTS.md"
+  printf 'placeholder\n' >"$ST_DIR/skills/example/SKILL.md"
+  printf '#!/bin/sh\nexit 0\n' >"$ST_DIR/hooks/pre-commit"
+  printf '#!/bin/sh\nexit 0\n' >"$ST_DIR/hooks/commit-msg"
+  chmod +x "$ST_DIR/hooks/pre-commit" "$ST_DIR/hooks/commit-msg"
+  cp "$REPO_ROOT/setup.sh" "$ST_DIR/setup.sh"
+  chmod +x "$ST_DIR/setup.sh"
+  git -C "$ST_DIR" init -q >/dev/null 2>&1 || :
+}
+
+# st_run <sandbox> <args...> — runs the sandboxed copy. Records its status in
+# ST_RC and always returns 0, so `set -e` does not abort the suite on a run that
+# is *expected* to exit nonzero.
+st_run() {
+  local d="$1"
+  shift
+  ST_RC=0
+  ( cd "$d" && ./setup.sh "$@" ) >/dev/null 2>&1 || ST_RC=$?
+  return 0
+}
+
+# The header promises a pre-existing regular file is never overwritten. This is the
+# case that costs a committed file if it ever regresses.
+st_case_keeps_real_file() {
+  st_sandbox
+  local d="$ST_DIR"
+  printf 'hand written, committed\n' >"$d/CLAUDE.md"
+  st_run "$d" --claude
+  if [ -L "$d/CLAUDE.md" ]; then
+    st_fail "a pre-existing regular CLAUDE.md was replaced by a symlink"
+  elif [ "$(cat "$d/CLAUDE.md")" != "hand written, committed" ]; then
+    st_fail "a pre-existing regular CLAUDE.md was modified"
+  elif [ "$ST_RC" -eq 0 ]; then
+    st_fail "skipping a real file exited 0; a warning must exit nonzero"
+  else
+    st_pass "keeps a pre-existing regular file, and exits nonzero"
+  fi
+}
+
+# `gga install` writes a real .git/hooks/pre-commit, and other tools alias the same
+# basenames. Retargeting someone else's link is the silent half of that collision.
+st_case_keeps_foreign_symlink() {
+  st_sandbox
+  local d="$ST_DIR"
+  ln -s SOMETHING_ELSE.md "$d/CLAUDE.md"
+  st_run "$d" --claude
+  if [ "$(readlink "$d/CLAUDE.md")" != "SOMETHING_ELSE.md" ]; then
+    st_fail "a symlink pointing somewhere unexpected was retargeted instead of skipped"
+  elif [ "$ST_RC" -eq 0 ]; then
+    st_fail "skipping an unexpected symlink exited 0"
+  else
+    st_pass "keeps a symlink that points somewhere unexpected"
+  fi
+}
+
+# The one that untracks a real file. An unanchored `CLAUDE.md` matches at any depth,
+# so a legitimately committed file of that name disappears from git with no error.
+st_case_drops_unanchored_ignore() {
+  st_sandbox
+  local d="$ST_DIR"
+  {
+    printf '%s\n' "$BEGIN_MARK"
+    printf '%s\n' "$BLOCK_NOTE"
+    printf 'CLAUDE.md\n'
+    printf '%s\n' "$END_MARK"
+  } >"$d/.gitignore"
+  st_run "$d" --claude
+  if grep -qx 'CLAUDE.md' "$d/.gitignore"; then
+    st_fail "an unanchored legacy entry survived; it untracks a committed file of that name at any depth"
+  elif ! grep -qx '/CLAUDE.md' "$d/.gitignore"; then
+    st_fail "the anchored entry /CLAUDE.md was not written"
+  else
+    st_pass "drops unanchored legacy entries, writes repo-root-anchored paths"
+  fi
+}
+
+# The header promises running twice is a no-op. Byte-identical, not merely valid:
+# duplicating entries is the drift this managed block exists to prevent.
+st_case_idempotent() {
+  st_sandbox
+  local d="$ST_DIR"
+  st_run "$d" --claude
+  cp "$d/.gitignore" "$d/gitignore.first.$$"
+  st_run "$d" --claude
+  if [ "$ST_RC" -ne 0 ]; then
+    st_fail "a second identical run exited $ST_RC; re-running must be a no-op"
+  elif ! cmp -s "$d/gitignore.first.$$" "$d/.gitignore"; then
+    st_fail "a second run changed .gitignore; entries are duplicating"
+  else
+    st_pass "re-running is a no-op and .gitignore stays byte-identical"
+  fi
+}
+
+# A dry run that writes is worse than no dry run: it is inspected precisely by
+# someone who has decided not to commit yet.
+st_case_dry_run_writes_nothing() {
+  st_sandbox
+  local d="$ST_DIR"
+  st_run "$d" --claude --dry-run
+  if [ -e "$d/CLAUDE.md" ] || [ -L "$d/CLAUDE.md" ]; then
+    st_fail "--dry-run created CLAUDE.md"
+  elif [ -e "$d/.claude" ]; then
+    st_fail "--dry-run created the .claude parent directory"
+  elif [ -e "$d/.gitignore" ]; then
+    st_fail "--dry-run wrote .gitignore"
+  elif [ "$ST_RC" -ne 0 ]; then
+    st_fail "--dry-run on a clean tree exited $ST_RC"
+  else
+    st_pass "--dry-run touches nothing on disk"
+  fi
+}
+
+# Hooks contribute no gitignore entries. Rewriting the block on a --hooks-only run
+# would churn a committed file for a run that had nothing to sync.
+st_case_hooks_only_leaves_ignore_alone() {
+  st_sandbox
+  local d="$ST_DIR"
+  printf 'notes\n' >"$d/.gitignore"
+  st_run "$d" --hooks
+  if [ ! -L "$d/.git/hooks/pre-commit" ]; then
+    st_fail "--hooks did not install the pre-commit gate"
+  elif [ ! -L "$d/.git/hooks/commit-msg" ]; then
+    st_fail "--hooks did not install the commit-msg gate"
+  elif [ "$(cat "$d/.gitignore")" != "notes" ]; then
+    st_fail "--hooks rewrote .gitignore; a hooks-only run has nothing to sync"
+  elif [ "$ST_RC" -ne 0 ]; then
+    st_fail "--hooks on a clean tree exited $ST_RC"
+  else
+    st_pass "--hooks installs both gates and leaves .gitignore untouched"
+  fi
+}
+
+self_test() {
+  printf 'setup.sh --self-test (ADR 0013)\n\n'
+  trap st_cleanup EXIT
+  st_case_keeps_real_file
+  st_case_keeps_foreign_symlink
+  st_case_drops_unanchored_ignore
+  st_case_idempotent
+  st_case_dry_run_writes_nothing
+  st_case_hooks_only_leaves_ignore_alone
+  if [ "$ST_FAILS" -eq 0 ]; then
+    printf '\n  self-test: 6 case(s) passed\n'
+    return 0
+  fi
+  printf '\n  self-test: %s of 6 case(s) FAILED\n' "$ST_FAILS" >&2
+  return 1
+}
+
 main() {
   while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -321,6 +507,7 @@ main() {
       --hooks)   INSTALL_HOOKS=1 ;;
       --all)     add_tool claude; add_tool gemini; add_tool codex; add_tool copilot; INSTALL_HOOKS=1 ;;
       --dry-run) DRY_RUN=1 ;;
+      --self-test) self_test; exit $? ;;
       -h|--help) usage; exit 0 ;;
       *)
         printf 'setup.sh: unknown option: %s\n\n' "$1" >&2

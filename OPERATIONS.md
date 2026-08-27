@@ -42,6 +42,7 @@ only some sessions need belongs behind a read-on-demand pointer rather than in a
 | Change `hooks/redaction-patterns.sh` | **both** hooks' `--self-test` | Yes. One list, two readers |
 | Change `check.sh` | `./check.sh --self-test` | Yes, same reason |
 | Change `open-work.sh` | `./open-work.sh --self-test` | Yes. Its cases assert the printed output, not only the exit code — for a generator the exit code is not the product |
+| Change `setup.sh` | `./setup.sh --self-test` | Yes. Its six cases assert the header's safety contract: a pre-existing real file kept, a foreign symlink kept, no unanchored `.gitignore` entry surviving, byte-identical re-runs, a dry run that writes nothing, and a `--hooks`-only run that leaves the managed block alone. Each of those failures is silent, and the first two cost a committed file |
 | Change shell | `sh -n <file>`, or `bash -n` for `setup.sh` and `hooks/pre-commit` | Yes. There is still no test *runner*, by decision — ADR 0013 |
 | Change Python | `python3 -m py_compile <file>` | Yes, same reason |
 | Change `rig/collect.py` | `python3 rig/collect.py --self-test` | Yes. The collector carries its own test, same flag-gated shape as `hooks/pre-commit --self-test` (ADR 0013) |
