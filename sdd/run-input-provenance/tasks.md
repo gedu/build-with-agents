@@ -520,6 +520,85 @@ Depends on: Sibling 1. Blocks: Sibling 3.
       only `checker_digest`, `schema_version` unchanged at 3. Idempotence confirmed for both experiments
       (derived twice, byte-identical both times).
 
+- [x] 2.9 **`load_surface()`'s own parse is unproven — task 2.0's and task 3.8's finding recursed into
+      Face C a third time this cycle.** Found by `sdd-verify` (CRITICAL-1, blocking FAIL) after Sibling 2
+      was committed (`5cfa456`), then independently confirmed by three of the orchestrator's own
+      mutations of `load_surface()`, each leaving the pre-existing 59/59 suite green. **Close this before
+      Face C's live drift comparand is trusted the way task 2.0 required for Face A and task 3.8 required
+      for Face B.**
+
+      **What is proven, and what is not.** Face C's live drift comparand at `derive.py:901` is
+      `surface_digest(load_surface(FAILURE_FLOOD_SURFACE_ARM))`. Every self-test that supplies a
+      `recorded_surface_preimage_sha256` default computes that identical expression **once**
+      (`_self_test_make_ff_run_dir`, `:1519`) and assigns it to BOTH `surface_sha256` (`:1524`) and
+      `recorded_surface_preimage_sha256` (`:1525`), so all three sides of every Face C comparison move
+      together and a wrong `load_surface()` is invisible to them. `_self_test_preimage_digest_pin()`
+      (task 2.1, `:1375-1388`) does not cover it either: it asserts `surface_digest()` over a hand-built
+      Python list, `["Bash","Read","Write","Read"]`, so it pins the hash CONVENTION and never calls
+      `load_surface()` — the file parse is exactly what it leaves unexercised. Task 2.1's own done-note
+      already named this pin as the weaker, shared-literal kind, "distinct from task 2.0's stronger
+      both-implementations pin"; the artifact knew the pin was the weaker kind and did not draw the
+      consequence.
+
+      **No live defect — recorded here so the record does not misread this as a bugfix.** Independently
+      verified, not accepted from the launch prompt: today, Python's
+      `surface_digest(load_surface("failure-flood"))` and bash's `preimage_digest()` (`sed`-extracted
+      from `rig/run-pipeline.sh`) already agree over the real committed `rig/surfaces/failure-flood.txt`
+      — both print `d8693e27d5f8e406a465def75101c4eaa85b23b685e78c2d5d07754d0f7e8daa`. The gap this task
+      closes is that nothing committed would have caught the two sides drifting apart, not that they
+      currently disagree. The fault, if it existed, could only over-void (Face C's accumulation at
+      `:974-978` voids on any disagreement); it cannot promote a row to `complete`, and N = 0 today.
+
+      **How it was found, recorded as the method it is.** Not by this batch's own mutation-proof table —
+      the same limitation task 2.0's and task 3.8's done-notes already recorded: a phase's own tests
+      cannot find a gap in the foundation they are built on. Found this time by `sdd-verify`, then
+      re-confirmed by the orchestrator independently mutating `load_surface()` itself (dropping the `#`
+      header filter, slicing the sorted list `[1:]`, and removing `.strip()`) rather than re-running the
+      apply phase's own table. This is the third occurrence of the same pattern in one cycle — task 2.0
+      for `answer_key_set_digest()` (Face A), task 3.8 for `fixture_digest_at()` (Face B), this task for
+      `load_surface()` (Face C).
+
+      Verify: a `derive.py --self-test` case runs the deriver's own full path —
+      `surface_digest(load_surface(arm))`, never a hardcoded list — over one synthetic preimage file
+      carrying a `# harness:` header (excluded), blank lines (excluded), a duplicate tool name (deduped),
+      and both an indented and a trailing-whitespace tool name (stripped, and still dedupes against each
+      other once stripped). Asserted against the SAME kind of cross-language pin task 2.0 part 2 already
+      built for Face A: `preimage_digest()` `sed`-extracted from `rig/run-pipeline.sh`, executed over the
+      identical file — never the weaker shared-literal mechanism task 2.1 used. Mutation-prove it three
+      ways, held to a higher standard than a `return "constant"` control: dropping the header filter,
+      slicing off the first sorted element, and removing `.strip()` from the returned value must each
+      turn exactly this new case red and nothing else.
+
+      Done: `_self_test_load_surface_preimage_pin()` added to `rig/derive.py`, registered in
+      `run_self_test()`'s roster immediately after `_self_test_preimage_digest_pin()`. The synthetic file
+      is written at `SURFACES_ROOT / "__self_test_load_surface_preimage_pin.txt"` — the exact path shape
+      `load_surface()` is hardcoded to, since it takes no root parameter — under an arm name no real
+      surface file uses, and deleted in `finally` regardless of outcome; `load_surface()` itself was not
+      changed. Content: `"# harness: v1\n\nBash\n\n  Read\nWrite\nRead   \n"`. Both sides independently
+      computed and confirmed to agree at
+      `4a626b46a7841184c5d423277a9c17cb15129f4ba32f92a88948b77735bfdcd3` — the same constant task 2.1's
+      pin already carries, because this file's deduped set is the identical `{Bash, Read, Write}`; this
+      is a useful coincidence, not a weakening, since the new case still exercises the full parse the old
+      pin never touched. `rig/derive.py --self-test` — **60/60 PASS**, exit 0, on the real, unmutated
+      file.
+
+      Mutation-proven three ways, each run in a full scratch copy of the repository tree living under
+      `rig/.scratch-task29-<pid>/` (deleted after every run; the real `rig/derive.py` `sha256`-verified
+      byte-identical before and after all three): (1) dropping `and not l.startswith("#")` from
+      `load_surface()`'s filter — 59 PASS / 1 FAIL, exit 1, only the new case red; (2) appending `[1:]` to
+      `load_surface()`'s return value, slicing off the alphabetically-first, non-duplicated element the
+      synthetic file's content was deliberately built to make load-bearing — 59 PASS / 1 FAIL, exit 1,
+      only the new case red; (3) removing the value-side `.strip()` from the comprehension (leaving the
+      filter's own `.strip()` truthiness check intact) — 59 PASS / 1 FAIL, exit 1, only the new case red.
+      All three confirm the case discriminates a subtle wrong implementation, not merely a
+      constant-returning one.
+
+      Re-derived both experiments after the edit (the unavoidable `checker_digest` reason Sibling 1's
+      task 1.11 and Sibling 3's task 2.8 both already noted): `failure-flood-v1`'s three rows and
+      `tool-surface-v1`'s 42 rows are unchanged apart from `checker_digest` on every row, confirmed by a
+      field-by-field diff. `rig/check.sh` — **20/20 PASS**, exit 0. `bash rig/run-pipeline.sh --self-test`
+      — **28/28 PASS**, exit 0, unaffected by this task (Python-only change).
+
 ---
 
 ## Sibling 3 — Face B + the R-F5.3 claim boundary (closes R-P7)
@@ -958,3 +1037,27 @@ confirmed in one cycle — task 2.0 found it for `answer_key_set_digest()` (Face
 committed, task 3.8 found it for `fixture_digest_at()` (Face B) after Sibling 3 committed — in both
 cases by the orchestrator independently re-running the proof and choosing its own mutation target, never
 by the apply phase re-running its own table against itself.
+
+### Third correction — task 2.9 closed `sdd-verify`'s blocking CRITICAL-1, same discipline (2026-08-27)
+
+The table immediately above (1049 total) is itself now superseded, in place, kept rather than deleted,
+per the same record-not-erase discipline applied twice already. Task 2.9 (`load_surface()`'s own parse,
+found by `sdd-verify`'s CRITICAL-1 and independently confirmed by orchestrator mutation-proof after
+Sibling 2 was committed — the third occurrence of the pattern task 2.0 and task 3.8 already found) added
+**98** authored lines to `rig/derive.py` (`git diff --numstat`: 98 insertions, 0 deletions), delivered as
+this cycle's fourth commit rather than folded into Sibling 2's:
+
+| Sibling | Forecast | Actual authored (after task 2.9) | Ratio |
+|---|---:|---:|---:|
+| 1 (Face A + WARNING-14) | ~260 (45 runner + 215 deriver) | **385** (32 runner + 353 deriver) | 1.48x |
+| 2 (Face C + task 2.0 + task 2.9) | ~150 (70 runner + 80 deriver) | **439** (80 runner + 359 deriver) | 2.93x |
+| 3 (Face B + task 3.8) | ~105 | **323** (24 runner + 285 deriver + 14 README) | 3.08x |
+| **Total** | **~515** | **1147** | **2.23x** |
+
+Sibling 2's own deriver line count moves 261 (after task 2.0) → 359 (+98, task 2.9's new self-test
+function, its registration, and the mutation-proof discipline task 2.0/3.8 already established); the
+runner figure is unchanged. **This is now the third instance of the same pattern in one cycle**, closing
+the loop this file's own method note above already named: task 2.0 for `answer_key_set_digest()` (Face
+A), task 3.8 for `fixture_digest_at()` (Face B), task 2.9 for `load_surface()` (Face C) — every producer
+feeding a cross-language comparand in this change now has a real both-implementations proof, not a
+shared-literal pin or a self-referential self-test.

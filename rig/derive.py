@@ -1388,6 +1388,103 @@ def _self_test_preimage_digest_pin():
     return ok
 
 
+def _self_test_load_surface_preimage_pin():
+    """run-input-provenance task 2.9 — task 2.0's and task 3.8's own finding
+    recursed into Face C a third time this cycle, raised by sdd-verify and
+    independently confirmed by the orchestrator's own mutations after
+    Sibling 2 was committed (`5cfa456`): `load_surface()`'s own parse was
+    proven ZERO ways. Every self-test that supplies a
+    `recorded_surface_preimage_sha256` default (`_self_test_make_ff_run_dir`,
+    :1519, and everything built on it) computes ONE
+    `surface_digest(load_surface(FAILURE_FLOOD_SURFACE_ARM))` expression and
+    assigns it to BOTH sides of every Face C comparison, so both sides move
+    together and a wrong `load_surface()` is invisible to them. The pin
+    directly above, `_self_test_preimage_digest_pin()`, does not cover it
+    either: it asserts `surface_digest()` over a hand-built Python list, so
+    it pins the hash CONVENTION and never calls `load_surface()` at all —
+    the parse is exactly what it leaves unexercised. Task 2.1's own
+    done-note already named this pin as the weaker, shared-literal kind,
+    distinct from task 2.0's stronger both-implementations pin; this task
+    is closing that gap for Face C the way task 2.0 closed it for Face A.
+
+    This case runs the deriver's OWN full path —
+    `surface_digest(load_surface(arm))`, never a hardcoded list — over one
+    synthetic preimage file carrying everything the parse must handle: a
+    `# harness:` header line (must be excluded), blank lines (must be
+    excluded), a duplicate tool name (must be deduped), and both an
+    indented and a trailing-whitespace tool name (must be stripped, and
+    must still dedupe against each other and against the unindented form
+    once stripped). Asserted against the SAME kind of cross-language pin
+    task 2.0 part 2 already built for Face A: `preimage_digest()`
+    `sed`-extracted from `rig/run-pipeline.sh` (never re-implemented — the
+    same convention `rig/check.sh`'s `load_compute_manifest()` and task
+    2.0's own pin already use), executed over the identical file. A later
+    disagreement here is the finding to report, never something to "fix"
+    on whichever side looks wrong (design.md sec 9).
+
+    No production code changed to make this reachable. `load_surface()`
+    takes no root parameter — it is hardcoded to
+    `SURFACES_ROOT / f"{arm}.txt"` — so the only way in without weakening
+    it is to write the synthetic file at that exact path shape, under an
+    arm name no real surface file uses, and delete it in `finally`
+    regardless of outcome. `SURFACES_ROOT` already resolves inside `rig/`
+    (`REPO_ROOT` is derived from `__file__`), so this satisfies the same
+    "scratch copies live inside rig/, deleted on every path" discipline
+    task 2.0's and task 3.8's own cross-checked-copy mutation proofs used,
+    without a second temp root: `SURFACES_ROOT` already is one.
+
+    **No live defect — recorded so a later reader does not misread this
+    case as a bugfix.** Independently verified: today,
+    `surface_digest(load_surface("failure-flood"))` on the Python side and
+    `preimage_digest()` (extracted from `rig/run-pipeline.sh`) on the bash
+    side already agree over the real committed
+    `rig/surfaces/failure-flood.txt` — both print
+    `d8693e27d5f8e406a465def75101c4eaa85b23b685e78c2d5d07754d0f7e8daa`. The
+    gap this case closes is that nothing committed would have caught the
+    two sides drifting apart, not that they currently disagree."""
+    arm = "__self_test_load_surface_preimage_pin"
+    surface_path = SURFACES_ROOT / f"{arm}.txt"
+    assert not surface_path.exists(), (
+        f"refusing to overwrite an existing file at {surface_path}"
+    )
+    try:
+        surface_path.write_text(
+            "# harness: v1\n\nBash\n\n  Read\nWrite\nRead   \n"
+        )
+
+        python_digest = surface_digest(load_surface(arm))
+
+        run_pipeline = REPO_ROOT / "rig" / "run-pipeline.sh"
+        case_pin = False
+        try:
+            extracted = subprocess.run(
+                ["sed", "-n", "/^preimage_digest() {/,/^}/p", str(run_pipeline)],
+                capture_output=True, text=True, check=True,
+            ).stdout
+            if not extracted.strip():
+                raise RuntimeError(f"could not extract preimage_digest() from {run_pipeline} by name")
+            bash_script = "set -euo pipefail\n" + extracted + '\npreimage_digest "$1"\n'
+            bash_digest = subprocess.run(
+                ["bash", "-c", bash_script, "load_surface_preimage_pin", str(surface_path)],
+                capture_output=True, text=True, check=True,
+            ).stdout.strip()
+            case_pin = python_digest is not None and python_digest == bash_digest
+        except (subprocess.CalledProcessError, OSError, RuntimeError) as exc:
+            print(f"  [FAIL] load_surface/preimage_digest cross-language pin could not run: {exc}", file=sys.stderr)
+    finally:
+        surface_path.unlink(missing_ok=True)
+    cases = [
+        ("cross-language pin: python surface_digest(load_surface()) and bash's"
+         " preimage_digest() (extracted from run-pipeline.sh) agree over the"
+         " SAME synthetic file exercising header/blank/duplicate/indented"
+         " tool lines — never a hardcoded list on either side", case_pin),
+    ]
+    ok = all(c for _, c in cases)
+    for name, cond in cases:
+        print(f"  [{'PASS' if cond else 'FAIL'}] load_surface preimage {name}")
+    return ok
+
+
 def _self_test_parse_root_cause_report():
     well_formed = "ROOT-CAUSE-REPORT v1\nsrc/a.ts:1\nsrc/b.ts:2\n"
     cases = [
@@ -2161,6 +2258,7 @@ def run_self_test() -> bool:
         _self_test_read_root_cause_report_handoff(),
         _self_test_answer_key_set_digest(),
         _self_test_preimage_digest_pin(),
+        _self_test_load_surface_preimage_pin(),
         _self_test_build_row_model_mismatch(),
         _self_test_build_row_token_breakdown(),
         _self_test_build_row_suite_state_and_attribution(),

@@ -806,3 +806,108 @@ python3 rig/derive.py --experiment failure-flood-v1
 
 All exited 0 except where a deliberate mutation is called out above (each mutation cycle used a scratch
 copy, never the committed file, and confirmed the real file byte-identical afterward).
+
+## Task 2.9 — closing `sdd-verify`'s blocking CRITICAL-1 (commit 4, this batch)
+
+`sdd-verify` graded the cycle **FAIL** on one CRITICAL: `load_surface()`'s own parse — the producer of
+Face C's live drift comparand, `surface_digest(load_surface(FAILURE_FLOOD_SURFACE_ARM))` at
+`rig/derive.py:901` — was proven ZERO ways. Every self-test that supplies a
+`recorded_surface_preimage_sha256` default computes that identical expression once
+(`_self_test_make_ff_run_dir`, `:1519`) and assigns it to both sides of every Face C comparison, and the
+committed pin (`_self_test_preimage_digest_pin`, task 2.1) asserts `surface_digest()` over a hand-built
+Python list, never calling `load_surface()` at all. Confirmed independently, not accepted from the
+verify report alone: three mutations of `load_surface()` (dropping the `#` header filter, slicing the
+sorted list `[1:]`, removing `.strip()` from the returned value) each left the pre-existing 59-case suite
+green. This is the third occurrence of the exact pattern task 2.0 (Face A) and task 3.8 (Face B) already
+closed in this cycle.
+
+**No live defect — stated plainly so this reads as a gap closed, not a bug fixed.** Independently
+verified before writing this note: today, Python's `surface_digest(load_surface("failure-flood"))` and
+bash's `preimage_digest()` (`sed`-extracted from `rig/run-pipeline.sh`) already agree over the real
+committed `rig/surfaces/failure-flood.txt` — both print
+`d8693e27d5f8e406a465def75101c4eaa85b23b685e78c2d5d07754d0f7e8daa`. The gap this task closes is that
+nothing committed would have caught the two sides drifting apart, not that they currently disagree. The
+fault, had it existed, could only over-void (Face C's drift accumulation at `:974-978` voids on any
+disagreement between recorded and live); it could never promote a row to `complete`, and N = 0 today.
+
+**What was done.** `_self_test_load_surface_preimage_pin()` added to `rig/derive.py`, registered in
+`run_self_test()`'s roster immediately after `_self_test_preimage_digest_pin()`. It runs the deriver's
+own full path — `surface_digest(load_surface(arm))`, never a hardcoded list — over one synthetic
+preimage file it writes and deletes at `SURFACES_ROOT / "__self_test_load_surface_preimage_pin.txt"`,
+the exact path shape `load_surface()` is hardcoded to (it takes no root parameter, so this is the only
+way in without weakening it; `load_surface()` itself is unchanged). Content:
+`"# harness: v1\n\nBash\n\n  Read\nWrite\nRead   \n"` — a `# harness:` header (excluded), blank lines
+(excluded), a duplicate tool name across an indented and a trailing-whitespace form (both stripped, and
+still deduped against each other once stripped). Asserted against the SAME kind of cross-language pin
+task 2.0 part 2 built for Face A: `preimage_digest()` `sed`-extracted from `rig/run-pipeline.sh`,
+executed over the identical file — never the weaker shared-literal mechanism task 2.1 used.
+
+Both sides independently computed and confirmed equal at
+`4a626b46a7841184c5d423277a9c17cb15129f4ba32f92a88948b77735bfdcd3` — the same constant task 2.1's pin
+already carries, because this synthetic file's deduped set is the identical `{Bash, Read, Write}`. That
+is a useful coincidence recorded so a later reader does not mistake it for reuse of the old pin: this
+case never calls the pin, and it exercises the full file parse the old pin never touched.
+
+## Mutation-proof table (task 2.9)
+
+Each mutation applied to a full scratch copy of the repository tree under `rig/.scratch-task29-<pid>/`,
+deleted after every run; the real `rig/derive.py` `sha256`-verified byte-identical
+(`0ce09c0680457c15d2fb4509b3325d9fa1d4e7c692d423fe16409c676292d004`) before this task started and again
+after all three mutation cycles completed.
+
+| # | Mutation | `derive.py --self-test` | Case counts |
+|---|---|---|---|
+| Baseline | unmutated | **60/60 PASS**, exit 0 | 60 PASS / 0 FAIL |
+| M1 | drop `and not l.startswith("#")` from `load_surface()`'s filter | **FAIL**, exit 1 | 59 PASS / 1 FAIL (only the new case) |
+| M2 | append `[1:]` to `load_surface()`'s return value | **FAIL**, exit 1 | 59 PASS / 1 FAIL (only the new case) |
+| M3 | remove the value-side `.strip()` from the comprehension (filter's own `.strip()` truthiness check left intact) | **FAIL**, exit 1 | 59 PASS / 1 FAIL (only the new case) |
+
+The synthetic file's own content was deliberately built so M2 is discriminating rather than vacuous: the
+alphabetically-first tool name (`Bash`) appears exactly once (not duplicated), so slicing it off the
+sorted list before dedup actually removes it from the deduped set rather than being masked by a second
+occurrence surviving the slice. Held to a higher standard than a `return "constant"` control per this
+batch's own governing instruction: all three mutations are realistic wrong-implementations of the parse
+itself (a missing filter, a subset return, a missing strip), not a constant body.
+
+## Line accounting (task 2.9)
+
+`git diff --numstat -- rig/derive.py`: **98 insertions, 0 deletions** — the new self-test function, its
+docstring, and its roster registration. No other file's authored line count changes; `rig/run-pipeline.sh`
+is untouched by this task (the bash side is read, never written — `sed`-extracted, same as task 2.0 part
+2's own convention).
+
+Sibling 2's running total (`rig/run-pipeline.sh` + `rig/derive.py`) moves 341 (after task 2.0) → 439
+(+98, this task). Cycle-wide total moves 1049 → **1147**. `tasks.md`'s own Review Workload Forecast
+carries the same correction, in place, per this file's own record-not-erase discipline applied three
+times now.
+
+Re-derived both experiments after the edit: `git diff --stat -- rig/results/` showed
+`failure-flood-v1/runs.jsonl` (6 lines changed, 3 rows) and `tool-surface-v1/runs.jsonl` (84 lines
+changed, 42 rows); a field-by-field diff of every row before/after confirmed the only differing key on
+every row, in both files, is `checker_digest` — `schema_version` unchanged (4 and 3 respectively), every
+other field byte-identical.
+
+## Gate output (task 2.9), verbatim commands and counts
+
+```
+python3 -c "import ast; ast.parse(open('rig/derive.py').read())"   # syntax ok
+bash -n rig/run-pipeline.sh                                        # bash -n clean, unchanged by this task
+python3 rig/derive.py --self-test                                  # exit 0, 60/60 PASS
+bash rig/run-pipeline.sh --self-test                                # exit 0, 28/28 PASS, unaffected
+python3 rig/derive.py --experiment tool-surface-v1                 # 42 rows re-derived
+python3 rig/derive.py --experiment failure-flood-v1                # 3 rows re-derived
+./rig/check.sh                                                     # 20/20 PASS, exit 0
+```
+
+All exited 0 on the real, unmutated tree. `./check.sh` and `./hooks/pre-commit` are run once more,
+against the full staged set for this commit (this note plus `tasks.md`, `rig/derive.py`, the re-derived
+result files, and the verify report), immediately before committing — their output is recorded in the
+commit's own return contract rather than duplicated here.
+
+## Deliberately not done (task 2.9)
+
+- **WARNING-1 through WARNING-5, and the two SUGGESTIONS not already addressed** — all recorded in
+  `sdd/run-input-provenance/verify-report.md`, out of scope for this work unit by the launch prompt's own
+  instruction. Not fixed here.
+- **No new ADR.** Same reasoning as the rest of this cycle — out of scope regardless.
+- **No real `claude -p` run.** N stays 0; nothing in this task could change that boundary.
