@@ -32,6 +32,7 @@ import hashlib
 import json
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -617,8 +618,52 @@ def fixture_digest_at(root: Path):
     return sha256_hex(manifest.read_bytes()) if manifest.is_file() else None
 
 
+def answer_key_set_digest(root: Path):
+    """Face A's digest (run-input-provenance spec R-P2, design.md secs 1/2):
+    set-wide over the answer-key/ relpaths of ONE fixture root, never the
+    merged load_failure_flood_answer_keys() dict — a run only ever ran
+    against one root, and this must be comparable to what a runner (which
+    also only ever sees one root) can compute. Mirrors fixture_digest_at()'s
+    shape: an arbitrary root, None when there is nothing under it to digest.
+
+    This is a genuine cross-language pair with rig/run-pipeline.sh's
+    existing hash_paths(): sorted "sha256(content)  relpath" lines, joined
+    by a single newline, then hashed. Reproduced here rather than invented,
+    so the two sides can only ever disagree by drifting apart, never by
+    starting from two different conventions. The relpath filter/exclusion
+    (skip __pycache__/*.pyc) mirrors compute_manifest()'s own walk, which is
+    what the runner side filters by prefix to build its own input list."""
+    ak_dir = root / "answer-key"
+    if not ak_dir.is_dir():
+        return None
+    rels = []
+    for p in ak_dir.rglob("*"):
+        if not p.is_file():
+            continue
+        if "__pycache__" in p.parts or p.suffix == ".pyc":
+            continue
+        rels.append(p.relative_to(root).as_posix())
+    lines = [f"{sha256_hex((root / rel).read_bytes())}  {rel}" for rel in sorted(rels)]
+    return sha256_hex("\n".join(lines).encode())
+
+
 FAILURE_FLOOD_EXPERIMENT = "failure-flood-v1"
-FAILURE_FLOOD_SCHEMA_VERSION = 3  # v3: PR7B closes verify-report CRITICAL-1/-2.
+FAILURE_FLOOD_SCHEMA_VERSION = 4  # v4 (run-input-provenance): adds
+# input_provenance_version (row), recorded_answer_key_digest (row, Sibling 1
+# — Face A + WARNING-14, R-P2/R-P3/R-P4/R-P5), recorded_fixture_digest (row,
+# Sibling 3 — Face B, R-P7), and each model step's
+# recorded_surface_preimage_sha256 (per-step, Sibling 2 — Face C, R-P6; no
+# deriver code needed for that one, steps are copied through by
+# `step_out = dict(step)` below) — a run's own record of what it was scored
+# against, read back and compared rather than recomputed live. Correction:
+# the two prior siblings' own done-notes here said the other two fields
+# stayed "null until" a not-yet-landed sibling; both are now wired, so this
+# comment names the sibling that actually populated each field rather than
+# leaving a stale forward reference. Same no-migrations rule as every prior
+# bump (Decision 8, restated at v2->v3 below): re-deriving rewrites every
+# existing row with this version and these fields; nothing here reads the
+# old schema_version value to special-case a row's treatment (R-P11.1).
+# v3: PR7B closes verify-report CRITICAL-1/-2.
 # Added declared_model (row) + model_matches_declared (per step, read back
 # from run-pipeline.sh's own write_step_status, mirroring
 # permission_mode_matches_declared) and the model-mismatch void it can now
@@ -827,6 +872,12 @@ def build_row_failure_flood(run_dir: Path, surfaces, digests, answer_keys):
     diagnostician_src_violation = bool(arm_data.get("diagnostician_src_violation"))
     steps_meta = arm_data.get("steps", [])
     anomaly_classes = set()
+    fixture_version = FAILURE_FLOOD_FIXTURE_VERSIONS.get(task_id, "v1")
+    # Read once, used both by the provenance gate below (R-P4.1's malformed-
+    # key detection) and by the scoring sections further down — one variable,
+    # never re-fetched, so the two places can't observe a different snapshot
+    # of it.
+    ak = answer_keys.get(task_id)
 
     # Hard Ordering Gate layer 3 (design.md sec 7, task 5.8's own scope):
     # a row cannot be counted without a pre-registration digest unless it
@@ -840,23 +891,123 @@ def build_row_failure_flood(run_dir: Path, surfaces, digests, answer_keys):
         state, void_reason = "void", "no-preregistration"
         anomaly_classes.add("no-preregistration")
 
+    # ff_surface_digest: the LIVE preimage recompute, read via the same
+    # `surfaces` parameter every existing precedent uses (never a second,
+    # direct rig/surfaces/ read here) — Face C's own drift comparand below
+    # (task 2.4), computed once, ahead of the gate, because that gate now
+    # needs it too. No longer the per-step READ-BACK comparand (task 2.5
+    # retires that use — see the loop below).
+    ff_surface = surfaces.get(FAILURE_FLOOD_SURFACE_ARM) or []
+    ff_surface_digest = surface_digest(ff_surface) if ff_surface else None
+
+    # ---- Face A + C + WARNING-14: input-provenance annotation + gate -----
+    # (run-input-provenance spec R-P2/R-P3/R-P4/R-P5/R-P6.3, design.md
+    # secs 4-6).
+    #
+    # The ANNOTATION that this capture predates the scheme is independent of
+    # the STATE TRANSITION (R-P5.2's own explicit carve-out, proven by the
+    # three existing shakedown rows, R-P8): a row already void for another
+    # reason still gains "pre-scheme-provenance" when it carries no
+    # input_provenance_version at all, without its void_reason changing.
+    # Every OTHER provenance check below (digest-null, digest-mismatch,
+    # malformed key) stays ordinary downgrade-only: it neither annotates nor
+    # transitions a row an earlier check already voided (R-P3.2) — it is
+    # nested inside `if state == "complete":`, unlike the marker-absence
+    # annotation above it.
+    input_provenance_version = arm_data.get("input_provenance_version")
+    if input_provenance_version is None:
+        anomaly_classes.add("pre-scheme-provenance")
+        if state == "complete":
+            state, void_reason = "void", "input-provenance-missing"
+    elif state == "complete":
+        # Pass 2 (R-P5.3): the scheme is present, but a promised digest was
+        # recorded null — a destroyed or truncated capture, never conflated
+        # with pre-scheme (mutually exclusive with the branch above by
+        # construction — R-P5.5's "caught once" scenario). Face C's own
+        # promised value is PER MODEL STEP (design.md sec 1 — a three-step
+        # arm has three invocations and the preimage file can change between
+        # them), unlike Face A's arm-level recorded_answer_key_digest, so it
+        # joins this same null check per model step (task 2.4).
+        recorded_answer_key_digest = arm_data.get("recorded_answer_key_digest")
+        # Face B's own promised value (task 3.1, R-P7.1): arm-level, same
+        # null-check as Face A's — a run that never recorded its fixture
+        # digest at all cannot say what it was scored against any more than
+        # one that never recorded its answer-key digest can.
+        recorded_fixture_digest = arm_data.get("recorded_fixture_digest")
+        missing_surface_preimage = any(
+            s.get("kind") == "model" and s.get("recorded_surface_preimage_sha256") is None
+            for s in steps_meta
+        )
+        if recorded_answer_key_digest is None or recorded_fixture_digest is None or missing_surface_preimage:
+            state, void_reason = "void", "input-provenance-missing"
+            anomaly_classes.add("provenance-capture-incomplete")
+        else:
+            # Pass 3 (R-P2.2a): accumulate every drifted face BEFORE
+            # deciding, rather than branching on the first mismatch found —
+            # this is what makes "check order MUST NOT be observable in the
+            # outcome" true by construction, not a convention. Face B's own
+            # check (task 3.2, R-P7.1a) JOINS this set rather than being
+            # inserted at a particular point relative to the answer-key
+            # check — R-P2.2a forbids that framing entirely, which is why
+            # this accumulation shape, not an insertion point, is what
+            # "joins" means here.
+            drifted = set()
+            live_answer_key_digest = digests.get("answer_key", {}).get(fixture_version)
+            if recorded_answer_key_digest != live_answer_key_digest:
+                drifted.add("answer-key-drift")
+            live_fixture_digest = digests.get("fixture", {}).get(fixture_version)
+            if recorded_fixture_digest != live_fixture_digest:
+                drifted.add("fixture-drift")
+            if ak is not None:
+                # R-P4.1: a malformed key IS an instance of "this row's
+                # inputs do not match a scoreable answer key," never a
+                # separate class needing its own reason — per the
+                # requirement's own text it joins the same `drifted` set a
+                # digest mismatch does.
+                f0 = ak.get("F0") or {}
+                if "failures" not in f0 or "R0" not in ak:
+                    drifted.add("answer-key-drift")
+            # R-P6.3: "did the thing that was frozen at run time still match
+            # the fixture later" — a DIFFERENT question from the read-back
+            # loop's own "did the model's observed surface match what was
+            # frozen" below (task 2.5). The two MUST NOT share a reason.
+            for s in steps_meta:
+                if s.get("kind") != "model":
+                    continue
+                if s.get("recorded_surface_preimage_sha256") != ff_surface_digest:
+                    drifted.add("surface-preimage-drift")
+            if drifted:
+                state, void_reason = "void", "input-provenance-mismatch"
+                anomaly_classes |= drifted
+
     # Read-back downgrades (never upgrades — same discipline as build_row's
     # own complete-only checks above): the surface/permission-mode
     # comparison is explicitly THIS file's job, never run-pipeline.sh's own
     # (task 5.2's done-note; run-pipeline.sh's read_back_init() comment:
     # "every existing precedent puts that decision in derive.py").
-    ff_surface = surfaces.get(FAILURE_FLOOD_SURFACE_ARM) or []
-    ff_surface_digest = surface_digest(ff_surface) if ff_surface else None
     if state == "complete":
         for step in steps_meta:
             if step.get("kind") != "model":
                 continue
             step_surface = step.get("surface_sha256")
-            if ff_surface_digest is not None and step_surface != ff_surface_digest:
+            # R-P6.2/R-P6.1: the `is not None` guard is DELETED, not
+            # weakened — its job (deciding whether this comparison can be
+            # trusted at all) moved to the gate above, which never reaches
+            # this loop with a missing comparand (R-P5.3's own null check).
+            # The comparand is now the run's OWN frozen recording (the
+            # OBSERVED step_surface's counterpart), never the live recompute
+            # ff_surface_digest — that value is Face C's DRIFT comparand
+            # above, a different question (R-P6.3's own text).
+            if step_surface != step.get("recorded_surface_preimage_sha256"):
                 state, void_reason = "void", "surface-mismatch"
                 anomaly_classes.add("surface-mismatch")
                 break
-            if step.get("permission_mode_matches_declared") is False:
+            if step.get("permission_mode_matches_declared") is not True:
+                # R-P5.4: not-True is not-proven, not "is False" — a `None`
+                # read back from a SCHEME-AWARE capture (the only kind that
+                # can still be `state == "complete"` here; a pre-scheme row
+                # was already voided by the gate above, R-P5.5) has not
+                # shown the mode matched either.
                 state, void_reason = "void", "permission-mode-mismatch"
                 anomaly_classes.add("permission-mode-mismatch")
                 break
@@ -880,7 +1031,9 @@ def build_row_failure_flood(run_dir: Path, surfaces, digests, answer_keys):
             # written by write_step_status the same way
             # permission_mode_matches_declared already is) rather than
             # inventing a second comparison mechanism here.
-            if step.get("model_matches_declared") is False:
+            if step.get("model_matches_declared") is not True:
+                # R-P5.4 (same rule as permission_mode_matches_declared
+                # above): not-True is not-proven.
                 state, void_reason = "void", "model-mismatch"
                 anomaly_classes.add("model-mismatch")
                 break
@@ -960,7 +1113,6 @@ def build_row_failure_flood(run_dir: Path, surfaces, digests, answer_keys):
     verdict = integrity_guard_pass = None
     suite_state_cause_value = None
     verify_path = run_dir / "steps" / "99-verify" / "collection.json"
-    ak = answer_keys.get(task_id)
     if state == "complete" and verify_path.is_file() and ak:
         collection = json.loads(verify_path.read_text())
         suite_state = collection.get("suite_state")
@@ -977,12 +1129,17 @@ def build_row_failure_flood(run_dir: Path, surfaces, digests, answer_keys):
             state, void_reason = "void", "suite-state-mismatch"
             anomaly_classes.add("suite-state-mismatch")
         elif suite_state == "ran":
+            # R-P4.1: .get()-based, never a direct subscript — a malformed
+            # key (no F0.failures) must not raise mid-derive. In practice
+            # this branch is unreachable for a row the provenance gate above
+            # already voided over that same malformed key (R-P4.1's own
+            # "answer-key-drift" case), but the total-function guarantee
+            # holds independently of that gate's own reach.
             verdict, integrity_guard_pass = green_restore_verdict(
-                observed_failures, ak["F0"]["failures"], ro_substrate_violation
+                observed_failures, ak.get("F0", {}).get("failures", []), ro_substrate_violation
             )
 
     bash_call_count_total = sum(s.get("bash_call_count", 0) for s in steps_out)
-    fixture_version = FAILURE_FLOOD_FIXTURE_VERSIONS.get(task_id, "v1")
 
     # Diagnostic attribution (R-F3.2, CRITICAL-2): scored whenever the row
     # is (still) complete and an answer key exists — never gated on the
@@ -1024,6 +1181,13 @@ def build_row_failure_flood(run_dir: Path, surfaces, digests, answer_keys):
         # init event (unchanged meaning); this is what was DECLARED, so the
         # two are comparable per row without a second file.
         "declared_model": arm_data.get("declared_model"),
+        # Faces A and B's own records, read back — never recomputed here
+        # (R-P2, R-P5, R-P7). All three fields are already compared against
+        # their live values by the provenance gate above (never re-derived a
+        # second time for display).
+        "input_provenance_version": arm_data.get("input_provenance_version"),
+        "recorded_answer_key_digest": arm_data.get("recorded_answer_key_digest"),
+        "recorded_fixture_digest": arm_data.get("recorded_fixture_digest"),
         "workspace_file_count": arm_data.get("workspace_file_count"),
         "state": state,
         "void_reason": void_reason,
@@ -1068,7 +1232,10 @@ def build_row_failure_flood(run_dir: Path, surfaces, digests, answer_keys):
         # retrofit.
         "causes_claimed": causes_claimed,
         "causes_correct": causes_correct,
-        "causes_present": len(ak["R0"]) if ak else None,
+        # R-P4.1: absence is not a count. `len(ak.get("R0", []))` would
+        # publish 0, a claim that this task has zero causes; None means "no
+        # scoreable R0 to count," never conflated with a real zero.
+        "causes_present": len(ak["R0"]) if ak and "R0" in ak else None,
         "steps": steps_out,
         "anomaly_classes": sorted(anomaly_classes),
     }
@@ -1096,6 +1263,11 @@ EXPERIMENTS = {
         "load_answer_keys": load_failure_flood_answer_keys,
         "load_surfaces": lambda: {FAILURE_FLOOD_SURFACE_ARM: load_surface(FAILURE_FLOOD_SURFACE_ARM)},
         "fixture_digest": lambda version, root: fixture_digest_at(root),
+        # tool-surface-v1's own registry entry above gains NO key here —
+        # digests["answer_key"] is built in main() only when an experiment
+        # declares this key (design.md sec 7's mechanical non-regression
+        # guarantee), never unconditionally.
+        "answer_key_digest": lambda version, root: answer_key_set_digest(root),
         "apply_ambient_drift_pairing": False,
     },
 }
@@ -1113,6 +1285,205 @@ EXPERIMENTS = {
 # creates and removes — no dependency on rig/runs/ or any path outside this
 # repo, other than the committed rig/surfaces/failure-flood.txt preimage the
 # real pipeline also reads.
+
+def _self_test_answer_key_set_digest():
+    """run-input-provenance task 2.0 — a gatekeeping finding raised after
+    Sibling 1 was committed: answer_key_set_digest()'s own computation was
+    proven ZERO ways. Every existing self-test derives its expected digest
+    by calling answer_key_set_digest() itself (this file's own
+    _self_test_make_ff_run_dir, _self_test_build_row_model_mismatch, etc.),
+    so both sides of every comparison move together and a `return
+    "constant"` body left all 43 of Sibling 1's cases green. Two cases close
+    that, neither one calling the function under test to build its own
+    expected value:
+
+    a. the digest MUST move when the digested bytes move — proven against
+    itself, on a synthetic root this case builds and mutates, never against
+    another self-test's own fixture. This mutation is append-shaped (adds
+    `, "mutated": true` to the JSON, changing the byte length along with the
+    content) rather than same-length — left that way deliberately, NOT an
+    accidental inconsistency with task 3.8's own case, which was strengthened
+    to a same-length, one-byte mutation after the orchestrator found the
+    append shape lets a length-hashing (never content-reading) implementation
+    pass undetected. That finding applies here too in principle, but this
+    case is backstopped by case (b) below: a length-hashing Python side would
+    disagree with the bash side over real digested bytes and turn the PIN
+    red regardless of what this case alone could catch. Face B's own
+    `_self_test_fixture_digest_at()` has no such backstop — no pin exists for
+    it (see that function's own docstring for why) — which is why ITS case
+    needed the stronger, same-length form and this one did not.
+
+    b. the cross-language pin task 1.3's done-note verified BY HAND, never
+    committed: python's answer_key_set_digest() and bash's
+    answer_key_paths()|hash_paths() pipeline, EXTRACTED from
+    rig/run-pipeline.sh (never re-implemented — the same sed convention
+    rig/check.sh's load_compute_manifest() already uses), executed over the
+    SAME synthetic root and asserted equal. A later disagreement here is the
+    finding to report, never something to "fix" on whichever side looks
+    wrong (design.md sec 9)."""
+    tmproot = Path(tempfile.mkdtemp())
+    try:
+        fixture_root = tmproot / "fixture"
+        ak_dir = fixture_root / "answer-key"
+        ak_dir.mkdir(parents=True)
+        (ak_dir / "s1.json").write_text('{"task_id": "s1", "F0": {"failures": []}, "R0": []}')
+        (ak_dir / "prereg.json").write_text('{"required_hypotheses": []}')
+
+        digest_before = answer_key_set_digest(fixture_root)
+        (ak_dir / "s1.json").write_text(
+            '{"task_id": "s1", "F0": {"failures": []}, "R0": [], "mutated": true}'
+        )
+        digest_after = answer_key_set_digest(fixture_root)
+        case_fires = digest_before is not None and digest_before != digest_after
+
+        run_pipeline = REPO_ROOT / "rig" / "run-pipeline.sh"
+        bash_script = "set -euo pipefail\n"
+        case_pin = False
+        try:
+            for fn in ("compute_manifest", "answer_key_paths", "hash_paths"):
+                extracted = subprocess.run(
+                    ["sed", "-n", f"/^{fn}() {{/,/^}}/p", str(run_pipeline)],
+                    capture_output=True, text=True, check=True,
+                ).stdout
+                if not extracted.strip():
+                    raise RuntimeError(f"could not extract {fn}() from {run_pipeline} by name")
+                bash_script += extracted + "\n"
+            bash_script += 'answer_key_paths "$1" | hash_paths "$1"\n'
+            bash_digest = subprocess.run(
+                ["bash", "-c", bash_script, "answer_key_pin", str(fixture_root)],
+                capture_output=True, text=True, check=True,
+            ).stdout.strip()
+            python_digest = answer_key_set_digest(fixture_root)
+            case_pin = python_digest is not None and python_digest == bash_digest
+        except (subprocess.CalledProcessError, OSError, RuntimeError) as exc:
+            print(f"  [FAIL] answer_key_set_digest cross-language pin could not run: {exc}", file=sys.stderr)
+    finally:
+        shutil.rmtree(tmproot)
+    cases = [
+        ("a. mutating a digested file's bytes changes the digest — proven"
+         " against itself, not a second self-test's own fixture", case_fires),
+        ("b. cross-language pin: python answer_key_set_digest() and bash's"
+         " answer_key_paths()|hash_paths() (extracted from run-pipeline.sh)"
+         " agree over the same synthetic root", case_pin),
+    ]
+    ok = all(c for _, c in cases)
+    for name, cond in cases:
+        print(f"  [{'PASS' if cond else 'FAIL'}] answer_key_set_digest {name}")
+    return ok
+
+
+def _self_test_preimage_digest_pin():
+    """run-input-provenance task 2.1 — the cross-language pin for Face C's
+    own new algorithm (preimage_digest(), rig/run-pipeline.sh), the same
+    shared-literal-constant mechanism already used for surface_digest at
+    rig/run-pipeline.sh:424-430 (design.md sec 9), asserted independently
+    here against derive.py's own surface_digest(). A pin failure is the
+    finding to report, never a thing to "fix" on whichever side looks
+    wrong."""
+    pinned = "4a626b46a7841184c5d423277a9c17cb15129f4ba32f92a88948b77735bfdcd3"
+    got = surface_digest(["Bash", "Read", "Write", "Read"])
+    ok = got == pinned
+    print(f"  [{'PASS' if ok else 'FAIL'}] surface_digest: dedupe + sort matches the pinned constant"
+          " shared with rig/run-pipeline.sh --self-test's preimage_digest case a")
+    return ok
+
+
+def _self_test_load_surface_preimage_pin():
+    """run-input-provenance task 2.9 — task 2.0's and task 3.8's own finding
+    recursed into Face C a third time this cycle, raised by sdd-verify and
+    independently confirmed by the orchestrator's own mutations after
+    Sibling 2 was committed (`5cfa456`): `load_surface()`'s own parse was
+    proven ZERO ways. Every self-test that supplies a
+    `recorded_surface_preimage_sha256` default (`_self_test_make_ff_run_dir`,
+    :1519, and everything built on it) computes ONE
+    `surface_digest(load_surface(FAILURE_FLOOD_SURFACE_ARM))` expression and
+    assigns it to BOTH sides of every Face C comparison, so both sides move
+    together and a wrong `load_surface()` is invisible to them. The pin
+    directly above, `_self_test_preimage_digest_pin()`, does not cover it
+    either: it asserts `surface_digest()` over a hand-built Python list, so
+    it pins the hash CONVENTION and never calls `load_surface()` at all —
+    the parse is exactly what it leaves unexercised. Task 2.1's own
+    done-note already named this pin as the weaker, shared-literal kind,
+    distinct from task 2.0's stronger both-implementations pin; this task
+    is closing that gap for Face C the way task 2.0 closed it for Face A.
+
+    This case runs the deriver's OWN full path —
+    `surface_digest(load_surface(arm))`, never a hardcoded list — over one
+    synthetic preimage file carrying everything the parse must handle: a
+    `# harness:` header line (must be excluded), blank lines (must be
+    excluded), a duplicate tool name (must be deduped), and both an
+    indented and a trailing-whitespace tool name (must be stripped, and
+    must still dedupe against each other and against the unindented form
+    once stripped). Asserted against the SAME kind of cross-language pin
+    task 2.0 part 2 already built for Face A: `preimage_digest()`
+    `sed`-extracted from `rig/run-pipeline.sh` (never re-implemented — the
+    same convention `rig/check.sh`'s `load_compute_manifest()` and task
+    2.0's own pin already use), executed over the identical file. A later
+    disagreement here is the finding to report, never something to "fix"
+    on whichever side looks wrong (design.md sec 9).
+
+    No production code changed to make this reachable. `load_surface()`
+    takes no root parameter — it is hardcoded to
+    `SURFACES_ROOT / f"{arm}.txt"` — so the only way in without weakening
+    it is to write the synthetic file at that exact path shape, under an
+    arm name no real surface file uses, and delete it in `finally`
+    regardless of outcome. `SURFACES_ROOT` already resolves inside `rig/`
+    (`REPO_ROOT` is derived from `__file__`), so this satisfies the same
+    "scratch copies live inside rig/, deleted on every path" discipline
+    task 2.0's and task 3.8's own cross-checked-copy mutation proofs used,
+    without a second temp root: `SURFACES_ROOT` already is one.
+
+    **No live defect — recorded so a later reader does not misread this
+    case as a bugfix.** Independently verified: today,
+    `surface_digest(load_surface("failure-flood"))` on the Python side and
+    `preimage_digest()` (extracted from `rig/run-pipeline.sh`) on the bash
+    side already agree over the real committed
+    `rig/surfaces/failure-flood.txt` — both print
+    `d8693e27d5f8e406a465def75101c4eaa85b23b685e78c2d5d07754d0f7e8daa`. The
+    gap this case closes is that nothing committed would have caught the
+    two sides drifting apart, not that they currently disagree."""
+    arm = "__self_test_load_surface_preimage_pin"
+    surface_path = SURFACES_ROOT / f"{arm}.txt"
+    assert not surface_path.exists(), (
+        f"refusing to overwrite an existing file at {surface_path}"
+    )
+    try:
+        surface_path.write_text(
+            "# harness: v1\n\nBash\n\n  Read\nWrite\nRead   \n"
+        )
+
+        python_digest = surface_digest(load_surface(arm))
+
+        run_pipeline = REPO_ROOT / "rig" / "run-pipeline.sh"
+        case_pin = False
+        try:
+            extracted = subprocess.run(
+                ["sed", "-n", "/^preimage_digest() {/,/^}/p", str(run_pipeline)],
+                capture_output=True, text=True, check=True,
+            ).stdout
+            if not extracted.strip():
+                raise RuntimeError(f"could not extract preimage_digest() from {run_pipeline} by name")
+            bash_script = "set -euo pipefail\n" + extracted + '\npreimage_digest "$1"\n'
+            bash_digest = subprocess.run(
+                ["bash", "-c", bash_script, "load_surface_preimage_pin", str(surface_path)],
+                capture_output=True, text=True, check=True,
+            ).stdout.strip()
+            case_pin = python_digest is not None and python_digest == bash_digest
+        except (subprocess.CalledProcessError, OSError, RuntimeError) as exc:
+            print(f"  [FAIL] load_surface/preimage_digest cross-language pin could not run: {exc}", file=sys.stderr)
+    finally:
+        surface_path.unlink(missing_ok=True)
+    cases = [
+        ("cross-language pin: python surface_digest(load_surface()) and bash's"
+         " preimage_digest() (extracted from run-pipeline.sh) agree over the"
+         " SAME synthetic file exercising header/blank/duplicate/indented"
+         " tool lines — never a hardcoded list on either side", case_pin),
+    ]
+    ok = all(c for _, c in cases)
+    for name, cond in cases:
+        print(f"  [{'PASS' if cond else 'FAIL'}] load_surface preimage {name}")
+    return ok
+
 
 def _self_test_parse_root_cause_report():
     well_formed = "ROOT-CAUSE-REPORT v1\nsrc/a.ts:1\nsrc/b.ts:2\n"
@@ -1213,35 +1584,94 @@ def _self_test_write_stream(path, model, events=None):
     path.write_text("\n".join(json.dumps(ev) for ev in lines) + "\n")
 
 
-def _self_test_make_ff_run_dir(root, run_id, step_overrides, write_stream=True):
+def _self_test_make_ff_run_dir(root, run_id, step_overrides, write_stream=True, arm_overrides=None):
     """One synthetic s1-monolithic-<N> run directory: arm.json + status.json
     + one model step, matching run-pipeline.sh's own real Amendment-1 shape
-    closely enough for build_row_failure_flood to read it as a real run."""
+    closely enough for build_row_failure_flood to read it as a real run.
+
+    `arm_overrides` carries the provenance-related arm.json fields
+    (input_provenance_version, recorded_answer_key_digest,
+    recorded_fixture_digest) — arm-level, not per-step, per design.md sec 1.
+    Defaults to a provenance-INTACT capture whose recorded digests agree
+    with the REAL committed v1 fixture (via answer_key_set_digest() and
+    fixture_digest_at() themselves, never a hardcoded string that might
+    coincidentally never collide with anything), so every existing caller of
+    this fixture builder now carries provenance and none of them accidentally
+    drift the new gate — design.md sec 9's own stated intent ("it forces
+    every existing detector fixture to carry provenance and proves the new
+    gate composes with the old ones rather than sitting beside them"). A
+    caller building an s2/v2 run (task 3.3) MUST override both digests to
+    the v2 root's own real values, or v2 values, since this default is
+    always v1's.
+
+    The one step's OWN default is likewise Face-C-intact (Sibling 2): both
+    the OBSERVED `surface_sha256` and the frozen `recorded_surface_preimage_
+    sha256` default to the REAL committed rig/surfaces/failure-flood.txt
+    digest, so they agree with each other by construction. A caller that
+    passes `surfaces={FAILURE_FLOOD_SURFACE_ARM: []}` to isolate itself from
+    Face C entirely must also pass the SAME real surface names in — see
+    _self_test_build_row_model_mismatch/_self_test_build_row_token_breakdown
+    below — so the gate's own live recompute (ff_surface_digest) agrees with
+    this default too."""
+    real_surface_digest = surface_digest(load_surface(FAILURE_FLOOD_SURFACE_ARM))
     run_dir = root / run_id
     (run_dir / "steps" / "01-monolith").mkdir(parents=True, exist_ok=True)
     step = {
         "index": "01-monolith", "kind": "model", "permission_mode_matches_declared": True,
-        "surface_sha256": None, **step_overrides,
+        "surface_sha256": real_surface_digest,
+        "recorded_surface_preimage_sha256": real_surface_digest,
+        **step_overrides,
     }
     if write_stream:
         _self_test_write_stream(run_dir / "steps" / "01-monolith" / "stream.jsonl", step_overrides.get("model_actual"))
     (run_dir / "status.json").write_text(json.dumps({"state": "complete", "void_reason": None}))
-    (run_dir / "arm.json").write_text(json.dumps({
+    arm = {
         # prereg_digest is required or the Hard Ordering Gate layer-3 check
         # (build_row_failure_flood's own "no-preregistration" void) fires
         # before anything this fixture exists to test even runs.
         "declared_model": step_overrides.get("declared_model"), "prereg_digest": "deadbeef", "steps": [step],
-    }))
+        "input_provenance_version": 1,
+        "recorded_answer_key_digest": answer_key_set_digest(FAILURE_FLOOD_FIXTURE_ROOTS["v1"]),
+        "recorded_fixture_digest": fixture_digest_at(FAILURE_FLOOD_FIXTURE_ROOTS["v1"]),
+        **(arm_overrides or {}),
+    }
+    (run_dir / "arm.json").write_text(json.dumps(arm))
     return run_dir
 
 
 def _self_test_build_row_model_mismatch():
     """Absorbed from a prior batch's own scratch script (PR7A's model-pin
-    verification): three cases proving the DECLARED-value comparison (never
+    verification): cases proving the DECLARED-value comparison (never
     build_row's own self-consistency check, which cannot catch two
-    internally-consistent runs of the same arm on different models)."""
-    surfaces = {FAILURE_FLOOD_SURFACE_ARM: []}  # empty surface -> surface-mismatch never fires; isolates this check
-    digests = {"fixture": {}, "checker": "x"}
+    internally-consistent runs of the same arm on different models).
+
+    Case 3 (R-P10.2): REWRITTEN, never deleted. It used to assert
+    `model_matches_declared: None -> state == "complete"`, labelled "old
+    capture — never falsely voids" — that pinned WARNING-14's own defect as
+    intended behaviour rather than naming it as a bug. Deleting it would
+    erase the evidence that "absence is consent" was ever asserted; rewriting
+    it records the inversion R-P5 makes: the SAME fixture, now with no
+    `input_provenance_version`, must void as pre-scheme (R-P5.2). Case 4 is
+    NEW and proves the other half: the same `None` read-back, from a
+    provenance-INTACT capture, voids as `model-mismatch` (R-P5.4) — together
+    they are the WARNING-14 proof; keeping only one leaves the other half
+    unproven (R-P10.2's own scenario).
+
+    Case 5 is NEW and closes a gap mutation-testing found during this
+    batch's own apply: R-P5.4 names BOTH `:859`
+    (`permission_mode_matches_declared`) and `:883`
+    (`model_matches_declared`) — design.md sec 9's case 8 says "both sites" —
+    but only the model site had a committed case proving it fires. Reverting
+    the permission-mode line alone from `is not True` back to `is False`
+    left every other case in this file green; only this case catches it."""
+    # The REAL committed surface, matching _self_test_make_ff_run_dir's own
+    # Face-C-intact step default (Sibling 2) — an empty surface would now
+    # disagree with that default and trip surface-mismatch, which is not
+    # what this function's own cases are about; isolating this check from
+    # Face C is achieved by AGREEING, not by omitting.
+    surfaces = {FAILURE_FLOOD_SURFACE_ARM: load_surface(FAILURE_FLOOD_SURFACE_ARM)}
+    digests = {"fixture": {"v1": fixture_digest_at(FAILURE_FLOOD_FIXTURE_ROOTS["v1"])}, "checker": "x",
+               "answer_key": {"v1": answer_key_set_digest(FAILURE_FLOOD_FIXTURE_ROOTS["v1"])}}
     tmproot = Path(tempfile.mkdtemp())
     try:
         d1 = _self_test_make_ff_run_dir(tmproot, "s1-monolithic-99mismatch",
@@ -1259,15 +1689,35 @@ def _self_test_build_row_model_mismatch():
 
         d3 = _self_test_make_ff_run_dir(tmproot, "s1-monolithic-99old",
                                           {"declared_model": "claude-opus-5[1m]", "model_actual": None,
-                                           "model_matches_declared": None})
+                                           "model_matches_declared": None},
+                                          arm_overrides={"input_provenance_version": None})
         row3, *_ = build_row_failure_flood(d3, surfaces, digests, {})
-        case3 = row3["state"] == "complete"
+        case3 = (row3["state"] == "void" and row3["void_reason"] == "input-provenance-missing"
+                 and "pre-scheme-provenance" in row3["anomaly_classes"])
+
+        d4 = _self_test_make_ff_run_dir(tmproot, "s1-monolithic-99nullintact",
+                                          {"declared_model": "claude-opus-5[1m]", "model_actual": None,
+                                           "model_matches_declared": None})
+        row4, *_ = build_row_failure_flood(d4, surfaces, digests, {})
+        case4 = row4["state"] == "void" and row4["void_reason"] == "model-mismatch"
+
+        d5 = _self_test_make_ff_run_dir(tmproot, "s1-monolithic-99permnull",
+                                          {"declared_model": "claude-opus-5[1m]", "model_actual": "claude-opus-5[1m]",
+                                           "model_matches_declared": True,
+                                           "permission_mode_matches_declared": None})
+        row5, *_ = build_row_failure_flood(d5, surfaces, digests, {})
+        case5 = row5["state"] == "void" and row5["void_reason"] == "permission-mode-mismatch"
     finally:
         shutil.rmtree(tmproot)
     cases = [
         ("model_matches_declared=False -> state=void, void_reason=model-mismatch", case1),
         ("model_matches_declared=True -> state stays complete", case2),
-        ("model_matches_declared absent/None (old capture) -> never falsely voids", case3),
+        ("model_matches_declared=None, no input_provenance_version -> void: input-provenance-missing"
+         " (rewritten from the old 'never falsely voids' assertion, R-P10.2)", case3),
+        ("model_matches_declared=None, provenance INTACT -> void: model-mismatch"
+         " (R-P5.4 — WARNING-14's other half)", case4),
+        ("permission_mode_matches_declared=None, provenance INTACT -> void: permission-mode-mismatch"
+         " (R-P5.4's OTHER site — design.md sec 9's 'both sites', gap found by mutation-testing)", case5),
     ]
     ok = all(c for _, c in cases)
     for name, cond in cases:
@@ -1280,8 +1730,11 @@ def _self_test_build_row_token_breakdown():
     restoration): per-step and per-run input/output/cache_read/
     cache_creation tokens, plus tool_calls names+count — never a single
     total, per and R-F7.3's own words."""
-    surfaces = {FAILURE_FLOOD_SURFACE_ARM: []}
-    digests = {"fixture": {}, "checker": "x"}
+    # Real committed surface — see _self_test_build_row_model_mismatch's own
+    # comment for why (Sibling 2's Face-C-intact default agrees with this).
+    surfaces = {FAILURE_FLOOD_SURFACE_ARM: load_surface(FAILURE_FLOOD_SURFACE_ARM)}
+    digests = {"fixture": {"v1": fixture_digest_at(FAILURE_FLOOD_FIXTURE_ROOTS["v1"])}, "checker": "x",
+               "answer_key": {"v1": answer_key_set_digest(FAILURE_FLOOD_FIXTURE_ROOTS["v1"])}}
     tmproot = Path(tempfile.mkdtemp())
     try:
         events = [
@@ -1334,7 +1787,10 @@ def _self_test_build_row_suite_state_and_attribution():
     surface_names = load_surface(FAILURE_FLOOD_SURFACE_ARM)
     surface_dig = surface_digest(surface_names)
     surfaces = {FAILURE_FLOOD_SURFACE_ARM: surface_names}
-    digests = {"fixture": {"v1": None, "v2": None}, "checker": CHECKER_DIGEST}
+    live_answer_key_digest = answer_key_set_digest(FAILURE_FLOOD_FIXTURE_ROOTS["v1"])
+    live_fixture_digest = fixture_digest_at(FAILURE_FLOOD_FIXTURE_ROOTS["v1"])
+    digests = {"fixture": {"v1": live_fixture_digest, "v2": None}, "checker": CHECKER_DIGEST,
+               "answer_key": {"v1": live_answer_key_digest}}
     answer_keys = {"s1": {
         "task_id": "s1", "S0": {"suite_state": "ran"}, "F0": {"failures": []},
         "R0": [{"cause_site": "src/a.ts:1"}, {"cause_site": "src/c.ts:9"}],
@@ -1351,11 +1807,17 @@ def _self_test_build_row_suite_state_and_attribution():
         (run_dir / "steps" / "99-verify").mkdir(parents=True)
         (run_dir / "steps" / "99-verify" / "collection.json").write_text(json.dumps(collection))
         (run_dir / "status.json").write_text(json.dumps({"state": "complete", "void_reason": None}))
-        (run_dir / "arm.json").write_text(json.dumps({"prereg_digest": "deadbeef", "steps": [
-            {"index": "01-monolith", "kind": "model", "surface_sha256": surface_dig,
-             "permission_mode_matches_declared": True, "model_matches_declared": True},
-            {"index": "99-verify", "kind": "code"},
-        ]}))
+        (run_dir / "arm.json").write_text(json.dumps({
+            "prereg_digest": "deadbeef",
+            "input_provenance_version": 1,
+            "recorded_answer_key_digest": live_answer_key_digest,
+            "recorded_fixture_digest": live_fixture_digest,
+            "steps": [
+                {"index": "01-monolith", "kind": "model", "surface_sha256": surface_dig,
+                 "recorded_surface_preimage_sha256": surface_dig,
+                 "permission_mode_matches_declared": True, "model_matches_declared": True},
+                {"index": "99-verify", "kind": "code"},
+            ]}))
         return run_dir
 
     tmproot = Path(tempfile.mkdtemp())
@@ -1414,17 +1876,396 @@ def _self_test_build_row_suite_state_and_attribution():
     return ok
 
 
+def _self_test_build_row_answer_key_provenance():
+    """Face A's own detector-fires proof (R-P10.1) plus the WARNING-14
+    absence-distinction proof (R-P5), built on the same
+    _self_test_make_ff_run_dir fixture every other build_row_failure_flood
+    self-test uses — now carrying provenance by default (design.md sec 9),
+    so this case list is what proves the new gate composes with every
+    existing detector rather than sitting beside them. Uses the REAL
+    committed surface (Sibling 2's own composition requirement — see
+    _self_test_build_row_model_mismatch's comment), never an empty one:
+    this function is about Face A, not Face C, and stays isolated from it by
+    agreeing rather than by omitting."""
+    surfaces = {FAILURE_FLOOD_SURFACE_ARM: load_surface(FAILURE_FLOOD_SURFACE_ARM)}
+    live_v1 = answer_key_set_digest(FAILURE_FLOOD_FIXTURE_ROOTS["v1"])
+    live_v2 = answer_key_set_digest(FAILURE_FLOOD_FIXTURE_ROOTS["v2"])
+    live_fixture_v1 = fixture_digest_at(FAILURE_FLOOD_FIXTURE_ROOTS["v1"])
+    digests = {"fixture": {"v1": live_fixture_v1}, "checker": "x", "answer_key": {"v1": live_v1, "v2": live_v2}}
+    intact_step = {"declared_model": "claude-opus-5[1m]", "model_actual": "claude-opus-5[1m]",
+                    "model_matches_declared": True}
+    tmproot = Path(tempfile.mkdtemp())
+    try:
+        # a. negative control — every digest present and agreeing. A gate
+        # that always voids would pass every later case here too.
+        d_a = _self_test_make_ff_run_dir(tmproot, "s1-monolithic-99pa", intact_step)
+        row_a, *_ = build_row_failure_flood(d_a, surfaces, digests, {})
+        case_a = row_a["state"] == "complete" and row_a["void_reason"] is None
+
+        # b. recorded digest deliberately disagrees with the REAL on-disk v1
+        # answer key (R-P10.1's own named scenario, R-P3's own scenario).
+        d_b = _self_test_make_ff_run_dir(tmproot, "s1-monolithic-99pb", intact_step,
+                                           arm_overrides={"recorded_answer_key_digest": "deadbeef" * 8})
+        row_b, *_ = build_row_failure_flood(d_b, surfaces, digests, {})
+        case_b = (row_b["state"] == "void" and row_b["void_reason"] == "input-provenance-mismatch"
+                   and "answer-key-drift" in row_b["anomaly_classes"])
+
+        # c. an unrelated task's answer key (a DIFFERENT fixture root's own
+        # digest, v2) is deliberately wrong in `digests`; this s1/v1 row's
+        # own recorded digest still agrees with the real v1 value, so it
+        # must be unaffected — spec's own "an unrelated answer key changing
+        # does not touch this row" scenario, proven by the per-root indexing
+        # itself rather than by editing a real fixture file.
+        digests_wrong_v2 = {"fixture": {"v1": live_fixture_v1}, "checker": "x",
+                             "answer_key": {"v1": live_v1, "v2": "wrongwrong" * 6}}
+        d_c = _self_test_make_ff_run_dir(tmproot, "s1-monolithic-99pc", intact_step)
+        row_c, *_ = build_row_failure_flood(d_c, surfaces, digests_wrong_v2, {})
+        case_c = row_c["state"] == "complete" and row_c["void_reason"] is None
+
+        # d. no input_provenance_version at all -> pre-scheme (R-P5.2).
+        d_d = _self_test_make_ff_run_dir(tmproot, "s1-monolithic-99pd", intact_step,
+                                           arm_overrides={"input_provenance_version": None})
+        row_d, *_ = build_row_failure_flood(d_d, surfaces, digests, {})
+        case_d = (row_d["state"] == "void" and row_d["void_reason"] == "input-provenance-missing"
+                   and "pre-scheme-provenance" in row_d["anomaly_classes"])
+
+        # e. version present, recorded_answer_key_digest null -> incomplete
+        # capture (R-P5.3) — MUST reach a different anomaly_classes member
+        # than case d, or the two absences are conflated after all.
+        d_e = _self_test_make_ff_run_dir(tmproot, "s1-monolithic-99pe", intact_step,
+                                           arm_overrides={"recorded_answer_key_digest": None})
+        row_e, *_ = build_row_failure_flood(d_e, surfaces, digests, {})
+        case_e = (row_e["state"] == "void" and row_e["void_reason"] == "input-provenance-missing"
+                   and "provenance-capture-incomplete" in row_e["anomaly_classes"]
+                   and "pre-scheme-provenance" not in row_e["anomaly_classes"])
+
+        # f. a malformed answer key (F0.failures and R0 both absent) — no
+        # exception; voids via the SAME reason as a digest mismatch (R-P4.1),
+        # verdict/causes_present stay None — never a crash, never a 0.
+        d_f = _self_test_make_ff_run_dir(tmproot, "s1-monolithic-99pf", intact_step)
+        row_f, *_ = build_row_failure_flood(d_f, surfaces, digests, {"s1": {"task_id": "s1"}})
+        case_f = (row_f["state"] == "void" and row_f["void_reason"] == "input-provenance-mismatch"
+                   and "answer-key-drift" in row_f["anomaly_classes"]
+                   and row_f["verdict"] is None and row_f["causes_present"] is None)
+
+        # g. a row already void for another reason (Hard Ordering Gate layer
+        # 3, no-preregistration) before this gate runs -> void_reason
+        # unchanged, never overwritten (R-P3.2), even though the digest we
+        # also mismatch here would have voided it too if it had been reached.
+        d_g = _self_test_make_ff_run_dir(tmproot, "s1-monolithic-99pg", intact_step,
+                                           arm_overrides={"prereg_digest": None,
+                                                            "recorded_answer_key_digest": "deadbeef" * 8})
+        row_g, *_ = build_row_failure_flood(d_g, surfaces, digests, {})
+        case_g = row_g["state"] == "void" and row_g["void_reason"] == "no-preregistration"
+
+        # h. the three committed shakedown rows' own shape: void for an
+        # unrelated reason, no provenance at all — must gain
+        # pre-scheme-provenance without losing "shakedown" (R-P8), proven
+        # against a SYNTHETIC fixture shaped like the real rows, never the
+        # real committed ones.
+        run_dir_h = tmproot / "s1-monolithic-99ph"
+        (run_dir_h / "steps" / "01-monolith").mkdir(parents=True)
+        (run_dir_h / "status.json").write_text(json.dumps({"state": "void", "void_reason": "shakedown"}))
+        (run_dir_h / "arm.json").write_text(json.dumps({
+            "state": "void", "void_reason": "shakedown", "shakedown_used": True, "steps": [],
+        }))
+        row_h, *_ = build_row_failure_flood(run_dir_h, surfaces, digests, {})
+        case_h = (row_h["state"] == "void" and row_h["void_reason"] == "shakedown"
+                   and "pre-scheme-provenance" in row_h["anomaly_classes"])
+    finally:
+        shutil.rmtree(tmproot)
+    cases = [
+        ("a. all provenance present and agreeing -> complete (negative control)", case_a),
+        ("b. recorded answer-key digest disagrees with the real v1 key"
+         " -> void: input-provenance-mismatch, answer-key-drift", case_b),
+        ("c. an unrelated (v2) answer key digest being wrong does not touch this s1/v1 row", case_c),
+        ("d. no input_provenance_version -> void: input-provenance-missing, pre-scheme-provenance", case_d),
+        ("e. version present, digest null -> void: input-provenance-missing, provenance-capture-incomplete"
+         " (never pre-scheme-provenance)", case_e),
+        ("f. malformed answer key (no F0.failures, no R0) -> no crash; void: input-provenance-mismatch,"
+         " answer-key-drift; verdict/causes_present stay None", case_f),
+        ("g. already-void row (no-preregistration) keeps its own void_reason, never overwritten", case_g),
+        ("h. a synthetic shakedown-shaped row keeps void_reason=shakedown, gains pre-scheme-provenance", case_h),
+    ]
+    ok = all(c for _, c in cases)
+    for name, cond in cases:
+        print(f"  [{'PASS' if cond else 'FAIL'}] build_row_failure_flood answer-key provenance {name}")
+    return ok
+
+
+def _self_test_build_row_surface_preimage_provenance():
+    """Face C's own detector-fires proofs (run-input-provenance tasks 2.4,
+    2.6, 2.7 — R-P6.3), built on the same _self_test_make_ff_run_dir fixture,
+    which now defaults to a Face-C-intact step (both surface_sha256 and
+    recorded_surface_preimage_sha256 equal to the real committed preimage
+    digest). Case b is this batch's own addition beyond the tasks' literal
+    text: no committed case previously proved build_row_failure_flood's
+    surface-mismatch void can fire at all (ADR 0013) — only build_row's,
+    tool-surface-v1's own row builder, a DIFFERENT function."""
+    surfaces = {FAILURE_FLOOD_SURFACE_ARM: load_surface(FAILURE_FLOOD_SURFACE_ARM)}
+    digests = {"fixture": {"v1": fixture_digest_at(FAILURE_FLOOD_FIXTURE_ROOTS["v1"])}, "checker": "x",
+               "answer_key": {"v1": answer_key_set_digest(FAILURE_FLOOD_FIXTURE_ROOTS["v1"])}}
+    intact_step = {"declared_model": "claude-opus-5[1m]", "model_actual": "claude-opus-5[1m]",
+                    "model_matches_declared": True}
+    tmproot = Path(tempfile.mkdtemp())
+    try:
+        # a. negative control — everything present and agreeing (design.md
+        # sec 9's own "the one that gets skipped").
+        d_a = _self_test_make_ff_run_dir(tmproot, "s1-monolithic-99sa", intact_step)
+        row_a, *_ = build_row_failure_flood(d_a, surfaces, digests, {})
+        case_a = row_a["state"] == "complete" and row_a["void_reason"] is None
+
+        # b. the OBSERVED surface disagrees with the run's own FROZEN
+        # comparand (never the live recompute, task 2.5's own fix) -> the
+        # existing, unchanged surface-mismatch reason.
+        d_b = _self_test_make_ff_run_dir(tmproot, "s1-monolithic-99sb",
+                                           {**intact_step, "surface_sha256": "deadbeef" * 8})
+        row_b, *_ = build_row_failure_flood(d_b, surfaces, digests, {})
+        case_b = (row_b["state"] == "void" and row_b["void_reason"] == "surface-mismatch"
+                   and "surface-mismatch" in row_b["anomaly_classes"])
+
+        # c. R-P6.3 — the FROZEN comparand itself disagrees with a fresh live
+        # recompute, while the observed value matches the (wrong) frozen
+        # comparand cleanly, so task 2.5's own check would pass. Must reach
+        # surface-preimage-drift, never surface-mismatch — the two questions
+        # R-P6.3's own text keeps apart.
+        d_c = _self_test_make_ff_run_dir(tmproot, "s1-monolithic-99sc",
+                                           {**intact_step, "surface_sha256": "deadbeef" * 8,
+                                            "recorded_surface_preimage_sha256": "deadbeef" * 8})
+        row_c, *_ = build_row_failure_flood(d_c, surfaces, digests, {})
+        case_c = (row_c["state"] == "void" and row_c["void_reason"] == "input-provenance-mismatch"
+                   and "surface-preimage-drift" in row_c["anomaly_classes"]
+                   and "surface-mismatch" not in row_c["anomaly_classes"])
+
+        # d. the ordering proof — recorded_surface_preimage_sha256 is null
+        # (provenance incomplete) AND the observed value would, if compared,
+        # genuinely disagree with the live preimage. MUST void as
+        # input-provenance-missing and MUST NOT reach or stamp
+        # surface-mismatch — without this case the "correct refusal, false
+        # stated cause" regression (design.md secs 4/6) is undetectable.
+        d_d = _self_test_make_ff_run_dir(tmproot, "s1-monolithic-99sd",
+                                           {**intact_step, "surface_sha256": "deadbeef" * 8,
+                                            "recorded_surface_preimage_sha256": None})
+        row_d, *_ = build_row_failure_flood(d_d, surfaces, digests, {})
+        case_d = (row_d["state"] == "void" and row_d["void_reason"] == "input-provenance-missing"
+                   and "provenance-capture-incomplete" in row_d["anomaly_classes"]
+                   and row_d["void_reason"] != "surface-mismatch")
+    finally:
+        shutil.rmtree(tmproot)
+    cases = [
+        ("a. all provenance present and agreeing -> complete (negative control)", case_a),
+        ("b. observed surface disagrees with the frozen comparand -> void: surface-mismatch"
+         " (task 2.5's own fire-proof — never committed before this batch)", case_b),
+        ("c. frozen comparand disagrees with a live recompute, observed matches the (wrong)"
+         " comparand -> void: input-provenance-mismatch, surface-preimage-drift, never"
+         " surface-mismatch (R-P6.3)", case_c),
+        ("d. recorded preimage null, observed would disagree with live if compared -> void:"
+         " input-provenance-missing, never surface-mismatch (the ordering proof)", case_d),
+    ]
+    ok = all(c for _, c in cases)
+    for name, cond in cases:
+        print(f"  [{'PASS' if cond else 'FAIL'}] build_row_failure_flood surface-preimage provenance {name}")
+    return ok
+
+
+def _self_test_build_row_fixture_provenance():
+    """Face B's own detector-fires proofs (run-input-provenance tasks
+    3.2/3.3/3.4, R-P7.1a) plus the full negative control (design.md sec 9
+    case 1, "first achievable once all three digests exist" — this batch is
+    what makes it achievable). Built on the same _self_test_make_ff_run_dir
+    fixture every other build_row_failure_flood self-test uses, which now
+    defaults to a Face-B-intact arm (both recorded_fixture_digest and the
+    digests dict's own "fixture" entry equal to the REAL committed v1
+    MANIFEST.sha256 digest)."""
+    surfaces = {FAILURE_FLOOD_SURFACE_ARM: load_surface(FAILURE_FLOOD_SURFACE_ARM)}
+    live_fixture_v1 = fixture_digest_at(FAILURE_FLOOD_FIXTURE_ROOTS["v1"])
+    live_fixture_v2 = fixture_digest_at(FAILURE_FLOOD_FIXTURE_ROOTS["v2"])
+    live_answer_key_v1 = answer_key_set_digest(FAILURE_FLOOD_FIXTURE_ROOTS["v1"])
+    live_answer_key_v2 = answer_key_set_digest(FAILURE_FLOOD_FIXTURE_ROOTS["v2"])
+    digests = {"fixture": {"v1": live_fixture_v1, "v2": live_fixture_v2},
+               "answer_key": {"v1": live_answer_key_v1, "v2": live_answer_key_v2}, "checker": "x"}
+    intact_step = {"declared_model": "claude-opus-5[1m]", "model_actual": "claude-opus-5[1m]",
+                    "model_matches_declared": True}
+    tmproot = Path(tempfile.mkdtemp())
+    try:
+        # a. task 3.4 — the FULL negative control (design.md sec 9 case 1):
+        # input_provenance_version present, all THREE digests (answer-key,
+        # fixture, surface-preimage) present and agreeing -> complete. A
+        # gate that always voids would pass every other case in this file
+        # too; this is the one case that actually catches it.
+        d_a = _self_test_make_ff_run_dir(tmproot, "s1-monolithic-99fa", intact_step)
+        row_a, *_ = build_row_failure_flood(d_a, surfaces, digests, {})
+        case_a = row_a["state"] == "complete" and row_a["void_reason"] is None
+
+        # b. Face B's own fire-proof, alone: recorded_fixture_digest
+        # deliberately disagrees with the real on-disk v1 MANIFEST.sha256,
+        # while Face A and Face C stay intact -> void: input-provenance-
+        # mismatch, "fixture-drift" present, "answer-key-drift" ABSENT
+        # (proving the two faces are independently triggerable, never
+        # conflated, R-P7.1a's own text).
+        d_b = _self_test_make_ff_run_dir(tmproot, "s1-monolithic-99fb", intact_step,
+                                           arm_overrides={"recorded_fixture_digest": "deadbeef" * 8})
+        row_b, *_ = build_row_failure_flood(d_b, surfaces, digests, {})
+        case_b = (row_b["state"] == "void" and row_b["void_reason"] == "input-provenance-mismatch"
+                   and "fixture-drift" in row_b["anomaly_classes"]
+                   and "answer-key-drift" not in row_b["anomaly_classes"])
+
+        # c. task 3.2's own null-check extension: version present,
+        # recorded_fixture_digest null -> the SAME "input-provenance-missing"
+        # / "provenance-capture-incomplete" outcome as a null answer-key or
+        # surface-preimage digest already reaches — never "fixture-drift"
+        # (an absent value is not a disagreeing one) and never
+        # "pre-scheme-provenance" (the scheme marker IS present here).
+        d_c = _self_test_make_ff_run_dir(tmproot, "s1-monolithic-99fc", intact_step,
+                                           arm_overrides={"recorded_fixture_digest": None})
+        row_c, *_ = build_row_failure_flood(d_c, surfaces, digests, {})
+        case_c = (row_c["state"] == "void" and row_c["void_reason"] == "input-provenance-missing"
+                   and "provenance-capture-incomplete" in row_c["anomaly_classes"]
+                   and "fixture-drift" not in row_c["anomaly_classes"]
+                   and "pre-scheme-provenance" not in row_c["anomaly_classes"])
+
+        # d. task 3.3 — the both-drifts-recorded case (replaces the withdrawn
+        # R-P2.2 precedence task, R-P2.2a): a run recorded against fixture
+        # root v2 whose recorded answer-key digest AND recorded fixture
+        # digest BOTH disagree with the live v2 values at once — the same
+        # shape a single edit to answer-key/prereg.json produces in the real
+        # fixture (answer-key/ sits inside compute_manifest()'s own walked
+        # set, spec.md Decision 2/R-P2.2). MUST record BOTH drift classes,
+        # never a precedence choice between them.
+        d_d = _self_test_make_ff_run_dir(tmproot, "s2-monolithic-99fd", intact_step,
+                                           arm_overrides={"recorded_answer_key_digest": "deadbeef" * 8,
+                                                            "recorded_fixture_digest": "deadbeef" * 8})
+        row_d, *_ = build_row_failure_flood(d_d, surfaces, digests, {})
+        case_d = (row_d["state"] == "void" and row_d["void_reason"] == "input-provenance-mismatch"
+                   and "answer-key-drift" in row_d["anomaly_classes"]
+                   and "fixture-drift" in row_d["anomaly_classes"])
+    finally:
+        shutil.rmtree(tmproot)
+    cases = [
+        ("a. all three digests present and agreeing -> complete (task 3.4's own negative control)", case_a),
+        ("b. recorded fixture digest disagrees with the real v1 MANIFEST.sha256 -> void:"
+         " input-provenance-mismatch, fixture-drift, never answer-key-drift", case_b),
+        ("c. version present, recorded fixture digest null -> void: input-provenance-missing,"
+         " provenance-capture-incomplete (never fixture-drift, never pre-scheme-provenance)", case_c),
+        ("d. one v2 run whose answer-key AND fixture digests both drift at once -> void:"
+         " input-provenance-mismatch, BOTH answer-key-drift and fixture-drift present"
+         " (task 3.3, R-P2.2/R-P2.2a)", case_d),
+    ]
+    ok = all(c for _, c in cases)
+    for name, cond in cases:
+        print(f"  [{'PASS' if cond else 'FAIL'}] build_row_failure_flood fixture provenance {name}")
+    return ok
+
+
+def _self_test_fixture_digest_at():
+    """run-input-provenance task 3.8 — a gatekeeping finding raised after
+    Sibling 3 was committed, task 2.0's own finding recursed into Face B:
+    fixture_digest_at()'s own computation was proven ZERO ways.
+    `_self_test_build_row_fixture_provenance()` (task 3.2/3.3/3.4) and every
+    other self-test that carries a `recorded_fixture_digest` default derives
+    its expected value by calling `fixture_digest_at()` itself (:1526, :1564,
+    :1627, :1682, :1784, :1897, :1972-73), so both sides of every comparison
+    move together and a `return "constant"` body left all 58 cases green.
+    One case closes that, never calling the function under test to build its
+    own expected value:
+
+    a. the digest MUST move when the digested bytes move — proven against
+    itself, on a synthetic root this case builds and mutates, never against
+    another self-test's own fixture. Mirrors task 2.0 part 1's pattern in
+    shape (same idea as `_self_test_answer_key_set_digest()`'s own case a,
+    applied to `fixture_digest_at()` instead of `answer_key_set_digest()`),
+    but NOT verbatim in the mutation's own shape — see the paragraph below,
+    a correction the orchestrator's own independent mutation-proof forced
+    after this case's first version was already committed (task 3.8's own
+    amendment, closing a second, deeper finding of the same class task 3.8
+    itself exists to close).
+
+    **The mutation is same-length, one byte changed — deliberately, not an
+    append.** The first version of this case mutated by *appending* a line
+    (`"...src/a.ts\n"` -> `"...src/a.ts\nmutated  src/b.ts\n"`), which changes
+    the byte length along with the content. That shape is satisfiable by any
+    wrong implementation that merely varies with length — the orchestrator's
+    own follow-up mutation-proof, `sha256_hex(str(len(manifest.read_bytes()))
+    .encode())` (hash the byte COUNT, never the bytes), still produced
+    `digest_before != digest_after` under an append and stayed green. This
+    matters more here than it did for task 2.0's own identically-shaped
+    append case: Face A's case is backstopped by a real cross-language pin
+    (task 2.0 part 2), and a length-hashing Python side would disagree with
+    the bash side and turn THAT case red regardless of this one's own
+    weakness. Face B has no pin — correctly, per the paragraph below — which
+    makes this single case the ONLY proof `fixture_digest_at()`'s computation
+    has. A sole proof must not be satisfiable by an implementation that never
+    reads the content, so the mutation here changes one byte at a fixed
+    length (`"deadbeef  src/a.ts\n"` -> `"deadbeee  src/a.ts\n"`) instead of
+    appending a line. This one change strictly dominates the append form: it
+    still catches a constant body and a path-hashing body, and it additionally
+    catches a length-hashing body, which the append form could not.
+
+    No cross-language pin is added here, unlike task 2.0 part 2 (Face A) and
+    task 2.1 (Face C) — and none is needed. `rig/run-pipeline.sh`'s own
+    `RECORDED_FIXTURE_DIGEST` (task 3.1, `:738`) computes the identical
+    `hashlib.sha256(open(path, "rb").read()).hexdigest()` idiom over the same
+    file bytes as `fixture_digest_at()` does here — the same idiom
+    `LOCKFILE_SHA256` already uses, chosen at task 3.1 specifically so no
+    independent reimplementation exists on either side to drift apart (see
+    task 3.1's own done-note in tasks.md). A pin asserts two independent
+    algorithms agree; there is only one algorithm here, expressed twice in
+    two languages with no room for either side to diverge in shape (no
+    sort order, no line-joining convention, nothing to disagree about except
+    the literal bytes both sides already read from the same file). Adding a
+    pin here would prove nothing beyond what case (a) already proves, and a
+    later reader finding "no pin" next to Face A's and Face C's pins should
+    read this paragraph rather than add one."""
+    tmproot = Path(tempfile.mkdtemp())
+    try:
+        fixture_root = tmproot / "fixture"
+        fixture_root.mkdir(parents=True)
+        (fixture_root / "MANIFEST.sha256").write_text("deadbeef  src/a.ts\n")
+
+        digest_before = fixture_digest_at(fixture_root)
+        # Same-length, one byte changed (never an append — see the docstring
+        # above): "deadbeef" -> "deadbeee", identical byte count. A
+        # length-varying mutation here would be satisfiable by an
+        # implementation that hashes the byte COUNT rather than the bytes
+        # themselves; this form is not.
+        (fixture_root / "MANIFEST.sha256").write_text("deadbeee  src/a.ts\n")
+        digest_after = fixture_digest_at(fixture_root)
+        case_fires = digest_before is not None and digest_before != digest_after
+        assert len("deadbeef  src/a.ts\n") == len("deadbeee  src/a.ts\n"), \
+            "the mutation MUST be same-length — a length change would let a" \
+            " length-hashing implementation pass this case undetected"
+    finally:
+        shutil.rmtree(tmproot)
+    cases = [
+        ("a. mutating MANIFEST.sha256's bytes (same length, one byte"
+         " changed — never an append) changes the digest, proven against"
+         " itself, not a second self-test's own fixture", case_fires),
+    ]
+    ok = all(c for _, c in cases)
+    for name, cond in cases:
+        print(f"  [{'PASS' if cond else 'FAIL'}] fixture_digest_at {name}")
+    return ok
+
+
 def run_self_test() -> bool:
     print("derive.py self-test (ADR 0013 — R-F2.2/R-F3.2/R-F7.1/R-F7.3, restoring three prior"
-          " batches' own scratch verification):")
+          " batches' own scratch verification; run-input-provenance Sibling 1 — Face A +"
+          " WARNING-14, R-P2/R-P3/R-P4/R-P5):")
     results = [
         _self_test_parse_root_cause_report(),
         _self_test_score_diagnostic_attribution(),
         _self_test_suite_state_cause(),
         _self_test_read_root_cause_report_handoff(),
+        _self_test_answer_key_set_digest(),
+        _self_test_preimage_digest_pin(),
+        _self_test_load_surface_preimage_pin(),
         _self_test_build_row_model_mismatch(),
         _self_test_build_row_token_breakdown(),
         _self_test_build_row_suite_state_and_attribution(),
+        _self_test_build_row_answer_key_provenance(),
+        _self_test_build_row_surface_preimage_provenance(),
+        _self_test_build_row_fixture_provenance(),
+        _self_test_fixture_digest_at(),
     ]
     ok = all(results)
     print("\nself-test: all cases passed" if ok else "\nSELF-TEST FAILED", file=sys.stderr if not ok else sys.stdout)
@@ -1474,6 +2315,8 @@ def main():
         "fixture": {v: reg["fixture_digest"](v, root) for v, root in reg["fixture_roots"].items()},
         "checker": CHECKER_DIGEST,
     }
+    if reg.get("answer_key_digest"):
+        digests["answer_key"] = {v: reg["answer_key_digest"](v, root) for v, root in reg["fixture_roots"].items()}
 
     runs_root = reg["runs_root"]
     run_dirs = sorted(p for p in runs_root.glob("*") if p.is_dir()) if runs_root.is_dir() else []

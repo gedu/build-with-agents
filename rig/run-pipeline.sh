@@ -100,6 +100,7 @@ PERMISSION_MODE_CHOICES="acceptEdits auto bypassPermissions manual dontAsk plan"
 usage() {
   cat <<'USAGE'
 Usage: rig/run-pipeline.sh <task_id> <arm> <iteration> --permission-mode <mode> --model <model-id> [--shakedown] [--dirty-ok]
+       rig/run-pipeline.sh --self-test
 
   task_id            s1 (failure-flood/v1, stage 1) | s2 (failure-flood/v2, stage 2)
   arm                monolithic | pipeline
@@ -118,6 +119,13 @@ Usage: rig/run-pipeline.sh <task_id> <arm> <iteration> --permission-mode <mode> 
                      preflight (layer 2). Distinct from --dirty-ok (R-F8.2).
   --dirty-ok         bypass the dirty-tree guard. Does not itself produce a
                      countable row, and does not imply --shakedown.
+  --self-test        run this script's own committed suite (ADR 0013, task 7.10)
+                     over its extractable functions — compute_manifest,
+                     manifest_workspace_paths, hash_paths, check_prereg,
+                     read_back_init — against synthetic fixtures only. Takes no
+                     positional arguments, launches nothing, touches no committed
+                     fixture or run directory, and needs only python3 and git.
+                     Exit 0 every case passed, 1 a case failed.
 
 Guards, launches ONE multi-step arm, and persists its artifacts under
 rig/runs/failure-flood-v1/<run_id>/. rig/run.sh is untouched (R-F6.4) — this
@@ -182,6 +190,17 @@ manifest_workspace_paths() {
   compute_manifest "$1" | awk '{print $2}' | grep -E '^(src|tests|runtime)/' | sort
 }
 
+# answer_key_paths <fixture-root> — relpaths under answer-key/ ONLY, same
+# filter-by-prefix pattern as manifest_workspace_paths() above, derived from
+# compute_manifest()'s own output — never a second manifest algorithm and
+# never a directory walk of its own (run-input-provenance spec R-P2.1: the
+# runner MUST NOT resolve which file carries a row's task_id, so it hashes
+# the whole answer-key/ set for its one fixture root, exactly the same way
+# it never resolves which src/ file matters before hashing that set either).
+answer_key_paths() {
+  compute_manifest "$1" | awk '{print $2}' | grep -E '^answer-key/' | sort
+}
+
 # hash_paths <workspace-root> — one sha256 over exactly the explicit relpath
 # list piped in on stdin, one per line — never a fresh directory listing.
 # Identical combining convention to rig/run.sh:122-141's hash_fixture_files
@@ -218,6 +237,32 @@ for rel in sorted(l.strip() for l in os.environ["HASH_PATHS_INPUT"].splitlines()
         content = b"<missing>"
     lines.append(f"{hashlib.sha256(content).hexdigest()}  {rel}")
 print(hashlib.sha256("\n".join(lines).encode()).hexdigest())
+PY
+}
+
+# preimage_digest <preimage-file> — Face C's own digest (run-input-provenance
+# spec R-P6, design.md secs 1/9): the ONE genuinely new algorithm this whole
+# change introduces. Reproduces rig/derive.py's load_surface() + surface_digest()
+# convention exactly — dedupe + sort, `# harness:` header and blank lines
+# excluded, sha256 of the joined newline-set — so a run's own recorded
+# comparand and the deriver's live recompute can only ever disagree by
+# drifting apart, never by starting from two different conventions (the same
+# reason answer_key_set_digest() reproduces hash_paths() rather than inventing
+# a second one). Prints an EMPTY string, never a hash of the empty set and
+# never a crash, when the file has no tool lines at all or does not exist —
+# WARNING-14's own shape at the recording end: absence must read as absence,
+# never as a value that happens to be a real digest of nothing.
+preimage_digest() {
+  python3 - "$1" <<'PY'
+import hashlib, sys
+
+path = sys.argv[1]
+try:
+    lines = open(path).read().splitlines()
+except FileNotFoundError:
+    lines = []
+names = sorted(set(l.strip() for l in lines if l.strip() and not l.startswith("#")))
+print(hashlib.sha256("\n".join(names).encode()).hexdigest() if names else "")
 PY
 }
 
@@ -312,10 +357,262 @@ print(f"{digest} {mode} {model}")
 PY
 }
 
+# ============================================================================
+# self-test (ADR 0013, task 7.10) — the extractable functions above, against
+# synthetic fixtures only
+# ============================================================================
+#
+# WHY A COMMITTED FLAG AND NOT A FOURTH AD HOC SCRIPT: task 6.6 (check_prereg)
+# and PR7A (read_back_init, hash_paths) each verified shell logic by extracting
+# the function into a throwaway harness — three times, in three separate
+# batches, none of it committed. That re-invention, not any single missing
+# test, is the recurrence ADR 0013 exists to catch (task 7.10's own wording).
+# Every future extractable function in this file belongs in the suite below.
+#
+# Same shape as rig/check.sh's own self_test(): an expect() helper, one
+# `mktemp -d`, and an explicit `rm -rf` on every return path — NOT
+# `trap ... EXIT`, which fires after `local tmp` is out of scope again and
+# lets `set -u` clobber an otherwise-passing suite's exit code with
+# "tmp: unbound variable".
+#
+# Prerequisites are deliberately narrower than the ones the run itself needs:
+# python3 (the functions under test are python3 heredocs) and git
+# (check_prereg shells out to `git ls-files` / `git status`). `claude`, node,
+# npm and `timeout` are prerequisites for LAUNCHING an arm, never for testing
+# these functions — so --self-test must stay runnable on a machine that could
+# not launch one. That is what places its short-circuit above both the
+# positional validation and the prerequisite block.
+#
+# check_prereg reads REPO_ROOT (a global) for its git queries, so its cases
+# run in a SUBSHELL with REPO_ROOT repointed at a synthetic repository under
+# $tmp. This repository is never queried and never written to.
+
+self_test() {
+  local tmp failed=0
+  command -v python3 >/dev/null 2>&1 || die_cannot_run "python3 is missing — --self-test needs it (every function under test is a python3 heredoc)."
+  command -v git >/dev/null 2>&1 || die_cannot_run "git is missing — --self-test needs it (check_prereg shells out to git ls-files / git status)."
+  tmp="$(mktemp -d)" || die_cannot_run "could not create a temporary directory"
+
+  expect() {
+    # $1 expected  $2 got  $3 label
+    if [ "$1" = "$2" ]; then
+      printf '  [PASS] %s\n' "$3"
+    else
+      printf '  [FAIL] %s -- expected %s, got %s\n' "$3" "$1" "$2" >&2
+      failed=1
+    fi
+  }
+  expect_ne() {
+    # $1 not-expected  $2 got  $3 label
+    if [ "$1" != "$2" ]; then
+      printf '  [PASS] %s\n' "$3"
+    else
+      printf '  [FAIL] %s -- expected any value OTHER than %s\n' "$3" "$1" >&2
+      failed=1
+    fi
+  }
+  expect_contains() {
+    # $1 needle  $2 haystack  $3 label
+    case "$2" in
+      *"$1"*) printf '  [PASS] %s\n' "$3" ;;
+      *) printf '  [FAIL] %s -- %s not found in: %s\n' "$3" "$1" "$2" >&2; failed=1 ;;
+    esac
+  }
+
+  # -- hash_paths ----------------------------------------------------------
+  # The first case is the committed regression guard for the REAL BUG this
+  # file's header documents: while the path list was read from `sys.stdin`,
+  # the heredoc (which IS python3's own stdin) silently won, every call hashed
+  # an EMPTY list, and a real byte edit did not move the digest. That is the
+  # exact, previously-unexplained cause of PR5b's `substrate_changed: false`
+  # anomaly. If it ever regresses, this is the case that fires.
+  mkdir -p "$tmp/ws/src"
+  printf 'original\n' >"$tmp/ws/src/a.ts"
+  local h1 h2 h_missing h_empty h_ab h_ba h_after
+  h1="$(printf 'src/a.ts\n' | hash_paths "$tmp/ws")"
+  printf 'changed\n' >"$tmp/ws/src/a.ts"
+  h2="$(printf 'src/a.ts\n' | hash_paths "$tmp/ws")"
+  expect_ne "$h1" "$h2" "hash_paths: editing a listed file changes the digest (the stdin/heredoc bug's own shape)"
+
+  # A listed path that does not exist hashes as the literal b"<missing>"
+  # rather than raising — and must stay distinguishable from a real empty file.
+  printf '' >"$tmp/ws/src/empty.ts"
+  h_missing="$(printf 'src/nope.ts\n' | hash_paths "$tmp/ws")"
+  h_empty="$(printf 'src/empty.ts\n' | hash_paths "$tmp/ws")"
+  expect_ne "$h_missing" "$h_empty" "hash_paths: a missing path and an empty file are distinguishable"
+
+  # The function sorts its own input, so a caller's ordering can never change
+  # a digest that was already recorded against a run.
+  h_ab="$(printf 'src/a.ts\nsrc/empty.ts\n' | hash_paths "$tmp/ws")"
+  h_ba="$(printf 'src/empty.ts\nsrc/a.ts\n' | hash_paths "$tmp/ws")"
+  expect "$h_ab" "$h_ba" "hash_paths: input order does not change the digest"
+
+  # A file outside the listed set must not move the digest — the whole reason
+  # this takes an explicit list instead of a directory walk (task 5.6).
+  printf 'noise\n' >"$tmp/ws/src/unlisted.ts"
+  h_after="$(printf 'src/a.ts\n' | hash_paths "$tmp/ws")"
+  expect "$h2" "$h_after" "hash_paths: a file outside the listed set does not change the digest"
+
+  # -- read_back_init ------------------------------------------------------
+  # The empty-field shapes below are exactly the `None`s that reach
+  # derive.py's read-back checks. They are pinned here so "nothing was
+  # captured" stays a stable, recognisable contract rather than an accident.
+  local expected_digest
+  cat >"$tmp/stream-ok.jsonl" <<'JSONL'
+{"type":"system","subtype":"init","tools":["Read","Bash","Read"],"permissionMode":"bypassPermissions","model":"claude-opus-5"}
+{"type":"assistant","message":{"content":[]}}
+JSONL
+  expected_digest="$(printf 'Bash\nRead' | python3 -c 'import hashlib,sys; print(hashlib.sha256(sys.stdin.buffer.read()).hexdigest())')"
+  expect "$expected_digest bypassPermissions claude-opus-5" "$(read_back_init "$tmp/stream-ok.jsonl")" \
+    "read_back_init: tool names dedupe and sort before hashing (derive.py's surface_digest convention)"
+
+  expect "  " "$(read_back_init "$tmp/absent.jsonl")" \
+    "read_back_init: a missing stream file yields three empty fields, not an error"
+
+  printf '{"type":"assistant"}\nnot json at all\n' >"$tmp/stream-noinit.jsonl"
+  expect "  " "$(read_back_init "$tmp/stream-noinit.jsonl")" \
+    "read_back_init: no init event (and a malformed line) yields three empty fields"
+
+  cat >"$tmp/stream-notools.jsonl" <<'JSONL'
+{"type":"system","subtype":"init","tools":[],"permissionMode":"plan","model":"claude-sonnet-5"}
+JSONL
+  expect " plan claude-sonnet-5" "$(read_back_init "$tmp/stream-notools.jsonl")" \
+    "read_back_init: an init event with zero tools yields an empty digest but a real mode and model"
+
+  # -- check_prereg --------------------------------------------------------
+  mkdir -p "$tmp/repo/hypotheses" "$tmp/fx/answer-key"
+  git -C "$tmp/repo" init -q
+  git -C "$tmp/repo" config user.email t@example.invalid
+  git -C "$tmp/repo" config user.name t
+  printf 'a hypothesis\n' >"$tmp/repo/hypotheses/h1.md"
+  git -C "$tmp/repo" add -A >/dev/null
+  git -C "$tmp/repo" commit -qm base
+
+  local rc out
+  out="$( (REPO_ROOT="$tmp/repo"; check_prereg "$tmp/fx") 2>&1 )" && rc=0 || rc=$?
+  expect 2 "$rc" "check_prereg: a fixture with no prereg.json exits 2"
+  expect_contains missing-prereg-config "$out" "check_prereg: names missing-prereg-config"
+
+  printf '{"required_hypotheses": [{"path_glob": "hypotheses/*.md"}]}\n' >"$tmp/fx/answer-key/prereg.json"
+  out="$( (REPO_ROOT="$tmp/repo"; check_prereg "$tmp/fx") 2>&1 )" && rc=0 || rc=$?
+  expect 0 "$rc" "check_prereg: one tracked, clean, uniquely-matched file passes"
+  expect 64 "${#out}" "check_prereg: prints a 64-hex prereg_digest on the pass path"
+
+  printf '{"required_hypotheses": [{"path_glob": "hypotheses/*.absent"}]}\n' >"$tmp/fx/answer-key/prereg.json"
+  out="$( (REPO_ROOT="$tmp/repo"; check_prereg "$tmp/fx") 2>&1 )" && rc=0 || rc=$?
+  expect 2 "$rc" "check_prereg: a glob matching nothing exits 2"
+  expect_contains zero_matches "$out" "check_prereg: names zero_matches"
+
+  printf 'second\n' >"$tmp/repo/hypotheses/h2.md"
+  git -C "$tmp/repo" add -A >/dev/null
+  git -C "$tmp/repo" commit -qm second
+  printf '{"required_hypotheses": [{"path_glob": "hypotheses/*.md"}]}\n' >"$tmp/fx/answer-key/prereg.json"
+  out="$( (REPO_ROOT="$tmp/repo"; check_prereg "$tmp/fx") 2>&1 )" && rc=0 || rc=$?
+  expect 2 "$rc" "check_prereg: an ambiguous glob exits 2 rather than picking one"
+  expect_contains more_than_one_match "$out" "check_prereg: names more_than_one_match"
+
+  # The REASON assertion below is the load-bearing one, not the exit code.
+  # Proven by mutation: with the untracked guard removed, an untracked file
+  # still exits 2 — `git status --porcelain` reports it as `?? path`, so the
+  # NEXT guard catches it and calls it `tracked_but_dirty`. The refusal stays
+  # correct while its stated cause becomes false. That is the same
+  # accidental-catch-with-a-wrong-reason shape verify-report's WARNING-14
+  # names, and only a reason-level assertion can see it.
+  printf 'loose\n' >"$tmp/repo/hypotheses/loose.txt"
+  printf '{"required_hypotheses": [{"path_glob": "hypotheses/*.txt"}]}\n' >"$tmp/fx/answer-key/prereg.json"
+  out="$( (REPO_ROOT="$tmp/repo"; check_prereg "$tmp/fx") 2>&1 )" && rc=0 || rc=$?
+  expect 2 "$rc" "check_prereg: an untracked match exits 2"
+  expect_contains untracked "$out" "check_prereg: names untracked"
+
+  printf 'edited\n' >>"$tmp/repo/hypotheses/h1.md"
+  printf '{"required_hypotheses": [{"path_glob": "hypotheses/h1.md"}]}\n' >"$tmp/fx/answer-key/prereg.json"
+  out="$( (REPO_ROOT="$tmp/repo"; check_prereg "$tmp/fx") 2>&1 )" && rc=0 || rc=$?
+  expect 2 "$rc" "check_prereg: a tracked-but-dirty match exits 2"
+  expect_contains tracked_but_dirty "$out" "check_prereg: names tracked_but_dirty"
+
+  # -- compute_manifest / manifest_workspace_paths -------------------------
+  # Both assertions below pin a correction this function already needed once
+  # after a LIVE recompute-compare disagreed with the committed manifests:
+  # answer-key/ must be walked whole (not one case-table file), and prompts/
+  # must be covered too (task 5.4b). rig/check.sh tests compute_manifest by
+  # sed-extracting it FROM this file; the function's own contract is tested
+  # here, where it is defined.
+  mkdir -p "$tmp/fixture"/{src,tests,runtime,answer-key,prompts} "$tmp/fixture/tools/__pycache__"
+  printf 's\n' >"$tmp/fixture/src/a.ts"
+  printf 't\n' >"$tmp/fixture/tests/a.test.ts"
+  printf 'r\n' >"$tmp/fixture/runtime/r.js"
+  printf 'g\n' >"$tmp/fixture/tools/generate.py"
+  printf 'c\n' >"$tmp/fixture/tools/__pycache__/generate.cpython-311.pyc"
+  printf 'k\n' >"$tmp/fixture/answer-key/s1.json"
+  printf 'p\n' >"$tmp/fixture/prompts/s1.txt"
+  local man ws
+  man="$(compute_manifest "$tmp/fixture")"
+  expect_contains 'answer-key/s1.json' "$man" "compute_manifest: answer-key/ is walked whole (first live-measurement correction)"
+  expect_contains 'prompts/s1.txt' "$man" "compute_manifest: prompts/ is covered (task 5.4b's correction)"
+  case "$man" in
+    *.pyc*) printf '  [FAIL] %s\n' "compute_manifest: a __pycache__ .pyc leaked into the manifest" >&2; failed=1 ;;
+    *) printf '  [PASS] %s\n' "compute_manifest: __pycache__/*.pyc is skipped (task 3.5's hazard)" ;;
+  esac
+
+  ws="$(manifest_workspace_paths "$tmp/fixture")"
+  expect "runtime/r.js
+src/a.ts
+tests/a.test.ts" "$ws" \
+    "manifest_workspace_paths: exactly src/, tests/, runtime/ — sorted, never tools/, answer-key/ or prompts/"
+
+  # -- answer_key_paths (run-input-provenance task 2.0 part 2 — the gate-
+  # keeping finding that Face A's own runner-side helper had no case of its
+  # own beyond task 7.10's compute_manifest ones) ---------------------------
+  local ak
+  ak="$(answer_key_paths "$tmp/fixture")"
+  expect "answer-key/s1.json" "$ak" \
+    "answer_key_paths: exactly answer-key/ relpaths — sorted, never src/, tests/, runtime/, tools/ or prompts/"
+
+  # -- preimage_digest (run-input-provenance task 2.1 — Face C's own new
+  # algorithm) --------------------------------------------------------------
+  # a. dedupe + sort, `# harness:` header and blank lines excluded, against a
+  # PINNED CONSTANT — the same constant is asserted independently by
+  # rig/derive.py --self-test over the equivalent surface_digest() input
+  # (task 2.1's own cross-language pin). A later disagreement between the
+  # two is the finding to report, never something to "fix" on either side.
+  printf '# harness: v1\n\nBash\nRead\nWrite\nRead\n\n' >"$tmp/preimage.txt"
+  expect "4a626b46a7841184c5d423277a9c17cb15129f4ba32f92a88948b77735bfdcd3" \
+    "$(preimage_digest "$tmp/preimage.txt")" \
+    "preimage_digest: dedupe + sort, header/blank lines excluded (pinned constant, shared with derive.py --self-test)"
+
+  # b. no tool lines at all -> an ABSENT digest (empty string), never a hash
+  # of the empty set read back as if it were a real value — WARNING-14's own
+  # shape at the recording end.
+  printf '# harness: v1\n\n' >"$tmp/preimage-empty.txt"
+  expect "" "$(preimage_digest "$tmp/preimage-empty.txt")" \
+    "preimage_digest: no tool lines -> empty/absent, never a hash of the empty set"
+
+  # c. a missing preimage file yields an absent digest from preimage_digest
+  # itself, never a crash — checked directly here rather than through
+  # run_model_step's own existence check (:956-959), which cannot be called
+  # from this suite (it is defined AFTER this suite's own --self-test
+  # dispatch point in this file's top-to-bottom execution order). That
+  # existence check is unchanged by this batch, runs strictly before
+  # preimage_digest is ever reached, and is what actually produces
+  # missing-surface-preimage — provenance recording never masks that abort.
+  expect "" "$(preimage_digest "$tmp/does-not-exist.txt")" \
+    "preimage_digest: a missing preimage file yields an absent digest, never a crash (run_model_step's own existence check runs first and is unchanged)"
+
+  rm -rf "$tmp"
+
+  if [ "$failed" -eq 0 ]; then
+    printf '\n  self-test: all cases passed\n'
+    return 0
+  fi
+  printf '\n  SELF-TEST FAILED -- rig/run-pipeline.sh is not behaving as specified.\n' >&2
+  return 1
+}
+
 # ---- argument parsing -------------------------------------------------
 
 SHAKEDOWN=0
 DIRTY_OK=0
+SELF_TEST=0
 PERMISSION_MODE=""
 MODEL=""
 POSITIONAL=()
@@ -323,6 +620,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --shakedown) SHAKEDOWN=1; shift ;;
     --dirty-ok) DIRTY_OK=1; shift ;;
+    --self-test) SELF_TEST=1; shift ;;
     --permission-mode)
       [ $# -ge 2 ] || die_bad_args "--permission-mode requires a value"
       PERMISSION_MODE="$2"; shift 2 ;;
@@ -334,6 +632,16 @@ while [ $# -gt 0 ]; do
     *) POSITIONAL+=("$1"); shift ;;
   esac
 done
+
+# --self-test is a MODE, not a run. It short-circuits here, above the
+# positional validation (it takes none) and above the prerequisite block
+# further down (it needs neither `claude` nor the node/npm toolchain) — the
+# same reason rig/check.sh dispatches --self-test before running any check.
+if [ "$SELF_TEST" -eq 1 ]; then
+  [ "${#POSITIONAL[@]}" -eq 0 ] || die_bad_args "--self-test takes no positional arguments, got ${#POSITIONAL[@]}"
+  self_test
+  exit $?
+fi
 
 [ "${#POSITIONAL[@]}" -eq 3 ] || die_bad_args "expected 3 positional arguments (task_id arm iteration), got ${#POSITIONAL[@]}"
 TASK_ID="${POSITIONAL[0]}"; ARM="${POSITIONAL[1]}"; ITERATION="${POSITIONAL[2]}"
@@ -414,6 +722,30 @@ COMMITTED_MANIFEST="$(cat "$MANIFEST_FILE")"
 if [ "$COMPUTED_MANIFEST" != "$COMMITTED_MANIFEST" ]; then
   die_cannot_run "MANIFEST.sha256 mismatch under $FIXTURE_ROOT — refusing to run against a tampered or edited fixture."
 fi
+
+# ---- Face B: fixture digest (run-input-provenance task 3.1, R-P7.1) -------
+# sha256 of MANIFEST.sha256's own bytes, taken over bytes the recompute-
+# compare gate just above has already proven match the live tree — the same
+# one-liner idiom LOCKFILE_SHA256 below uses, applied here instead of
+# invented fresh. This needs no cross-language pin (unlike Face A's
+# answer_key_paths|hash_paths pair and Face C's preimage_digest): both sides
+# are the exact same "sha256 of one file's bytes" idiom design.md sec 1
+# already uses for LOCKFILE_SHA256, so there is no sort-order or
+# newline-joining convention that could drift apart between them.
+# rig/derive.py's own fixture_digest_at() is this digest's deriver-side
+# twin, unchanged by this cycle (design.md sec 1: "already this exact
+# value").
+RECORDED_FIXTURE_DIGEST="$(python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$MANIFEST_FILE")"
+
+# ---- Face A: answer-key set digest (run-input-provenance task 1.3, R-P2.1) -
+# Recorded over bytes now PROVEN frozen by the recompute-compare gate just
+# above — the same "record after the freeze is proven" convention every
+# other digest below already follows. Filters compute_manifest()'s own
+# output by prefix (answer_key_paths(), the same pattern
+# manifest_workspace_paths() already uses) rather than a second manifest
+# algorithm; hashed against FIXTURE_ROOT itself since answer-key/ is never
+# materialised into a per-step workspace (design.md 9a).
+RECORDED_ANSWER_KEY_DIGEST="$(answer_key_paths "$FIXTURE_ROOT" | hash_paths "$FIXTURE_ROOT")"
 
 # ---- Hard Ordering Gate, layer 2 (pre-registration) ---------------------
 # tasks.md "Hard Ordering Gate": "Preflight refuses (exit 2)... any
@@ -549,9 +881,14 @@ write_step_status() {
   # shape, for anything already reading that one field)
   # $12 model_actual — read back exactly the same way permission_mode_actual
   # is (ADR 0010, R-F7.1); empty for a code step, which never invokes `claude`.
+  # $13 recorded_surface_preimage_sha256 (run-input-provenance R-P6, task
+  # 2.2) — the ONE provenance face that is per-step, not arm-level: a
+  # three-step arm has three invocations and the preimage file can change
+  # between them. Empty for a code step, the same convention as $7.
   ROLE="$2" KIND="$3" EXIT_CODE="$4" WALL_MS="$5" SUBSTRATE_CHANGED="$6" \
   SURFACE_SHA256="$7" PERMISSION_MODE_ACTUAL="$8" TIMED_OUT="${9:-0}" \
   SRC_CHANGED="${10:-0}" RO_CHANGED="${11:-0}" MODEL_ACTUAL="${12:-}" \
+  RECORDED_SURFACE_PREIMAGE_SHA256="${13:-}" \
   DECLARED_PERMISSION_MODE="$PERMISSION_MODE" DECLARED_MODEL="$MODEL" \
   STATUS_FILE="$1/status.json" \
   python3 <<'PY'
@@ -575,6 +912,7 @@ data = {
     "src_changed": env["SRC_CHANGED"] == "1",
     "ro_changed": env["RO_CHANGED"] == "1",
     "surface_sha256": env["SURFACE_SHA256"] or None,
+    "recorded_surface_preimage_sha256": env["RECORDED_SURFACE_PREIMAGE_SHA256"] or None,
     "declared_permission_mode": env["DECLARED_PERMISSION_MODE"],
     "permission_mode_actual": actual,
     "permission_mode_matches_declared": (actual == env["DECLARED_PERMISSION_MODE"]) if actual else None,
@@ -625,6 +963,12 @@ run_model_step() {
     ABORT_REASON="missing-surface-preimage:$SURFACE_FILE"
     return 0
   fi
+  # Face C's own frozen comparand (R-P6.1) — taken here, at the same
+  # existence check that already guards this file, over bytes already
+  # proven present. Never the step's own OBSERVED surface (that is $surf,
+  # below, read back from the invocation's own init event).
+  local recorded_surface_preimage_sha256
+  recorded_surface_preimage_sha256="$(preimage_digest "$SURFACE_FILE")"
   local prompt_text
   prompt_text="$(cat "$prompt_file")"
   if [ "$role" = "apply" ] && [ -f "$RUN_DIR/steps/02-diagnose/handoff/fix-plan.txt" ]; then
@@ -707,7 +1051,7 @@ run_model_step() {
     cp "$ws/root-cause-report.txt" "$dir/handoff/root-cause-report.txt"
   fi
 
-  write_step_status "$dir" "$role" model "$exit_code" $((end_ms - start_ms)) "$substrate" "$surf" "$perm" "$timed_out" "$src_changed" "$ro_changed" "$model_actual"
+  write_step_status "$dir" "$role" model "$exit_code" $((end_ms - start_ms)) "$substrate" "$surf" "$perm" "$timed_out" "$src_changed" "$ro_changed" "$model_actual" "$recorded_surface_preimage_sha256"
   [ "$timed_out" -eq 1 ] && { ABORT_REASON="timeout"; return 0; }
   return 0
 }
@@ -750,7 +1094,7 @@ run_code_step() {
 
   # Tokens are recorded 0, not absent (design.md sec 2: "keeps the 'zero
   # model tokens' claim read back rather than asserted").
-  write_step_status "$dir" "$role" code "$exit_code" $((end_ms - start_ms)) "$substrate" "" "" 0 "$src_changed" "$ro_changed" ""
+  write_step_status "$dir" "$role" code "$exit_code" $((end_ms - start_ms)) "$substrate" "" "" 0 "$src_changed" "$ro_changed" "" ""
   # collector-error (design.md Decision 3: run-axis void, never a suite
   # state) is collect.py's own exit 2.
   [ "$exit_code" -eq 2 ] && { ABORT_REASON="collector-error"; return 0; }
@@ -833,6 +1177,8 @@ CODE_COMMIT="$CODE_COMMIT" DECLARED_PERMISSION_MODE="$PERMISSION_MODE" DECLARED_
 STATE="$ARM_STATE" VOID_REASON="$ARM_VOID_REASON" ABORT_REASON="$ABORT_REASON" DIRTY_OK_USED="$DIRTY_OK" \
 SHAKEDOWN_USED="$SHAKEDOWN" WORKSPACE_FILE_COUNT="$WORKSPACE_FILE_COUNT" \
 RO_SUBSTRATE_VIOLATION="$RO_SUBSTRATE_VIOLATION" DIAGNOSTICIAN_SRC_VIOLATION="$DIAGNOSTICIAN_SRC_VIOLATION" \
+RECORDED_ANSWER_KEY_DIGEST="$RECORDED_ANSWER_KEY_DIGEST" \
+RECORDED_FIXTURE_DIGEST="$RECORDED_FIXTURE_DIGEST" \
 python3 <<'PY'
 import json, os
 
@@ -853,6 +1199,17 @@ arm = {
     "case_table_digest": env["CASE_TABLE_DIGEST"] or None,
     "case_count": int(env["CASE_COUNT"] or 0),
     "prereg_digest": env["PREREG_DIGEST"] or None,
+    # run-input-provenance task 1.4 (R-P2, R-P5.1): the POSITIVE marker that
+    # this run was captured under the provenance scheme, plus Face A's own
+    # digest of the answer-key/ set it was scored against — same lifetime as
+    # PREREG_DIGEST/CASE_TABLE_DIGEST above, threaded through to this one
+    # write. `recorded_fixture_digest` (task 3.1, R-P7.1) is Face B's own
+    # identity digest, the same lifetime and write. Each model step's own
+    # `recorded_surface_preimage_sha256` is Face C's — per-step, not
+    # arm-level, written into status.json instead (task 2.2).
+    "input_provenance_version": 1,
+    "recorded_answer_key_digest": env["RECORDED_ANSWER_KEY_DIGEST"] or None,
+    "recorded_fixture_digest": env["RECORDED_FIXTURE_DIGEST"] or None,
     "declared_permission_mode": env["DECLARED_PERMISSION_MODE"],
     "declared_model": env["DECLARED_MODEL"],
     "workspace_file_count": int(env["WORKSPACE_FILE_COUNT"]),

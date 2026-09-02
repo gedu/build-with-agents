@@ -52,13 +52,25 @@ carries over unchanged; the dispatcher is what is new).
 
 **The two-schema rule.** Each experiment owns its own row shape — `tool-surface-v1`'s row
 (`schema_version` 3, cells `proper`/`improper-success`/`clean-failure`/`failure`) and
-`failure-flood-v1`'s row (`schema_version` 1, `green`/`partial`/`no-progress`/`regressed` plus
+`failure-flood-v1`'s row (`schema_version` 4, `green`/`partial`/`no-progress`/`regressed` plus
 `peak_occupancy_tokens`/`cumulative_occupancy_tokens`/`causes_claimed`/`causes_correct`) are **not**
 unified into one superset schema. A field that exists for one experiment and not the other stays absent
 from the other's rows rather than padded with a placeholder — the same "no field tooling does not read"
 discipline `AGENTS.md`'s frontmatter contract already applies to documents, applied here to `runs.jsonl`
 rows. Adding a third experiment means adding a third row-builder and a third report function, never
 widening the first two.
+
+**Correction** (`run-input-provenance`, 2026-08): this section previously stated
+`failure-flood-v1`'s `schema_version` as **1**; the code has said **3** since the CRITICAL-1/-2 bump,
+and this cycle takes it to **4**, adding four provenance fields — a run's own record of what it was
+scored against, read back and compared at derive time rather than recomputed live: `input_provenance_
+version` (row, the positive marker that a capture was made under this scheme), `recorded_answer_key_
+digest` (row, Face A), `recorded_fixture_digest` (row, Face B), and each model step's own `recorded_
+surface_preimage_sha256` (per-step, Face C — the one digest that is not arm-level, because a
+multi-step arm's preimage file can change between steps). Named as a correction rather than silently overwritten, per this file's own record-not-erase
+discipline. A related gap this correction does **not** also fix, named rather than left implicit:
+`rig/check.sh`'s `check_component_self_test()` still has no bash arm, so `run-pipeline.sh --self-test`
+is never composed by the repo gate and must still be run by hand.
 
 ## Does NOT belong here
 
