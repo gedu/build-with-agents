@@ -28,7 +28,9 @@ as designed, not a bug — but it means derive.py must be run on the machine
 holding the raw evidence, never blindly on a fresh clone.
 """
 
+import contextlib
 import hashlib
+import io
 import json
 import re
 import shutil
@@ -94,9 +96,21 @@ def surface_digest(names) -> str:
     return sha256_hex("\n".join(sorted(set(names))).encode())
 
 
-def load_surface(arm: str):
-    """Tool names only. `# harness: <version>` header is metadata, not a tool."""
-    lines = (SURFACES_ROOT / f"{arm}.txt").read_text().splitlines()
+def load_surface(arm: str, root: Path = SURFACES_ROOT):
+    """Tool names only. `# harness: <version>` header is metadata, not a tool.
+
+    `root` is ADDITIVE (F-5, verify-report 2026-08-27 SUGGESTION-6) and
+    defaults to the production `SURFACES_ROOT`, so every call site is
+    unchanged and nothing about the production path is weakened to make a
+    test reachable — the constraint the apply phase was right to hold. What
+    it buys: task 2.9's cross-language pin needs a synthetic preimage file
+    exercising header/blank/duplicate/indented lines, and with no root
+    parameter the only way in was to write that file into `rig/surfaces/`
+    itself, the real production directory, under a reserved arm name. That
+    write is now gone; the pin builds its file in a temp root instead. See
+    `_self_test_load_surface_preimage_pin()`.
+    """
+    lines = (root / f"{arm}.txt").read_text().splitlines()
     return sorted(l.strip() for l in lines if l.strip() and not l.startswith("#"))
 
 
@@ -383,12 +397,32 @@ def run_self_tests(answer_keys) -> bool:
         if "tool_sets" not in ak:
             continue
         cases = ak.get("checker_self_test", {})
+        # SUGGESTION-9, folded into F-7: R-P4's own `.get()` discipline, one
+        # layer over. This block is READ FROM AN ANSWER KEY, so it is exactly
+        # the untrusted-shape input R-P4.1 exists to forbid subscripting
+        # blind. Before this guard, a `checker_self_test` whose case was a
+        # string rather than an object raised `TypeError: string indices must
+        # be integers` and the derive died on a traceback. The OUTCOME was
+        # already safe and already satisfied R-P12.1 — exit 1, no rows
+        # written — but a gate whose job is to name which detector cannot
+        # fire must report a case, not a stack trace. The same argument
+        # SUGGESTION-6 made about the suite, made here about the gate.
+        if not isinstance(cases, dict):
+            print(f"  [FAIL] {task_id}/checker_self_test: malformed —"
+                  f" expected an object, got {type(cases).__name__}")
+            ok = False
+            continue
         expected, off_set = ak["tool_sets"]["expected"], ak["tool_sets"]["off_set"]
-        for case_name, case in cases.items():
+        for case_name, case in sorted(cases.items()):
             if case_name.startswith("_"):
                 continue
-            synth = case["synthetic_tool_uses"]
-            reported = case["reported_defect_lines"]
+            if not isinstance(case, dict):
+                print(f"  [FAIL] {task_id}/{case_name}: malformed case —"
+                      f" expected an object, got {type(case).__name__}")
+                ok = False
+                continue
+            synth = case.get("synthetic_tool_uses") or []
+            reported = case.get("reported_defect_lines") or []
             offset_calls, forbidden_calls, practice_pass = check_practice_self_test(synth, reported, expected, off_set)
             checks = []
             if "expected_practice_pass" in case:
@@ -651,15 +685,25 @@ FAILURE_FLOOD_EXPERIMENT = "failure-flood-v1"
 FAILURE_FLOOD_SCHEMA_VERSION = 4  # v4 (run-input-provenance): adds
 # input_provenance_version (row), recorded_answer_key_digest (row, Sibling 1
 # — Face A + WARNING-14, R-P2/R-P3/R-P4/R-P5), recorded_fixture_digest (row,
-# Sibling 3 — Face B, R-P7), and each model step's
-# recorded_surface_preimage_sha256 (per-step, Sibling 2 — Face C, R-P6; no
-# deriver code needed for that one, steps are copied through by
-# `step_out = dict(step)` below) — a run's own record of what it was scored
-# against, read back and compared rather than recomputed live. Correction:
-# the two prior siblings' own done-notes here said the other two fields
-# stayed "null until" a not-yet-landed sibling; both are now wired, so this
-# comment names the sibling that actually populated each field rather than
-# leaving a stale forward reference. Same no-migrations rule as every prior
+# Sibling 3 — Face B, R-P7), and each step's
+# recorded_surface_preimage_sha256 (per-step, Sibling 2 — Face C, R-P6) — a
+# run's own record of what it was scored against, read back and compared
+# rather than recomputed live.
+#
+# Correction (F-1, verify-report 2026-08-27 WARNING-1): this comment used to
+# say the per-step field needed "no deriver code ... steps are copied through
+# by `step_out = dict(step)`". That was wrong in the one case R-P11.1 is
+# actually about. `dict(step)` cannot invent a key a PRE-SCHEME `arm.json`
+# never had, so re-deriving an old capture landed three of the four
+# provenance fields as present-and-`null` and the fourth as ABSENT. The steps
+# loop below now writes it explicitly, the same way the three row-level
+# fields are written at the row literal.
+#
+# Correction (this cycle): the two prior siblings' own done-notes here said
+# the other two fields stayed "null until" a not-yet-landed sibling; both
+# are now wired, so this comment names the sibling that actually populated
+# each field rather than leaving a stale forward reference. Same
+# no-migrations rule as every prior
 # bump (Decision 8, restated at v2->v3 below): re-deriving rewrites every
 # existing row with this version and these fields; nothing here reads the
 # old schema_version value to special-case a row's treatment (R-P11.1).
@@ -686,6 +730,11 @@ FAILURE_FLOOD_RESULTS_DIR = REPO_ROOT / "rig/results" / FAILURE_FLOOD_EXPERIMENT
 # arms and every role"; task 5.4) — unlike tool-surface-v1's per-arm broad/
 # scoped preimages, there is exactly one file, rig/surfaces/failure-flood.txt.
 FAILURE_FLOOD_SURFACE_ARM = "failure-flood"
+# The three input-provenance drift classes, as a set, so a self-test can
+# assert which faces a row stamped rather than only which ones it contains
+# (F-4). Named here and not inline in the test so the two never disagree
+# about what "a drift face" is.
+_DRIFT_FACES = frozenset({"answer-key-drift", "fixture-drift", "surface-preimage-drift"})
 
 
 def load_failure_flood_answer_keys():
@@ -998,6 +1047,31 @@ def build_row_failure_flood(run_dir: Path, surfaces, digests, answer_keys):
             # OBSERVED step_surface's counterpart), never the live recompute
             # ff_surface_digest — that value is Face C's DRIFT comparand
             # above, a different question (R-P6.3's own text).
+            #
+            # F-3 (verify-report 2026-08-27 WARNING-3) — the claim boundary
+            # this comment was missing, and the reason it is worth a clause
+            # rather than a test. Swapping this comparand back to the live
+            # `ff_surface_digest` is currently a row-outcome NO-OP, and no
+            # committed case would notice (re-proven empirically: the revert
+            # leaves the whole suite green). That is not a property of THIS
+            # line. It is owned entirely by Face C's drift loop above —
+            # `for s in steps_meta: ... if s.get("recorded_surface_preimage_
+            # sha256") != ff_surface_digest: drifted.add("surface-preimage-
+            # drift")` — which voids the row before control can ever reach
+            # here with a frozen comparand that differs from the live one.
+            # By the time this loop runs, the two values are equal for every
+            # model step BY CONSTRUCTION, so either choice reads the same.
+            #
+            # The invariant is therefore CONDITIONAL, and its owner is named
+            # here so a future reader cannot mistake the no-op for a licence:
+            # narrow that loop, scope it to fewer steps, or move it below
+            # this one, and this comparand becomes observable again — at
+            # which point the live recompute would answer R-P6.3's question
+            # in a slot that R-P6.1/R-P6.2 reserve for the run's own frozen
+            # recording, which is exactly the "correct refusal, false stated
+            # cause" regression design.md secs 4/6 exist to forbid. Change
+            # that loop and this line stops being equivalent; that is the
+            # whole content of the boundary.
             if step_surface != step.get("recorded_surface_preimage_sha256"):
                 state, void_reason = "void", "surface-mismatch"
                 anomaly_classes.add("surface-mismatch")
@@ -1050,6 +1124,29 @@ def build_row_failure_flood(run_dir: Path, surfaces, digests, answer_keys):
     for step in steps_meta:
         step_name = step.get("index")
         step_out = dict(step)
+        # F-1 (R-P11.1, verify-report 2026-08-27 WARNING-1): write Face C's
+        # per-step field EXPLICITLY, the same way the three row-level
+        # provenance fields are written at the row literal below. `dict(step)`
+        # alone cannot invent a key a PRE-SCHEME `arm.json` never had, so a
+        # re-derive used to land three of the four provenance fields as
+        # present-and-`null` and the fourth as absent — an asymmetric
+        # consumer contract (`row["recorded_fixture_digest"]` yields `None`
+        # while `row["steps"][i]["recorded_surface_preimage_sha256"]` raised
+        # `KeyError`).
+        #
+        # `setdefault`, never a plain assignment: a run made through today's
+        # `write_step_status` already carries the real digest, and its own
+        # `$13`-empty-for-a-code-step convention already lands `None` there,
+        # so this must not overwrite either. Applied to EVERY step, not only
+        # model steps, because that is exactly the convention `surface_sha256`
+        # ($7) already follows — present on all four steps of the committed
+        # s2-pipeline row, `None` on its code steps.
+        #
+        # Detection is unchanged in both directions: the gate at the
+        # `missing_surface_preimage` check and Face C's own drift loop both
+        # read `.get(...)`, which already treated absent and null alike. This
+        # is a serialization fix, and it promotes no row past `void`.
+        step_out.setdefault("recorded_surface_preimage_sha256", None)
         if step.get("kind") == "model" and step_name:
             stream_path = run_dir / "steps" / step_name / "stream.jsonl"
             init_event, tool_calls, _hooks, result_event, stream_anomalies, turns = parse_stream(
@@ -1394,8 +1491,8 @@ def _self_test_load_surface_preimage_pin():
     independently confirmed by the orchestrator's own mutations after
     Sibling 2 was committed (`5cfa456`): `load_surface()`'s own parse was
     proven ZERO ways. Every self-test that supplies a
-    `recorded_surface_preimage_sha256` default (`_self_test_make_ff_run_dir`,
-    :1519, and everything built on it) computes ONE
+    `recorded_surface_preimage_sha256` default (`_self_test_make_ff_run_dir`
+    and everything built on it) computes ONE
     `surface_digest(load_surface(FAILURE_FLOOD_SURFACE_ARM))` expression and
     assigns it to BOTH sides of every Face C comparison, so both sides move
     together and a wrong `load_surface()` is invisible to them. The pin
@@ -1422,16 +1519,42 @@ def _self_test_load_surface_preimage_pin():
     disagreement here is the finding to report, never something to "fix"
     on whichever side looks wrong (design.md sec 9).
 
-    No production code changed to make this reachable. `load_surface()`
-    takes no root parameter — it is hardcoded to
-    `SURFACES_ROOT / f"{arm}.txt"` — so the only way in without weakening
-    it is to write the synthetic file at that exact path shape, under an
-    arm name no real surface file uses, and delete it in `finally`
-    regardless of outcome. `SURFACES_ROOT` already resolves inside `rig/`
-    (`REPO_ROOT` is derived from `__file__`), so this satisfies the same
-    "scratch copies live inside rig/, deleted on every path" discipline
-    task 2.0's and task 3.8's own cross-checked-copy mutation proofs used,
-    without a second temp root: `SURFACES_ROOT` already is one.
+    **Correction (F-5, verify-report SUGGESTION-6).** This docstring used to
+    argue that no production code could change to make the case reachable,
+    because `load_surface()` was hardcoded to `SURFACES_ROOT / f"{arm}.txt"`
+    — so the case wrote its synthetic file INTO `rig/surfaces/`, the real
+    production directory, under a reserved arm name, and deleted it in
+    `finally`. The premise was sound and the priority was right (never
+    weaken production code to reach a test), but it missed the additive
+    third option: `load_surface(arm, root=SURFACES_ROOT)` leaves every
+    production call site byte-unchanged and weakens nothing, while removing
+    the production write entirely. That is what SUGGESTION-6 proposed and
+    what this case now does — a `tempfile.mkdtemp()` root, like every other
+    fixture-building case in this file.
+
+    Three things went away with the write, and they are the reason the
+    suggestion was worth taking rather than tolerating: the bare
+    `assert not surface_path.exists()` (whose residual failure printed an
+    `AssertionError` traceback instead of naming a failing case, so the
+    suite's whole job inverted); the SIGKILL/power-loss window that could
+    leave a stray untracked `.txt` in a production directory where
+    `git add -A` would happily commit it; and the need for a reserved arm
+    name to be permanently off-limits to real surfaces. No `.gitignore`
+    entry is needed either — SUGGESTION-6's own "failing that" fallbacks
+    exist only for the path where the root parameter was refused.
+
+    **What the pin spans, stated precisely (SUGGESTION-8).** "Cross-language"
+    is the useful shorthand but it overstates the isolation. Bash's
+    `preimage_digest()` is itself a `python3` heredoc
+    (`rig/run-pipeline.sh`), so both sides of this pin — and of
+    `_self_test_preimage_digest_pin()` above — execute in CPython over two
+    INDEPENDENTLY WRITTEN source texts. That is the pin's real and
+    sufficient value: the two texts cannot drift apart unnoticed. What it
+    does NOT span is a shared CPython assumption; `str.splitlines()`'s
+    treatment of `\x0b`, `\x0c` and `U+2028` is the concrete example, since
+    a change there would move both sides together. Low impact, because the
+    hash convention is separately anchored by two frozen literals — but a
+    reader should not take "cross-language" for more isolation than it buys.
 
     **No live defect — recorded so a later reader does not misread this
     case as a bugfix.** Independently verified: today,
@@ -1443,41 +1566,55 @@ def _self_test_load_surface_preimage_pin():
     gap this case closes is that nothing committed would have caught the
     two sides drifting apart, not that they currently disagree."""
     arm = "__self_test_load_surface_preimage_pin"
-    surface_path = SURFACES_ROOT / f"{arm}.txt"
-    assert not surface_path.exists(), (
-        f"refusing to overwrite an existing file at {surface_path}"
-    )
+    surface_root = Path(tempfile.mkdtemp())
+    surface_path = surface_root / f"{arm}.txt"
+    case_pin = False
     try:
-        surface_path.write_text(
-            "# harness: v1\n\nBash\n\n  Read\nWrite\nRead   \n"
-        )
-
-        python_digest = surface_digest(load_surface(arm))
-
-        run_pipeline = REPO_ROOT / "rig" / "run-pipeline.sh"
-        case_pin = False
+        # F-5, second half: EVERY step of this case sits inside the guarded
+        # block, including the Python-side parse. SUGGESTION-6's complaint
+        # was about a failure SHAPE, not only about the production write: a
+        # suite whose job is to name which case failed must never print a
+        # stack trace instead. Moving `load_surface()` out of the guard would
+        # reproduce that exactly — found by mutation, not by reasoning. A
+        # mutant whose `load_surface()` accepts `root=` and ignores it raises
+        # `FileNotFoundError` here, and with the parse outside the guard the
+        # whole 62-case suite died on a traceback while reporting ZERO failed
+        # cases. Inside it, the same mutant reports one named `[FAIL]`, which
+        # is the only version of this case that can be trusted to discriminate.
         try:
+            surface_path.write_text(
+                "# harness: v1\n\nBash\n\n  Read\nWrite\nRead   \n"
+            )
+            # The deriver's OWN full path, still — `surface_digest(
+            # load_surface(...))`, never a hardcoded list — now pointed at a
+            # temp root instead of the production `rig/surfaces/`. `root=` is
+            # the only difference from the committed form.
+            python_digest = surface_digest(load_surface(arm, root=surface_root))
+
+            run_pipeline = REPO_ROOT / "rig" / "run-pipeline.sh"
             extracted = subprocess.run(
                 ["sed", "-n", "/^preimage_digest() {/,/^}/p", str(run_pipeline)],
                 capture_output=True, text=True, check=True,
             ).stdout
             if not extracted.strip():
-                raise RuntimeError(f"could not extract preimage_digest() from {run_pipeline} by name")
+                raise RuntimeError("could not extract preimage_digest() from run-pipeline.sh by name")
             bash_script = "set -euo pipefail\n" + extracted + '\npreimage_digest "$1"\n'
             bash_digest = subprocess.run(
                 ["bash", "-c", bash_script, "load_surface_preimage_pin", str(surface_path)],
                 capture_output=True, text=True, check=True,
             ).stdout.strip()
             case_pin = python_digest is not None and python_digest == bash_digest
-        except (subprocess.CalledProcessError, OSError, RuntimeError) as exc:
-            print(f"  [FAIL] load_surface/preimage_digest cross-language pin could not run: {exc}", file=sys.stderr)
+        except (subprocess.CalledProcessError, OSError, RuntimeError, ValueError) as exc:
+            print(f"  [FAIL] load_surface preimage pin could not run: {type(exc).__name__}: {exc}",
+                  file=sys.stderr)
     finally:
-        surface_path.unlink(missing_ok=True)
+        shutil.rmtree(surface_root, ignore_errors=True)
     cases = [
-        ("cross-language pin: python surface_digest(load_surface()) and bash's"
+        ("two-implementation pin: python surface_digest(load_surface()) and bash's"
          " preimage_digest() (extracted from run-pipeline.sh) agree over the"
          " SAME synthetic file exercising header/blank/duplicate/indented"
-         " tool lines — never a hardcoded list on either side", case_pin),
+         " tool lines, in a temp root that is never rig/surfaces/ — never a"
+         " hardcoded list on either side", case_pin),
     ]
     ok = all(c for _, c in cases)
     for name, cond in cases:
@@ -1584,7 +1721,8 @@ def _self_test_write_stream(path, model, events=None):
     path.write_text("\n".join(json.dumps(ev) for ev in lines) + "\n")
 
 
-def _self_test_make_ff_run_dir(root, run_id, step_overrides, write_stream=True, arm_overrides=None):
+def _self_test_make_ff_run_dir(root, run_id, step_overrides, write_stream=True, arm_overrides=None,
+                               drop_step_keys=()):
     """One synthetic s1-monolithic-<N> run directory: arm.json + status.json
     + one model step, matching run-pipeline.sh's own real Amendment-1 shape
     closely enough for build_row_failure_flood to read it as a real run.
@@ -1612,7 +1750,17 @@ def _self_test_make_ff_run_dir(root, run_id, step_overrides, write_stream=True, 
     Face C entirely must also pass the SAME real surface names in — see
     _self_test_build_row_model_mismatch/_self_test_build_row_token_breakdown
     below — so the gate's own live recompute (ff_surface_digest) agrees with
-    this default too."""
+    this default too.
+
+    `drop_step_keys` is ADDITIVE and defaults to nothing, so every existing
+    caller is byte-unchanged in behaviour. It exists because `step_overrides`
+    is applied as `**step_overrides` and therefore can only SET a key, never
+    REMOVE one — and the one shape F-1 is about is a step that carries no
+    `recorded_surface_preimage_sha256` key at all, which is what every
+    pre-scheme capture in `rig/runs/` actually looks like (that field was
+    introduced by task 2.2's `write_step_status`, after those three runs were
+    made). A test that can only write `None` there cannot tell absent from
+    null, which is precisely the distinction WARNING-1 turned on."""
     real_surface_digest = surface_digest(load_surface(FAILURE_FLOOD_SURFACE_ARM))
     run_dir = root / run_id
     (run_dir / "steps" / "01-monolith").mkdir(parents=True, exist_ok=True)
@@ -1622,6 +1770,8 @@ def _self_test_make_ff_run_dir(root, run_id, step_overrides, write_stream=True, 
         "recorded_surface_preimage_sha256": real_surface_digest,
         **step_overrides,
     }
+    for k in drop_step_keys:
+        step.pop(k, None)
     if write_stream:
         _self_test_write_stream(run_dir / "steps" / "01-monolith" / "stream.jsonl", step_overrides.get("model_actual"))
     (run_dir / "status.json").write_text(json.dumps({"state": "complete", "void_reason": None}))
@@ -2050,6 +2200,38 @@ def _self_test_build_row_surface_preimage_provenance():
         case_d = (row_d["state"] == "void" and row_d["void_reason"] == "input-provenance-missing"
                    and "provenance-capture-incomplete" in row_d["anomaly_classes"]
                    and row_d["void_reason"] != "surface-mismatch")
+
+        # e. F-1 (R-P11.1, WARNING-1) — a PRE-SCHEME step: `arm.json` carries
+        # no `recorded_surface_preimage_sha256` KEY at all, which is the shape
+        # all three committed rows actually have. The re-derived row's step
+        # must carry it PRESENT-and-`null`, never absent, so the four
+        # provenance fields share one consumer contract. `in` is the whole
+        # point of the case and `.get()` would not express it: before F-1 the
+        # value read `None` either way, and only key presence told the two
+        # apart.
+        d_e = _self_test_make_ff_run_dir(tmproot, "s1-monolithic-99se", intact_step,
+                                          drop_step_keys=("recorded_surface_preimage_sha256",))
+        row_e, *_ = build_row_failure_flood(d_e, surfaces, digests, {})
+        step_e = row_e["steps"][0]
+        case_e = ("recorded_surface_preimage_sha256" in step_e
+                   and step_e["recorded_surface_preimage_sha256"] is None
+                   # detection is unchanged by the serialization fix — the
+                   # gate reads `.get(...) is None`, so an absent key and an
+                   # explicit null must still void identically.
+                   and row_e["state"] == "void"
+                   and row_e["void_reason"] == "input-provenance-missing"
+                   and "provenance-capture-incomplete" in row_e["anomaly_classes"])
+
+        # f. the other half of F-1, and the reason the write is a
+        # `setdefault` rather than an assignment: a step that DID record its
+        # preimage must reach the row with that digest intact. Case (a)'s own
+        # intact row is the fixture — reusing it rather than building an
+        # eighth directory. A plain `step_out[...] = None` passes case (e)
+        # and fails only here, so this is what makes the pair discriminate
+        # instead of merely fire.
+        step_a = row_a["steps"][0]
+        case_f = (step_a.get("recorded_surface_preimage_sha256")
+                   == surface_digest(load_surface(FAILURE_FLOOD_SURFACE_ARM)))
     finally:
         shutil.rmtree(tmproot)
     cases = [
@@ -2061,6 +2243,11 @@ def _self_test_build_row_surface_preimage_provenance():
          " surface-mismatch (R-P6.3)", case_c),
         ("d. recorded preimage null, observed would disagree with live if compared -> void:"
          " input-provenance-missing, never surface-mismatch (the ordering proof)", case_d),
+        ("e. a PRE-SCHEME step carrying no recorded_surface_preimage_sha256 KEY re-derives to"
+         " present-and-null, not absent, and still voids input-provenance-missing (F-1, R-P11.1)",
+         case_e),
+        ("f. a step that DID record its preimage keeps that digest through the re-derive —"
+         " the write is a setdefault, never an assignment (F-1)", case_f),
     ]
     ok = all(c for _, c in cases)
     for name, cond in cases:
@@ -2139,6 +2326,72 @@ def _self_test_build_row_fixture_provenance():
         case_d = (row_d["state"] == "void" and row_d["void_reason"] == "input-provenance-mismatch"
                    and "answer-key-drift" in row_d["anomaly_classes"]
                    and "fixture-drift" in row_d["anomaly_classes"])
+
+        # e. F-4 (WARNING-4) — R-P2.2a's ORDER-SWAP proof, committed so it
+        # re-runs. ADR 0013's rule is that a committed executable carries its
+        # own test, and task 3.3's own done-note records the original proof as
+        # "a throwaway local edit, reverted": a scratch copy of this file with
+        # the two check blocks physically swapped, run once by hand, deleted.
+        # Nothing re-ran it, which is the whole of WARNING-4.
+        #
+        # The committed form proves the same claim WITHOUT rewriting source,
+        # by making it an identity over the observable instead of an
+        # assertion about one tested ordering. R-P2.2a says check order MUST
+        # NOT be observable in the outcome. Equivalently: the outcome is a
+        # pure FUNCTION OF THE SET of drifted faces, with no interaction term
+        # between them. So run all three configurations that differ only in
+        # which face is corrupted, and assert the both-case is EXACTLY the
+        # union of the two singles — never a superset, never a subset:
+        #
+        #     both == answer-key-only | fixture-only
+        #
+        # Subset would mean a check was skipped once another had fired (an
+        # early exit, or an `if not drifted:` guard) — order observable.
+        # Superset would mean the two checks interact when they co-occur —
+        # also order observable, in the other direction. Case (d) above
+        # asserts both classes are PRESENT, which is a superset test and
+        # cannot see either failure. Exact equality can.
+        #
+        # `s1` run ids on purpose: _self_test_make_ff_run_dir defaults its
+        # recorded digests to the real v1 values, so every face not under
+        # test is genuinely intact and contributes nothing to the union.
+        # Case (d) uses an `s2` id and overrides both digests, so it cannot
+        # serve as the both-case here — this builds its own.
+        d_ak = _self_test_make_ff_run_dir(tmproot, "s1-monolithic-99fe", intact_step,
+                                           arm_overrides={"recorded_answer_key_digest": "deadbeef" * 8})
+        d_fx = _self_test_make_ff_run_dir(tmproot, "s1-monolithic-99ff", intact_step,
+                                           arm_overrides={"recorded_fixture_digest": "deadbeef" * 8})
+        d_bo = _self_test_make_ff_run_dir(tmproot, "s1-monolithic-99fg", intact_step,
+                                           arm_overrides={"recorded_answer_key_digest": "deadbeef" * 8,
+                                                            "recorded_fixture_digest": "deadbeef" * 8})
+        row_ak, *_ = build_row_failure_flood(d_ak, surfaces, digests, {})
+        row_fx, *_ = build_row_failure_flood(d_fx, surfaces, digests, {})
+        row_bo, *_ = build_row_failure_flood(d_bo, surfaces, digests, {})
+        union = set(row_ak["anomaly_classes"]) | set(row_fx["anomaly_classes"])
+        case_e = (
+            set(row_bo["anomaly_classes"]) == union
+            # and the reason slot is not order-observable either: R-P2.2a's
+            # own argument is that no precedence rule is needed BECAUSE the
+            # slot never has to choose between two true findings. All three
+            # configurations must land the same reason for that to hold.
+            and row_ak["void_reason"] == row_fx["void_reason"] == row_bo["void_reason"]
+                == "input-provenance-mismatch"
+            and row_ak["state"] == row_fx["state"] == row_bo["state"] == "void"
+            # Each single must carry EXACTLY its own face, not merely
+            # contain it. Two reasons. First, it guards the identity against
+            # holding vacuously: if either single stopped voiding at all the
+            # union would collapse and the equality above could still pass on
+            # two empty sets. Second — and this is a live gap found by
+            # mutation while building this case, not a hypothetical — making
+            # the answer-key check ALSO stamp `fixture-drift` (the exact
+            # copy-paste shape this cycle's own mutation table already found
+            # once, at the fixture-drift comparand) was invisible to all 63
+            # committed cases. Case (b) asserts `answer-key-drift` is absent
+            # from a fixture-only drift, but nothing asserted the mirror, so
+            # the two faces were only half proven independent.
+            and set(row_ak["anomaly_classes"]) & _DRIFT_FACES == {"answer-key-drift"}
+            and set(row_fx["anomaly_classes"]) & _DRIFT_FACES == {"fixture-drift"}
+        )
     finally:
         shutil.rmtree(tmproot)
     cases = [
@@ -2150,6 +2403,10 @@ def _self_test_build_row_fixture_provenance():
         ("d. one v2 run whose answer-key AND fixture digests both drift at once -> void:"
          " input-provenance-mismatch, BOTH answer-key-drift and fixture-drift present"
          " (task 3.3, R-P2.2/R-P2.2a)", case_d),
+        ("e. the outcome is a pure function of the SET of drifted faces: both-drifts is EXACTLY"
+         " the union of answer-key-only and fixture-only, same void_reason and state across all"
+         " three -> check order is not observable (F-4, R-P2.2a's order-swap proof, committed)",
+         case_e),
     ]
     ok = all(c for _, c in cases)
     for name, cond in cases:
@@ -2247,6 +2504,187 @@ def _self_test_fixture_digest_at():
     return ok
 
 
+def _self_test_main_derive_loop():
+    """F-7 (verify-report 2026-08-27 WARNING-6, R-P12.1/R-P12.2/R-P10.1) —
+    the two R-P12 scenarios the second verify pass EXECUTED and proved but
+    never committed. Both held at runtime; neither re-ran from the
+    repository, which is the whole of WARNING-6 and the same shape as
+    WARNING-4.
+
+    Both scenarios are about `main()`'s own loop rather than about one row,
+    so neither can be reached through `build_row_failure_flood()` — every
+    other case in this file calls that builder on one directory at a time,
+    which is why per-row independence was proven per row but never THROUGH
+    the loop.
+
+    How `main()` is driven, and why this is test-only. The experiment
+    registry is a plain module-level dict, so this case temporarily repoints
+    `runs_root`/`results_dir` (and, for the refusal scenario,
+    `load_answer_keys`) at a sandbox, calls the REAL `main()`, and restores
+    the entry wholesale in `finally`. No production code changed and no
+    seam was added to make this reachable — the same constraint F-5 held.
+    What runs is the real run-dir glob, the real refusal gate, the real
+    per-row loop and the real write, not a re-implementation of them.
+
+    Two things about the sandbox are deliberate. It lives under
+    `rig/runs/`, which is gitignored (`.gitignore`, ADR 0011), so a stray
+    directory left by a SIGKILL can never be committed — strictly better
+    than the `rig/surfaces/` write F-5 just removed, and the reason it is
+    not a bare `tempfile.mkdtemp()` is that `main()` prints
+    `out_path.relative_to(REPO_ROOT)`, which raises for any results
+    directory outside the repository. And nothing here reads the real
+    `rig/runs/`: those captures are gitignored too, so a case depending on
+    them would pass only on a machine that happens to have them.
+    """
+    ff = EXPERIMENTS[FAILURE_FLOOD_EXPERIMENT]
+    saved_entry, saved_argv = dict(ff), sys.argv[:]
+    sandbox_parent = REPO_ROOT / "rig" / "runs"
+    sandbox_parent.mkdir(parents=True, exist_ok=True)
+    sandbox = Path(tempfile.mkdtemp(prefix=".self-test-main-derive-loop.", dir=sandbox_parent))
+    intact_step = {"declared_model": "claude-opus-5[1m]", "model_actual": "claude-opus-5[1m]",
+                    "model_matches_declared": True}
+    case_multi = case_refuse = case_untouched = False
+    try:
+        # ---- scenario 1: "A single row's provenance mismatch derives
+        # everything else normally." One run directory whose recorded
+        # answer-key digest is deliberately wrong, three whose digests
+        # match, and one PRE-SCHEME capture standing in for the three
+        # committed shakedown rows the verify pass ran alongside (those live
+        # in gitignored `rig/runs/`, so this synthesises the same shape
+        # instead of depending on them). One single derive pass over all
+        # five.
+        runs_root, results_dir = sandbox / "runs", sandbox / "results"
+        runs_root.mkdir(), results_dir.mkdir()
+        _self_test_make_ff_run_dir(runs_root, "s1-monolithic-91pre", intact_step,
+                                    arm_overrides={"input_provenance_version": None})
+        _self_test_make_ff_run_dir(runs_root, "s1-monolithic-91bad", intact_step,
+                                    arm_overrides={"recorded_answer_key_digest": "deadbeef" * 8})
+        for tag in ("91ok1", "91ok2", "91ok3"):
+            _self_test_make_ff_run_dir(runs_root, f"s1-monolithic-{tag}", intact_step)
+
+        ff["runs_root"], ff["results_dir"] = runs_root, results_dir
+        sys.argv = ["derive.py", "--experiment", FAILURE_FLOOD_EXPERIMENT]
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            rc_multi = main()
+        rows = {}
+        for line in (results_dir / "runs.jsonl").read_text().splitlines():
+            row = json.loads(line)
+            rows[row["run_id"]] = row
+        bad, pre = rows.get("s1-monolithic-91bad", {}), rows.get("s1-monolithic-91pre", {})
+        case_multi = (
+            rc_multi == 0 and len(rows) == 5
+            # the mismatched row voids on its OWN inputs, with exactly the
+            # specified reason and drift face
+            and bad.get("state") == "void"
+            and bad.get("void_reason") == "input-provenance-mismatch"
+            and set(bad.get("anomaly_classes", [])) & _DRIFT_FACES == {"answer-key-drift"}
+            # ...and the three intact rows derive to complete anyway, which
+            # is the half a per-row test cannot show: R-P12.2's "everything
+            # else derives normally" is a claim about the LOOP.
+            and all(rows.get(f"s1-monolithic-{t}", {}).get("state") == "complete"
+                     and rows[f"s1-monolithic-{t}"]["void_reason"] is None
+                     for t in ("91ok1", "91ok2", "91ok3"))
+        )
+        # The neighbour that was ALREADY void for an unrelated reason keeps
+        # that reason and gains no drift face — a mismatch must not
+        # re-classify a row it has nothing to do with (R-P3.2, R-P5.2).
+        case_untouched = (
+            pre.get("state") == "void"
+            and pre.get("void_reason") == "input-provenance-missing"
+            and "pre-scheme-provenance" in pre.get("anomaly_classes", [])
+            and not (set(pre.get("anomaly_classes", [])) & _DRIFT_FACES)
+        )
+
+        # ---- scenario 2: "An unproven deriver still refuses everything,
+        # unrelated to any single row's provenance." The answer keys are
+        # supplied by the registry, so this repoints THAT rather than
+        # corrupting a real committed fixture file — the verify pass did the
+        # corruption in a throwaway tree, which is precisely why it did not
+        # re-run. The flip is the real `negative_control`'s own:
+        # `expected_practice_pass` is `false` in the committed key and false
+        # is CORRECT (no Read/Grep, one reported path), so asserting `true`
+        # is a detector that provably cannot fire.
+        sentinel = b'{"run_id": "SENTINEL - must not be overwritten"}\n'
+        (results_dir / "runs.jsonl").write_bytes(sentinel)
+        ff["load_answer_keys"] = lambda: {
+            "__self_test_unprovable_detector": {
+                "tool_sets": {"expected": ["Read"], "off_set": ["Glob", "Grep"]},
+                "checker_self_test": {
+                    "negative_control": {
+                        "synthetic_tool_uses": [],
+                        "reported_defect_lines": ["paginate.js:24"],
+                        "expected_practice_pass": True,
+                    },
+                },
+            },
+        }
+        err = io.StringIO()
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
+            rc_refuse = main()
+        case_refuse = (
+            rc_refuse == 1
+            and "Self-test FAILED — a detector cannot be proven to fire."
+                " Refusing to derive rows." in err.getvalue()
+            # all-or-nothing: the output file is BYTE-unchanged, so not one
+            # row was written for any of the five perfectly good run
+            # directories still sitting in the sandbox.
+            and (results_dir / "runs.jsonl").read_bytes() == sentinel
+        )
+        # ---- SUGGESTION-9, folded into F-7 per the verify-report's own
+        # instruction. Found while executing scenario 2 above: an answer key
+        # whose `checker_self_test` case is a STRING rather than an object
+        # raised `TypeError: string indices must be integers` and the derive
+        # died on a traceback instead of naming a failing case. The outcome
+        # was already safe — exit 1, no rows — so R-P12.1 was satisfied in
+        # substance, but the gate reported nothing about WHICH detector could
+        # not be proven. Two malformed shapes, both of which used to crash:
+        # a non-object case, and a non-object `checker_self_test` block.
+        # `run_self_tests()` is called directly here rather than through
+        # `main()` — the gate's own return value IS the observable, and
+        # scenario 2 above already proves what `main()` does with a `False`.
+        malformed_reports = []
+        for label, ak in (
+            ("a case that is a string", {"tool_sets": {"expected": [], "off_set": []},
+                                          "checker_self_test": {"negative_control": "oops"}}),
+            ("a checker_self_test that is a list", {"tool_sets": {"expected": [], "off_set": []},
+                                                     "checker_self_test": ["oops"]}),
+        ):
+            out = io.StringIO()
+            try:
+                with contextlib.redirect_stdout(out):
+                    returned = run_self_tests({"__self_test_malformed": ak})
+            except Exception as exc:  # a traceback here IS the finding
+                malformed_reports.append((label, None, f"raised {type(exc).__name__}"))
+                continue
+            malformed_reports.append((label, returned, out.getvalue()))
+        case_malformed = len(malformed_reports) == 2 and all(
+            returned is False and "[FAIL]" in text and "malformed" in text
+            for _label, returned, text in malformed_reports
+        )
+    finally:
+        sys.argv = saved_argv
+        ff.clear()
+        ff.update(saved_entry)
+        shutil.rmtree(sandbox, ignore_errors=True)
+    cases = [
+        ("a. one derive pass over five run dirs: the provenance-mismatched row voids on its own"
+         " inputs and the three intact rows still reach complete — per-row independence proven"
+         " THROUGH main()'s loop, not per row (F-7, R-P12.2)", case_multi),
+        ("b. a row already void for an unrelated reason keeps that reason and gains no drift"
+         " face from its neighbour's mismatch (F-7, R-P3.2/R-P5.2)", case_untouched),
+        ("c. one unprovable detector refuses EVERYTHING: exit 1, the exact refusal message, and"
+         " runs.jsonl byte-unchanged — no rows written for any of five good run dirs"
+         " (F-7, R-P12.1)", case_refuse),
+        ("d. a malformed checker_self_test — a case that is a string, and a block that is a"
+         " list — each reports a named [FAIL] and returns False, never a TypeError traceback"
+         " (F-7 / SUGGESTION-9, R-P4's .get() discipline one layer over)", case_malformed),
+    ]
+    ok = all(c for _, c in cases)
+    for name, cond in cases:
+        print(f"  [{'PASS' if cond else 'FAIL'}] main() derive loop {name}")
+    return ok
+
+
 def run_self_test() -> bool:
     print("derive.py self-test (ADR 0013 — R-F2.2/R-F3.2/R-F7.1/R-F7.3, restoring three prior"
           " batches' own scratch verification; run-input-provenance Sibling 1 — Face A +"
@@ -2266,6 +2704,7 @@ def run_self_test() -> bool:
         _self_test_build_row_surface_preimage_provenance(),
         _self_test_build_row_fixture_provenance(),
         _self_test_fixture_digest_at(),
+        _self_test_main_derive_loop(),
     ]
     ok = all(results)
     print("\nself-test: all cases passed" if ok else "\nSELF-TEST FAILED", file=sys.stderr if not ok else sys.stdout)
