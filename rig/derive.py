@@ -651,15 +651,25 @@ FAILURE_FLOOD_EXPERIMENT = "failure-flood-v1"
 FAILURE_FLOOD_SCHEMA_VERSION = 4  # v4 (run-input-provenance): adds
 # input_provenance_version (row), recorded_answer_key_digest (row, Sibling 1
 # — Face A + WARNING-14, R-P2/R-P3/R-P4/R-P5), recorded_fixture_digest (row,
-# Sibling 3 — Face B, R-P7), and each model step's
-# recorded_surface_preimage_sha256 (per-step, Sibling 2 — Face C, R-P6; no
-# deriver code needed for that one, steps are copied through by
-# `step_out = dict(step)` below) — a run's own record of what it was scored
-# against, read back and compared rather than recomputed live. Correction:
-# the two prior siblings' own done-notes here said the other two fields
-# stayed "null until" a not-yet-landed sibling; both are now wired, so this
-# comment names the sibling that actually populated each field rather than
-# leaving a stale forward reference. Same no-migrations rule as every prior
+# Sibling 3 — Face B, R-P7), and each step's
+# recorded_surface_preimage_sha256 (per-step, Sibling 2 — Face C, R-P6) — a
+# run's own record of what it was scored against, read back and compared
+# rather than recomputed live.
+#
+# Correction (F-1, verify-report 2026-08-27 WARNING-1): this comment used to
+# say the per-step field needed "no deriver code ... steps are copied through
+# by `step_out = dict(step)`". That was wrong in the one case R-P11.1 is
+# actually about. `dict(step)` cannot invent a key a PRE-SCHEME `arm.json`
+# never had, so re-deriving an old capture landed three of the four
+# provenance fields as present-and-`null` and the fourth as ABSENT. The steps
+# loop below now writes it explicitly, the same way the three row-level
+# fields are written at the row literal.
+#
+# Correction (this cycle): the two prior siblings' own done-notes here said
+# the other two fields stayed "null until" a not-yet-landed sibling; both
+# are now wired, so this comment names the sibling that actually populated
+# each field rather than leaving a stale forward reference. Same
+# no-migrations rule as every prior
 # bump (Decision 8, restated at v2->v3 below): re-deriving rewrites every
 # existing row with this version and these fields; nothing here reads the
 # old schema_version value to special-case a row's treatment (R-P11.1).
@@ -1050,6 +1060,29 @@ def build_row_failure_flood(run_dir: Path, surfaces, digests, answer_keys):
     for step in steps_meta:
         step_name = step.get("index")
         step_out = dict(step)
+        # F-1 (R-P11.1, verify-report 2026-08-27 WARNING-1): write Face C's
+        # per-step field EXPLICITLY, the same way the three row-level
+        # provenance fields are written at the row literal below. `dict(step)`
+        # alone cannot invent a key a PRE-SCHEME `arm.json` never had, so a
+        # re-derive used to land three of the four provenance fields as
+        # present-and-`null` and the fourth as absent — an asymmetric
+        # consumer contract (`row["recorded_fixture_digest"]` yields `None`
+        # while `row["steps"][i]["recorded_surface_preimage_sha256"]` raised
+        # `KeyError`).
+        #
+        # `setdefault`, never a plain assignment: a run made through today's
+        # `write_step_status` already carries the real digest, and its own
+        # `$13`-empty-for-a-code-step convention already lands `None` there,
+        # so this must not overwrite either. Applied to EVERY step, not only
+        # model steps, because that is exactly the convention `surface_sha256`
+        # ($7) already follows — present on all four steps of the committed
+        # s2-pipeline row, `None` on its code steps.
+        #
+        # Detection is unchanged in both directions: the gate at the
+        # `missing_surface_preimage` check and Face C's own drift loop both
+        # read `.get(...)`, which already treated absent and null alike. This
+        # is a serialization fix, and it promotes no row past `void`.
+        step_out.setdefault("recorded_surface_preimage_sha256", None)
         if step.get("kind") == "model" and step_name:
             stream_path = run_dir / "steps" / step_name / "stream.jsonl"
             init_event, tool_calls, _hooks, result_event, stream_anomalies, turns = parse_stream(
@@ -1584,7 +1617,8 @@ def _self_test_write_stream(path, model, events=None):
     path.write_text("\n".join(json.dumps(ev) for ev in lines) + "\n")
 
 
-def _self_test_make_ff_run_dir(root, run_id, step_overrides, write_stream=True, arm_overrides=None):
+def _self_test_make_ff_run_dir(root, run_id, step_overrides, write_stream=True, arm_overrides=None,
+                               drop_step_keys=()):
     """One synthetic s1-monolithic-<N> run directory: arm.json + status.json
     + one model step, matching run-pipeline.sh's own real Amendment-1 shape
     closely enough for build_row_failure_flood to read it as a real run.
@@ -1612,7 +1646,17 @@ def _self_test_make_ff_run_dir(root, run_id, step_overrides, write_stream=True, 
     Face C entirely must also pass the SAME real surface names in — see
     _self_test_build_row_model_mismatch/_self_test_build_row_token_breakdown
     below — so the gate's own live recompute (ff_surface_digest) agrees with
-    this default too."""
+    this default too.
+
+    `drop_step_keys` is ADDITIVE and defaults to nothing, so every existing
+    caller is byte-unchanged in behaviour. It exists because `step_overrides`
+    is applied as `**step_overrides` and therefore can only SET a key, never
+    REMOVE one — and the one shape F-1 is about is a step that carries no
+    `recorded_surface_preimage_sha256` key at all, which is what every
+    pre-scheme capture in `rig/runs/` actually looks like (that field was
+    introduced by task 2.2's `write_step_status`, after those three runs were
+    made). A test that can only write `None` there cannot tell absent from
+    null, which is precisely the distinction WARNING-1 turned on."""
     real_surface_digest = surface_digest(load_surface(FAILURE_FLOOD_SURFACE_ARM))
     run_dir = root / run_id
     (run_dir / "steps" / "01-monolith").mkdir(parents=True, exist_ok=True)
@@ -1622,6 +1666,8 @@ def _self_test_make_ff_run_dir(root, run_id, step_overrides, write_stream=True, 
         "recorded_surface_preimage_sha256": real_surface_digest,
         **step_overrides,
     }
+    for k in drop_step_keys:
+        step.pop(k, None)
     if write_stream:
         _self_test_write_stream(run_dir / "steps" / "01-monolith" / "stream.jsonl", step_overrides.get("model_actual"))
     (run_dir / "status.json").write_text(json.dumps({"state": "complete", "void_reason": None}))
@@ -2050,6 +2096,38 @@ def _self_test_build_row_surface_preimage_provenance():
         case_d = (row_d["state"] == "void" and row_d["void_reason"] == "input-provenance-missing"
                    and "provenance-capture-incomplete" in row_d["anomaly_classes"]
                    and row_d["void_reason"] != "surface-mismatch")
+
+        # e. F-1 (R-P11.1, WARNING-1) — a PRE-SCHEME step: `arm.json` carries
+        # no `recorded_surface_preimage_sha256` KEY at all, which is the shape
+        # all three committed rows actually have. The re-derived row's step
+        # must carry it PRESENT-and-`null`, never absent, so the four
+        # provenance fields share one consumer contract. `in` is the whole
+        # point of the case and `.get()` would not express it: before F-1 the
+        # value read `None` either way, and only key presence told the two
+        # apart.
+        d_e = _self_test_make_ff_run_dir(tmproot, "s1-monolithic-99se", intact_step,
+                                          drop_step_keys=("recorded_surface_preimage_sha256",))
+        row_e, *_ = build_row_failure_flood(d_e, surfaces, digests, {})
+        step_e = row_e["steps"][0]
+        case_e = ("recorded_surface_preimage_sha256" in step_e
+                   and step_e["recorded_surface_preimage_sha256"] is None
+                   # detection is unchanged by the serialization fix — the
+                   # gate reads `.get(...) is None`, so an absent key and an
+                   # explicit null must still void identically.
+                   and row_e["state"] == "void"
+                   and row_e["void_reason"] == "input-provenance-missing"
+                   and "provenance-capture-incomplete" in row_e["anomaly_classes"])
+
+        # f. the other half of F-1, and the reason the write is a
+        # `setdefault` rather than an assignment: a step that DID record its
+        # preimage must reach the row with that digest intact. Case (a)'s own
+        # intact row is the fixture — reusing it rather than building an
+        # eighth directory. A plain `step_out[...] = None` passes case (e)
+        # and fails only here, so this is what makes the pair discriminate
+        # instead of merely fire.
+        step_a = row_a["steps"][0]
+        case_f = (step_a.get("recorded_surface_preimage_sha256")
+                   == surface_digest(load_surface(FAILURE_FLOOD_SURFACE_ARM)))
     finally:
         shutil.rmtree(tmproot)
     cases = [
@@ -2061,6 +2139,11 @@ def _self_test_build_row_surface_preimage_provenance():
          " surface-mismatch (R-P6.3)", case_c),
         ("d. recorded preimage null, observed would disagree with live if compared -> void:"
          " input-provenance-missing, never surface-mismatch (the ordering proof)", case_d),
+        ("e. a PRE-SCHEME step carrying no recorded_surface_preimage_sha256 KEY re-derives to"
+         " present-and-null, not absent, and still voids input-provenance-missing (F-1, R-P11.1)",
+         case_e),
+        ("f. a step that DID record its preimage keeps that digest through the re-derive —"
+         " the write is a setdefault, never an assignment (F-1)", case_f),
     ]
     ok = all(c for _, c in cases)
     for name, cond in cases:

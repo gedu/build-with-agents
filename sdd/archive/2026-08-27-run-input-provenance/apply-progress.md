@@ -173,6 +173,18 @@ afterward (`shasum -a 256` compared before/after every cycle):**
 `schema_version == 4`, `input_provenance_version`/`recorded_answer_key_digest`/`recorded_fixture_digest`
 all `null`. No row acquired `state=complete`. Idempotent: derived twice, byte-identical both times.
 
+> **Correction (F-1, 2026-09; verify-report WARNING-1).** The claim above names exactly three fields
+> and is true of those three, but it sat next to a "four provenance fields" framing used elsewhere in
+> this cycle, and the fourth field did not behave like the other three. Face C's per-step
+> `steps[].recorded_surface_preimage_sha256` was **absent** on all three re-derived rows, not
+> present-and-`null`: the row-level three are written explicitly, while the per-step one relied on
+> `step_out = dict(step)` copying it through, and `dict()` cannot invent a key a pre-scheme
+> `arm.json` never had. Nothing detected differently — the gate reads `.get(...) is None` and treated
+> absent and null alike — but the consumer contract was asymmetric. F-1 writes the field explicitly;
+> a re-derive now lands it present-and-`null` on 2/2, 2/2 and 4/4 steps where it was 0/2, 0/2 and
+> 0/4. Recorded here rather than rewritten in place, per this cycle's own record-not-erase
+> discipline. **No row moved: still 3 rows, all `void (shakedown)`, 0 countable.**
+
 **`tool-surface-v1` non-regression (task 4.1's own check, run here as a consequence of re-deriving):**
 42 rows, projected excluding only `checker_digest` — zero mismatches against the pre-change file;
 `schema_version` stays `3`; `build_row`'s registry entry dict literal is byte-unchanged in the diff.
