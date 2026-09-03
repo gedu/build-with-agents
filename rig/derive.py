@@ -94,9 +94,21 @@ def surface_digest(names) -> str:
     return sha256_hex("\n".join(sorted(set(names))).encode())
 
 
-def load_surface(arm: str):
-    """Tool names only. `# harness: <version>` header is metadata, not a tool."""
-    lines = (SURFACES_ROOT / f"{arm}.txt").read_text().splitlines()
+def load_surface(arm: str, root: Path = SURFACES_ROOT):
+    """Tool names only. `# harness: <version>` header is metadata, not a tool.
+
+    `root` is ADDITIVE (F-5, verify-report 2026-08-27 SUGGESTION-6) and
+    defaults to the production `SURFACES_ROOT`, so every call site is
+    unchanged and nothing about the production path is weakened to make a
+    test reachable — the constraint the apply phase was right to hold. What
+    it buys: task 2.9's cross-language pin needs a synthetic preimage file
+    exercising header/blank/duplicate/indented lines, and with no root
+    parameter the only way in was to write that file into `rig/surfaces/`
+    itself, the real production directory, under a reserved arm name. That
+    write is now gone; the pin builds its file in a temp root instead. See
+    `_self_test_load_surface_preimage_pin()`.
+    """
+    lines = (root / f"{arm}.txt").read_text().splitlines()
     return sorted(l.strip() for l in lines if l.strip() and not l.startswith("#"))
 
 
@@ -1452,8 +1464,8 @@ def _self_test_load_surface_preimage_pin():
     independently confirmed by the orchestrator's own mutations after
     Sibling 2 was committed (`5cfa456`): `load_surface()`'s own parse was
     proven ZERO ways. Every self-test that supplies a
-    `recorded_surface_preimage_sha256` default (`_self_test_make_ff_run_dir`,
-    :1519, and everything built on it) computes ONE
+    `recorded_surface_preimage_sha256` default (`_self_test_make_ff_run_dir`
+    and everything built on it) computes ONE
     `surface_digest(load_surface(FAILURE_FLOOD_SURFACE_ARM))` expression and
     assigns it to BOTH sides of every Face C comparison, so both sides move
     together and a wrong `load_surface()` is invisible to them. The pin
@@ -1480,16 +1492,42 @@ def _self_test_load_surface_preimage_pin():
     disagreement here is the finding to report, never something to "fix"
     on whichever side looks wrong (design.md sec 9).
 
-    No production code changed to make this reachable. `load_surface()`
-    takes no root parameter — it is hardcoded to
-    `SURFACES_ROOT / f"{arm}.txt"` — so the only way in without weakening
-    it is to write the synthetic file at that exact path shape, under an
-    arm name no real surface file uses, and delete it in `finally`
-    regardless of outcome. `SURFACES_ROOT` already resolves inside `rig/`
-    (`REPO_ROOT` is derived from `__file__`), so this satisfies the same
-    "scratch copies live inside rig/, deleted on every path" discipline
-    task 2.0's and task 3.8's own cross-checked-copy mutation proofs used,
-    without a second temp root: `SURFACES_ROOT` already is one.
+    **Correction (F-5, verify-report SUGGESTION-6).** This docstring used to
+    argue that no production code could change to make the case reachable,
+    because `load_surface()` was hardcoded to `SURFACES_ROOT / f"{arm}.txt"`
+    — so the case wrote its synthetic file INTO `rig/surfaces/`, the real
+    production directory, under a reserved arm name, and deleted it in
+    `finally`. The premise was sound and the priority was right (never
+    weaken production code to reach a test), but it missed the additive
+    third option: `load_surface(arm, root=SURFACES_ROOT)` leaves every
+    production call site byte-unchanged and weakens nothing, while removing
+    the production write entirely. That is what SUGGESTION-6 proposed and
+    what this case now does — a `tempfile.mkdtemp()` root, like every other
+    fixture-building case in this file.
+
+    Three things went away with the write, and they are the reason the
+    suggestion was worth taking rather than tolerating: the bare
+    `assert not surface_path.exists()` (whose residual failure printed an
+    `AssertionError` traceback instead of naming a failing case, so the
+    suite's whole job inverted); the SIGKILL/power-loss window that could
+    leave a stray untracked `.txt` in a production directory where
+    `git add -A` would happily commit it; and the need for a reserved arm
+    name to be permanently off-limits to real surfaces. No `.gitignore`
+    entry is needed either — SUGGESTION-6's own "failing that" fallbacks
+    exist only for the path where the root parameter was refused.
+
+    **What the pin spans, stated precisely (SUGGESTION-8).** "Cross-language"
+    is the useful shorthand but it overstates the isolation. Bash's
+    `preimage_digest()` is itself a `python3` heredoc
+    (`rig/run-pipeline.sh`), so both sides of this pin — and of
+    `_self_test_preimage_digest_pin()` above — execute in CPython over two
+    INDEPENDENTLY WRITTEN source texts. That is the pin's real and
+    sufficient value: the two texts cannot drift apart unnoticed. What it
+    does NOT span is a shared CPython assumption; `str.splitlines()`'s
+    treatment of `\x0b`, `\x0c` and `U+2028` is the concrete example, since
+    a change there would move both sides together. Low impact, because the
+    hash convention is separately anchored by two frozen literals — but a
+    reader should not take "cross-language" for more isolation than it buys.
 
     **No live defect — recorded so a later reader does not misread this
     case as a bugfix.** Independently verified: today,
@@ -1501,41 +1539,55 @@ def _self_test_load_surface_preimage_pin():
     gap this case closes is that nothing committed would have caught the
     two sides drifting apart, not that they currently disagree."""
     arm = "__self_test_load_surface_preimage_pin"
-    surface_path = SURFACES_ROOT / f"{arm}.txt"
-    assert not surface_path.exists(), (
-        f"refusing to overwrite an existing file at {surface_path}"
-    )
+    surface_root = Path(tempfile.mkdtemp())
+    surface_path = surface_root / f"{arm}.txt"
+    case_pin = False
     try:
-        surface_path.write_text(
-            "# harness: v1\n\nBash\n\n  Read\nWrite\nRead   \n"
-        )
-
-        python_digest = surface_digest(load_surface(arm))
-
-        run_pipeline = REPO_ROOT / "rig" / "run-pipeline.sh"
-        case_pin = False
+        # F-5, second half: EVERY step of this case sits inside the guarded
+        # block, including the Python-side parse. SUGGESTION-6's complaint
+        # was about a failure SHAPE, not only about the production write: a
+        # suite whose job is to name which case failed must never print a
+        # stack trace instead. Moving `load_surface()` out of the guard would
+        # reproduce that exactly — found by mutation, not by reasoning. A
+        # mutant whose `load_surface()` accepts `root=` and ignores it raises
+        # `FileNotFoundError` here, and with the parse outside the guard the
+        # whole 62-case suite died on a traceback while reporting ZERO failed
+        # cases. Inside it, the same mutant reports one named `[FAIL]`, which
+        # is the only version of this case that can be trusted to discriminate.
         try:
+            surface_path.write_text(
+                "# harness: v1\n\nBash\n\n  Read\nWrite\nRead   \n"
+            )
+            # The deriver's OWN full path, still — `surface_digest(
+            # load_surface(...))`, never a hardcoded list — now pointed at a
+            # temp root instead of the production `rig/surfaces/`. `root=` is
+            # the only difference from the committed form.
+            python_digest = surface_digest(load_surface(arm, root=surface_root))
+
+            run_pipeline = REPO_ROOT / "rig" / "run-pipeline.sh"
             extracted = subprocess.run(
                 ["sed", "-n", "/^preimage_digest() {/,/^}/p", str(run_pipeline)],
                 capture_output=True, text=True, check=True,
             ).stdout
             if not extracted.strip():
-                raise RuntimeError(f"could not extract preimage_digest() from {run_pipeline} by name")
+                raise RuntimeError("could not extract preimage_digest() from run-pipeline.sh by name")
             bash_script = "set -euo pipefail\n" + extracted + '\npreimage_digest "$1"\n'
             bash_digest = subprocess.run(
                 ["bash", "-c", bash_script, "load_surface_preimage_pin", str(surface_path)],
                 capture_output=True, text=True, check=True,
             ).stdout.strip()
             case_pin = python_digest is not None and python_digest == bash_digest
-        except (subprocess.CalledProcessError, OSError, RuntimeError) as exc:
-            print(f"  [FAIL] load_surface/preimage_digest cross-language pin could not run: {exc}", file=sys.stderr)
+        except (subprocess.CalledProcessError, OSError, RuntimeError, ValueError) as exc:
+            print(f"  [FAIL] load_surface preimage pin could not run: {type(exc).__name__}: {exc}",
+                  file=sys.stderr)
     finally:
-        surface_path.unlink(missing_ok=True)
+        shutil.rmtree(surface_root, ignore_errors=True)
     cases = [
-        ("cross-language pin: python surface_digest(load_surface()) and bash's"
+        ("two-implementation pin: python surface_digest(load_surface()) and bash's"
          " preimage_digest() (extracted from run-pipeline.sh) agree over the"
          " SAME synthetic file exercising header/blank/duplicate/indented"
-         " tool lines — never a hardcoded list on either side", case_pin),
+         " tool lines, in a temp root that is never rig/surfaces/ — never a"
+         " hardcoded list on either side", case_pin),
     ]
     ok = all(c for _, c in cases)
     for name, cond in cases:
