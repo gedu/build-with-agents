@@ -3,8 +3,8 @@ id: ask/index
 type: index
 targets: [any]
 status: draft
-verified: 2026-08-13
-sources: ["skills/checkout-isolation/SKILL.md", "skills/context-checkpoint/SKILL.md", "skills/hypothesis-cycle/SKILL.md", "skills/project-gap-analysis/SKILL.md", "skills/source-verdict/SKILL.md", "skills/README.md", "journal/2026-08-13-skills-nobody-could-ask-for.md"]
+verified: 2026-09-03
+sources: ["skills/checkout-isolation/SKILL.md", "skills/context-checkpoint/SKILL.md", "skills/hypothesis-cycle/SKILL.md", "skills/project-gap-analysis/SKILL.md", "skills/guided-diagnosis/SKILL.md", "skills/source-verdict/SKILL.md", "skills/README.md", "journal/2026-08-13-skills-nobody-could-ask-for.md"]
 ---
 
 # ASK.md — what you can ask for
@@ -21,7 +21,7 @@ file yet. It promotes when a request phrased from here actually triggers the rig
 
 ## First, whether they are loaded at all
 
-Four of the five reach an executor only through the `.claude/skills` symlink `./setup.sh` generates,
+Five of the six reach an executor only through the `.claude/skills` symlink `./setup.sh` generates,
 so they load **only in a session rooted in this repo**. `checkout-isolation` is the exception: it is
 installed at user level and reaches every project.
 
@@ -30,7 +30,7 @@ same shape as the hook hazard `checkout-isolation` documents. **Run `./setup.sh 
 checkout.** This worktree did not have it while this file was being written, which is how the
 omission was found.
 
-## The five
+## The six
 
 Say it however you like — selection is semantic, not literal. "work in a worktree", "put this in a
 worktree" and "am I safe to write here" all reach the same skill. The wording below is the shape.
@@ -39,7 +39,7 @@ worktree" and "am I safe to write here" all reach the same skill. The wording be
 Records branch and HEAD, lists the other checkouts, and reports **which pre-commit hook actually
 guards the tree you are in** — a worktree does not run its own. Runs before any write whether you
 ask or not; ask explicitly when starting long work in a tree that looks clean.
-*The only one of the five also installed at user level, so it reaches every project.*
+*The only one of the six also installed at user level, so it reaches every project.*
 
 **"checkpoint this before I clear the conversation"** → `context-checkpoint`
 Closes the work unit so the conversation can be cleared without losing what it established, and so
@@ -55,7 +55,16 @@ a de-identified record lands in `gaps/`. Two recorded runs. `draft`.
 
 **"here is a link — worth building on?"** → `source-verdict`
 A verdict on a post, thread, paper or vendor doc by evidence rather than by author, written as the
-five-section entry `research/` requires. `validated` — the only one of the five.
+five-section entry `research/` requires. `validated` — the only one of the six.
+
+**"I don't know where to start"** · **"walk me through what my project is missing"** → `guided-diagnosis`
+An ordered walkthrough for somebody starting cold: establishes where the executor is standing, asks
+for the target once, delegates the seven checks to `project-gap-analysis`, and reports every absence
+**with the `validated` artifact behind it** — an absence it cannot cite is not reported as a finding.
+Says out loud, before being asked, that `blocks/` and `templates/` are empty, so what comes back is
+reasoning and at most one `draft` skill. Deliberately **not** called an installer: ADR 0017 lets a
+diagnosis ship before its prescription exists, on the condition that the missing half is never
+implied to exist. `draft`, never run.
 
 ## What this file does not cover
 
