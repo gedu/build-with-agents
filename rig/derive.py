@@ -1008,6 +1008,31 @@ def build_row_failure_flood(run_dir: Path, surfaces, digests, answer_keys):
             # OBSERVED step_surface's counterpart), never the live recompute
             # ff_surface_digest — that value is Face C's DRIFT comparand
             # above, a different question (R-P6.3's own text).
+            #
+            # F-3 (verify-report 2026-08-27 WARNING-3) — the claim boundary
+            # this comment was missing, and the reason it is worth a clause
+            # rather than a test. Swapping this comparand back to the live
+            # `ff_surface_digest` is currently a row-outcome NO-OP, and no
+            # committed case would notice (re-proven empirically: the revert
+            # leaves the whole suite green). That is not a property of THIS
+            # line. It is owned entirely by Face C's drift loop above —
+            # `for s in steps_meta: ... if s.get("recorded_surface_preimage_
+            # sha256") != ff_surface_digest: drifted.add("surface-preimage-
+            # drift")` — which voids the row before control can ever reach
+            # here with a frozen comparand that differs from the live one.
+            # By the time this loop runs, the two values are equal for every
+            # model step BY CONSTRUCTION, so either choice reads the same.
+            #
+            # The invariant is therefore CONDITIONAL, and its owner is named
+            # here so a future reader cannot mistake the no-op for a licence:
+            # narrow that loop, scope it to fewer steps, or move it below
+            # this one, and this comparand becomes observable again — at
+            # which point the live recompute would answer R-P6.3's question
+            # in a slot that R-P6.1/R-P6.2 reserve for the run's own frozen
+            # recording, which is exactly the "correct refusal, false stated
+            # cause" regression design.md secs 4/6 exist to forbid. Change
+            # that loop and this line stops being equivalent; that is the
+            # whole content of the boundary.
             if step_surface != step.get("recorded_surface_preimage_sha256"):
                 state, void_reason = "void", "surface-mismatch"
                 anomaly_classes.add("surface-mismatch")
