@@ -68,7 +68,16 @@ version` (row, the positive marker that a capture was made under this scheme), `
 digest` (row, Face A), `recorded_fixture_digest` (row, Face B), and each model step's own `recorded_
 surface_preimage_sha256` (per-step, Face C — the one digest that is not arm-level, because a
 multi-step arm's preimage file can change between steps). Named as a correction rather than silently overwritten, per this file's own record-not-erase
-discipline. A related gap this correction does **not** also fix, named rather than left implicit:
+discipline.
+
+**Correction to that correction** (F-1, 2026-09): "each **model** step's own" understated where the
+field lands. It is written on **every** step, `null` on a code step — the same convention
+`surface_sha256` already followed, and the one `write_step_status`'s own `$13`-empty-for-a-code-step
+argument implies. Only the *comparisons* are model-step-scoped, never the field. The same correction
+also closes the gap the field had on a re-derive: a pre-scheme capture recorded no such key, and
+`derive.py` used to copy steps through verbatim, so three of the four provenance fields landed
+present-and-`null` and the fourth landed absent. It is now written explicitly, so all four share one
+consumer contract. A related gap this correction does **not** also fix, named rather than left implicit:
 `rig/check.sh`'s `check_component_self_test()` still has no bash arm, so `run-pipeline.sh --self-test`
 is never composed by the repo gate and must still be run by hand.
 
