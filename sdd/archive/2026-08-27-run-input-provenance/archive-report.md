@@ -149,6 +149,27 @@ SDD proposal when someone chooses to.
 None of F-1 through F-7 blocks archive. None promotes any row past `void`, and none touches `rig/`
 (verified below — this archive move made zero code changes).
 
+### Closure status (added 2026-09, after the batch that closed five of them)
+
+This table is the authority a later reader arrives at, so it says which items are still open rather
+than leaving all seven reading as outstanding. The work was direct implementation, not a new SDD
+cycle: every remedy above was already named and mechanical, so none of them needed a proposal.
+
+| Task | Status | Where |
+|---|---|---|
+| **F-1** | **Closed** | Face C's per-step field is written explicitly, so all four provenance fields land present-and-`null` on a re-derive (0/2, 0/2, 0/4 steps → 2/2, 2/2, 4/4). Proven three ways by mutation, one of them `setdefault` → plain assignment |
+| **F-2** | **Open, deliberately deferred** | Lands with the timeout work, because the moment a vacuous refusal gate matters is the moment a countable row exists — and `STEP_TIMEOUT_S`/`SUITE_TIMEOUT_S` are still placeholders, so it does not yet |
+| **F-3** | **Closed** | One clause now names Face C's drift loop as the owner of the invariant that makes the read-back comparand's no-op a no-op, and says what changing that loop would cost. Documentation only; no detector changed |
+| **F-4** | **Closed** | The order-swap proof re-runs, as an identity over the observable rather than a source rewrite: the both-drifts outcome must be EXACTLY the union of the two singles. Building it found a live gap — a copy-paste bug in the answer-key check was invisible to all 63 committed cases, because only one direction of face independence was ever asserted |
+| **F-5** | **Closed** | `load_surface()` gained an additive `root=SURFACES_ROOT`, so no self-test writes into `rig/surfaces/` and the bare `assert` is gone. SUGGESTION-6's two "failing that" fallbacks were therefore not needed; its failure-SHAPE half still was, and mutation is what found that. SUGGESTION-8's docstring clause folded in on the trigger this report itself named |
+| **F-6** | **Closed** | Performed as part of this archive — see the sweep below |
+| **F-7** | **Closed** | Both R-P12 scenarios re-run through `main()`'s own loop, driven by a test-only registry repoint into a gitignored sandbox. SUGGESTION-9's `.get()` fix folded in, as the verify-report instructed |
+
+**Nothing in that batch promoted any row past `void`.** `failure-flood-v1` is still 3 rows, all
+`void (shakedown)`, **0 countable — N = 0**; `tool-surface-v1` is still 42 rows at schema 3. Across
+all five commits the goldens moved by `checker_digest` alone, plus F-1's per-step field. The suite
+grew from 60 committed cases to 67. No task spent a real `claude -p` run.
+
 ### The remaining eight findings, each judged individually
 
 | # | Finding | Home | Why |
