@@ -681,6 +681,24 @@ Depends on: Sibling 2.
       checks write into the same `drifted` set with no early-exit branch between them — not a claim
       about one particular ordering that happened to be tested.
 
+      > **Correction (F-4, 2026-09; verify-report WARNING-4).** The order-swap proof above was real
+      > and it held, but it was a throwaway: a scratch copy run once and deleted, so nothing re-ran
+      > it. ADR 0013's rule is that a committed executable carries its own test. It now re-runs, as
+      > case (e) of `_self_test_build_row_fixture_provenance()` — not by rewriting source, but as an
+      > identity over the observable: the both-drifts outcome must be EXACTLY the union of
+      > answer-key-only and fixture-only, with the same `void_reason` and `state` across all three,
+      > and each single carrying exactly its own face. A subset means a check was skipped once
+      > another had fired; a superset means the two interact when they co-occur. Both are order
+      > observable, and case (d)'s superset test could see neither. The physical swap itself is now
+      > reproducible as a mutation, and it is the positive control: swapped, the suite stays 63/63
+      > green, which is what the hand proof originally found.
+      >
+      > Building it also found a live gap the 63 committed cases had missed: making the answer-key
+      > check ALSO stamp `fixture-drift` — the same copy-paste shape this cycle's own mutation table
+      > caught once at the fixture-drift comparand — reddened nothing. Case (b) asserted
+      > `answer-key-drift` was absent from a fixture-only drift, but nothing asserted the mirror, so
+      > the two faces were only half proven independent. Case (e) now closes it.
+
 - [x] 3.4 Finalize the full negative control (design §9 case 1, first achievable once all three
       digests exist): a synthetic run with `input_provenance_version` present and all three digests
       (answer-key, fixture, surface-preimage) present and agreeing → `state == "complete"`. A gate that

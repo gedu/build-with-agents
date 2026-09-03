@@ -708,6 +708,11 @@ FAILURE_FLOOD_RESULTS_DIR = REPO_ROOT / "rig/results" / FAILURE_FLOOD_EXPERIMENT
 # arms and every role"; task 5.4) — unlike tool-surface-v1's per-arm broad/
 # scoped preimages, there is exactly one file, rig/surfaces/failure-flood.txt.
 FAILURE_FLOOD_SURFACE_ARM = "failure-flood"
+# The three input-provenance drift classes, as a set, so a self-test can
+# assert which faces a row stamped rather than only which ones it contains
+# (F-4). Named here and not inline in the test so the two never disagree
+# about what "a drift face" is.
+_DRIFT_FACES = frozenset({"answer-key-drift", "fixture-drift", "surface-preimage-drift"})
 
 
 def load_failure_flood_answer_keys():
@@ -2299,6 +2304,72 @@ def _self_test_build_row_fixture_provenance():
         case_d = (row_d["state"] == "void" and row_d["void_reason"] == "input-provenance-mismatch"
                    and "answer-key-drift" in row_d["anomaly_classes"]
                    and "fixture-drift" in row_d["anomaly_classes"])
+
+        # e. F-4 (WARNING-4) — R-P2.2a's ORDER-SWAP proof, committed so it
+        # re-runs. ADR 0013's rule is that a committed executable carries its
+        # own test, and task 3.3's own done-note records the original proof as
+        # "a throwaway local edit, reverted": a scratch copy of this file with
+        # the two check blocks physically swapped, run once by hand, deleted.
+        # Nothing re-ran it, which is the whole of WARNING-4.
+        #
+        # The committed form proves the same claim WITHOUT rewriting source,
+        # by making it an identity over the observable instead of an
+        # assertion about one tested ordering. R-P2.2a says check order MUST
+        # NOT be observable in the outcome. Equivalently: the outcome is a
+        # pure FUNCTION OF THE SET of drifted faces, with no interaction term
+        # between them. So run all three configurations that differ only in
+        # which face is corrupted, and assert the both-case is EXACTLY the
+        # union of the two singles — never a superset, never a subset:
+        #
+        #     both == answer-key-only | fixture-only
+        #
+        # Subset would mean a check was skipped once another had fired (an
+        # early exit, or an `if not drifted:` guard) — order observable.
+        # Superset would mean the two checks interact when they co-occur —
+        # also order observable, in the other direction. Case (d) above
+        # asserts both classes are PRESENT, which is a superset test and
+        # cannot see either failure. Exact equality can.
+        #
+        # `s1` run ids on purpose: _self_test_make_ff_run_dir defaults its
+        # recorded digests to the real v1 values, so every face not under
+        # test is genuinely intact and contributes nothing to the union.
+        # Case (d) uses an `s2` id and overrides both digests, so it cannot
+        # serve as the both-case here — this builds its own.
+        d_ak = _self_test_make_ff_run_dir(tmproot, "s1-monolithic-99fe", intact_step,
+                                           arm_overrides={"recorded_answer_key_digest": "deadbeef" * 8})
+        d_fx = _self_test_make_ff_run_dir(tmproot, "s1-monolithic-99ff", intact_step,
+                                           arm_overrides={"recorded_fixture_digest": "deadbeef" * 8})
+        d_bo = _self_test_make_ff_run_dir(tmproot, "s1-monolithic-99fg", intact_step,
+                                           arm_overrides={"recorded_answer_key_digest": "deadbeef" * 8,
+                                                            "recorded_fixture_digest": "deadbeef" * 8})
+        row_ak, *_ = build_row_failure_flood(d_ak, surfaces, digests, {})
+        row_fx, *_ = build_row_failure_flood(d_fx, surfaces, digests, {})
+        row_bo, *_ = build_row_failure_flood(d_bo, surfaces, digests, {})
+        union = set(row_ak["anomaly_classes"]) | set(row_fx["anomaly_classes"])
+        case_e = (
+            set(row_bo["anomaly_classes"]) == union
+            # and the reason slot is not order-observable either: R-P2.2a's
+            # own argument is that no precedence rule is needed BECAUSE the
+            # slot never has to choose between two true findings. All three
+            # configurations must land the same reason for that to hold.
+            and row_ak["void_reason"] == row_fx["void_reason"] == row_bo["void_reason"]
+                == "input-provenance-mismatch"
+            and row_ak["state"] == row_fx["state"] == row_bo["state"] == "void"
+            # Each single must carry EXACTLY its own face, not merely
+            # contain it. Two reasons. First, it guards the identity against
+            # holding vacuously: if either single stopped voiding at all the
+            # union would collapse and the equality above could still pass on
+            # two empty sets. Second — and this is a live gap found by
+            # mutation while building this case, not a hypothetical — making
+            # the answer-key check ALSO stamp `fixture-drift` (the exact
+            # copy-paste shape this cycle's own mutation table already found
+            # once, at the fixture-drift comparand) was invisible to all 63
+            # committed cases. Case (b) asserts `answer-key-drift` is absent
+            # from a fixture-only drift, but nothing asserted the mirror, so
+            # the two faces were only half proven independent.
+            and set(row_ak["anomaly_classes"]) & _DRIFT_FACES == {"answer-key-drift"}
+            and set(row_fx["anomaly_classes"]) & _DRIFT_FACES == {"fixture-drift"}
+        )
     finally:
         shutil.rmtree(tmproot)
     cases = [
@@ -2310,6 +2381,10 @@ def _self_test_build_row_fixture_provenance():
         ("d. one v2 run whose answer-key AND fixture digests both drift at once -> void:"
          " input-provenance-mismatch, BOTH answer-key-drift and fixture-drift present"
          " (task 3.3, R-P2.2/R-P2.2a)", case_d),
+        ("e. the outcome is a pure function of the SET of drifted faces: both-drifts is EXACTLY"
+         " the union of answer-key-only and fixture-only, same void_reason and state across all"
+         " three -> check order is not observable (F-4, R-P2.2a's order-swap proof, committed)",
+         case_e),
     ]
     ok = all(c for _, c in cases)
     for name, cond in cases:
