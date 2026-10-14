@@ -32,7 +32,7 @@ where to look and what you are allowed to trust.
 | `BACKLOG.md` | Candidate practices and downstream deliverables, recorded with a named unblock condition and never built ahead of it | Yes | draft, 2 entries |
 | `setup.sh` | Generates per-tool symlinks and installs git hooks; committed, output is not | Yes | active |
 | `check.sh` | Structural invariants: the frontmatter schema, and every `skills/` directory having an `ASK.md` entry. Redaction is not its job | Yes | active |
-| `open-work.sh` | The generated index of open work. Enumerates six structural sources and reports its own coverage; prints to stdout and writes nothing | Yes | active, ADR 0016 **draft** |
+| `open-work.sh` | The generated index of open work. Enumerates seven sources and reports its own coverage; prints to stdout and writes nothing | Yes | active, ADR 0016 **draft**. Seventh source (`odd/tasks/`) added 2026-10-14 — the event ADR 0016 predicted and its COVERAGE block did not catch |
 | `hooks/` | Committed git hooks. `pre-commit` and `commit-msg` are the ADR 0009 redaction gates, over files and over the message | Yes | 2 hooks + `redaction-patterns.sh`, the list both read |
 | `.github/` | Would hold CI workflows — the layer a fresh clone gets without installing anything. Today it holds only the gitignored Copilot entrypoint `setup.sh --copilot` generates | Yes | **no workflow.** ADR 0014 decided one and records why it is deferred |
 | `skills/` | Tool-neutral skills, one dir per skill (`SKILL.md` + optional `assets/`, `references/`) | Yes, when `validated` | 5 skills (`checkout-isolation` draft, `context-checkpoint` draft, `hypothesis-cycle` draft, `project-gap-analysis` draft, `source-verdict` validated) |
@@ -50,11 +50,19 @@ where to look and what you are allowed to trust.
 | `blocks/react-native/` | React Native-specific blocks | Yes, when `validated` | empty |
 | `templates/` | Compositions of blocks, ready to copy | Yes, when `validated` | empty |
 | `sdd/` | SDD cycles: proposal, spec, design, tasks, verification. Closed cycles move to `sdd/archive/` | No — process record | 3 cycles. `measurement-rig`, verified **PARTIAL** — verified cost instrument, unverified quality instrument. `archive/2026-08-18-failure-flood-triage`, archived after 4 verification rounds — an instrument plus a **failed** ratio target, never a comparative result: zero countable runs. `archive/2026-08-27-run-input-provenance`, archived after 2 verification rounds, PASS WITH WARNINGS (0 CRITICAL, 6 WARNING, 9 SUGGESTION) — a run's own record of what it was scored against (answer-key digest, fixture digest, surface-preimage digest), closing the archived cycle's own R-F5.3 gap (a re-derive verifies deriver drift only, never fixture drift); the same instrument, still an instrument plus a **failed** ratio target, never a comparative result: zero countable runs, and `STEP_TIMEOUT_S`/`SUITE_TIMEOUT_S` remain placeholders (`rig/run-pipeline.sh:85`) so this archive does not found the first countable run |
-| `odd/` | ODD feature documents: the tracking spec for work that is not an SDD cycle — specs quoting the requester's own words, vertical slices with blocking edges, a Log. `odd/tasks/<feature>.md` | No — process record | 1 document (`verified-agent-delivery`), 1 of 7 tasks closed. **Invisible to `./open-work.sh` today** — see the correction below |
+| `odd/` | ODD feature documents: the tracking spec for work that is not an SDD cycle — specs quoting the requester's own words, vertical slices with blocking edges, a Log. `odd/tasks/<feature>.md` | No — process record | 1 document (`verified-agent-delivery`), 2 of 7 tasks closed. **Enumerated by `./open-work.sh`** as source 6: open while one `- [ ]` remains, and a document with no checkbox at all is reported UNDECIDABLE rather than closed |
 | `rig/` | Measurement harness: fixtures, runner, analyser. Raw captures are gitignored | Code yes; **output is evidence only**, citable once promoted to `theory/` with scope and spread (ADR 0011) | 2 experiments (`tool-surface-v1`, `failure-flood-v1`), both in progress |
 | `upstream/` | Experiments against `gentle-ai` / `engram` / `gga` / `claude-code`, staged bug reports | No — experiments | `gentle-ai`: `0001` filed as [#2478](https://github.com/Gentleman-Programming/gentle-ai/issues/2478), `0002` and `0004` staged, `0003` **rejected** (resolved on 2.3.0 before filing). `claude-code`: `0001` staged |
 
-**Correction** (2026-10-14, `odd/tasks/verified-agent-delivery.md`): adding the `odd/` row above is the
+**Correction 2** (2026-10-14, same day, task T2): the paragraph below is already obsolete — `odd/tasks/`
+is now source 6 of `./open-work.sh`, enumerated from task-checkbox syntax. It is left standing because
+this file's rule is to record and not erase, and because an obsolete paragraph written and fixed on the
+same day is the cheapest available demonstration of why a hand-maintained pointer rots: it took one
+commit. What did **not** rot is the class of gap it describes — a directory nobody enumerates still
+reports nothing, and the next one will announce itself no louder than this one did. ADR 0016 carries
+the amendment.
+
+**Correction 1** (2026-10-14, `odd/tasks/verified-agent-delivery.md`): adding the `odd/` row above is the
 second half of what that directory's Log L5 records. `./open-work.sh` is *the generated index of what is
 open*, enumerates six structural sources, and cannot see `odd/tasks/`. So from 2026-10-14 until that
 index learns a seventh source, **this file is the only thing in the repository that knows an ODD feature
@@ -95,7 +103,7 @@ Do not create a target directory before there is validated content to put in it.
 | "Why is it done this way?" | `decisions/` |
 | "Is this claim backed?" | the artifact's `sources` field; empty means not verified |
 | "What was discussed about X?" | `journal/` — context and provenance only, never authority |
-| "What is open right now?" | `./open-work.sh` — generated, never hand-maintained. Read its COVERAGE block too: it states what the index cannot see. **It does not yet see `odd/tasks/`** |
+| "What is open right now?" | `./open-work.sh` — generated, never hand-maintained. Read its COVERAGE block too: it states what the index cannot see, and it cannot see a source nobody has written yet |
 | "What are we still unsure about?" | `hypotheses/` — open claims with their tests. Never citable |
 | "What do real projects actually lack?" | `gaps/` — and a demand needs two independent records before it builds anything |
 | "What can I actually ask for?" | `ASK.md` — the five skills in plain request form. The only file written for the human |

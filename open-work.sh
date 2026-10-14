@@ -16,18 +16,27 @@
 #   content file, this runs when a session starts. ADR 0016 carries the reasoning.
 #
 # WHAT IT READS - structure first, prose last
-#   Five of the six sources are a directory listing or a frontmatter field, and `check.sh`
-#   already verifies that schema on every content file. So this inherits a checked input
-#   instead of introducing an unchecked one.
+#   Five of the seven sources are read from a directory listing, one frontmatter field, or task-
+#   checkbox syntax; two are prose read for a marker. Of the five, the files listed do carry the
+#   frontmatter schema `check.sh` enforces, and `status` on an ADR is an enum that checker validates —
+#   so those sources inherit a checked input. One does not, and saying so is the point: **nothing in
+#   this repository validates task-checkbox SYNTAX.** `check.sh` reads frontmatter and the `skills/`
+#   obligation, nothing else, so `odd/tasks/` is enumerated from a shape no checker enforces. That
+#   exposure is bounded by making it fail closed — see section_odd: a malformed box parses as "no
+#   boxes", and "no boxes" is reported as UNDECIDABLE and listed, never as closed.
 #
 #     1. BACKLOG.md `###` entries       blocked work, each with its own named unblock condition
 #     2. hypotheses/                    open claims with a declared test (ADR 0012: zero citability)
 #     3. gaps/                          demand records below the two-occurrence threshold
 #     4. decisions/ with status: draft  a decision made and not ratified
 #     5. sdd/ outside sdd/archive/      a cycle still in flight
-#     6. `## What is not settled`       declared-unsettled prose, wherever someone wrote it
+#     6. odd/tasks/                     a feature document whose task boxes are not all ticked
+#     7. `## What is not settled`       declared-unsettled prose, wherever someone wrote it
 #
-#   Source 6 was proposed as the foundation of this index. Counted, it exists in two files,
+#   The `## What is not settled` convention was proposed as the foundation of this index. It is named
+#   here rather than numbered because numbering broke in the one commit that inserted a source ahead of
+#   it: this paragraph said "Source 6", and after `odd/tasks/` arrived that number pointed somewhere
+#   else while the sentence still read fluently. A stale pointer that still parses is the worst kind.
 #   both under `journal/`. It stays as the smallest input rather than the basis, because a
 #   generated index built on a two-file marker would have read as complete while being nearly
 #   empty - a worse failure than the stale hand-written table AGENTS.md already forbids.
@@ -335,7 +344,7 @@ section_sdd() {
   fi
 }
 
-# --- source 6: the prose convention ------------------------------------------------------
+# --- source 7: the prose convention ------------------------------------------------------
 section_not_settled() {
   found=''
   n=0
@@ -368,6 +377,94 @@ section_not_settled() {
     for e in $found; do
       IFS="$OLD_IFS"
       item "$e"
+      IFS='
+'
+    done
+    IFS="$OLD_IFS"
+    TOTAL=$((TOTAL + n))
+  fi
+}
+
+# --- source 6: an ODD feature document that has not closed --------------------------------
+section_odd() {
+  # Closure is read from checkbox SYNTAX, never from prose. A document that says "done" in a
+  # sentence while its boxes are empty is open, and a document whose every box is ticked is closed
+  # however pessimistic its prose reads. That is the whole reason this source is structural: the
+  # alternative is a checker that reads English, which is the layer `verifier-availability.md`
+  # measures as worth nothing.
+  #
+  # Three states are distinguishable and only one of them is skipped:
+  #   open        at least one `- [ ]` remains
+  #   closed      at least one `- [x]`, and no `- [ ]`
+  #   undecidable no task checkbox at all, so nothing here can tell whether the work finished
+  # An undecidable document is LISTED and COUNTED. Dropping it would be `absent` reported as `0`
+  # one level down - the exact confusion this file's header refuses - and a document with no
+  # checklist is precisely the case a person should be told about, not shown as absent.
+  if [ ! -d odd/tasks ]; then
+    head_row "ODD FEATURE DOCUMENTS NOT YET CLOSED" "odd/tasks/" "absent"
+    return 0
+  fi
+  [ -r odd/tasks ] || die_cannot_run "odd/tasks/ exists but is unreadable, so this index would under-report"
+
+  found=''
+  n=0
+  undec=0
+  OLD_IFS="$IFS"
+  IFS='
+'
+  for f in odd/tasks/*.md; do
+    IFS="$OLD_IFS"
+    [ -f "$f" ] || continue
+    case "$f" in odd/tasks/README.md) continue ;; esac
+    [ -r "$f" ] || die_cannot_run "'$f' is unreadable, so this index would under-report"
+
+    # `-c` prints 0 and exits 1 when nothing matched; only an exit above 1 is a real failure.
+    set +e
+    unchecked="$(grep -E -c '^[[:space:]]*- \[ \]' -- "$f")"
+    grc=$?
+    checked="$(grep -E -c '^[[:space:]]*- \[[xX]\]' -- "$f")"
+    grc2=$?
+    set -e
+    [ "$grc" -le 1 ] || die_cannot_run "grep exited $grc while reading '$f' for unchecked tasks"
+    [ "$grc2" -le 1 ] || die_cannot_run "grep exited $grc2 while reading '$f' for checked tasks"
+
+    base="${f#odd/tasks/}"
+    base="${base%.md}"
+    if [ "$unchecked" -gt 0 ]; then
+      found="$found$base|$unchecked
+"
+      n=$((n + 1))
+    elif [ "$checked" -eq 0 ]; then
+      found="$found$base|undecidable
+"
+      n=$((n + 1))
+      undec=$((undec + 1))
+    fi
+    IFS='
+'
+  done
+  IFS="$OLD_IFS"
+
+  head_row "ODD FEATURE DOCUMENTS NOT YET CLOSED" "odd/tasks/" "$n"
+  if [ "$n" -gt 0 ]; then
+    detail "open while one '- [ ]' remains; a ticked box is a claim, the Log beside it is the evidence"
+    [ "$undec" -gt 0 ] && detail "$undec of them carry no task checkbox, so closure is UNDECIDABLE from structure and is reported, never assumed"
+  fi
+  if [ "$n" -gt 0 ]; then
+    OLD_IFS="$IFS"
+    IFS='
+'
+    for e in $found; do
+      IFS="$OLD_IFS"
+      name="${e%%|*}"
+      state="${e##*|}"
+      if [ "$state" = "undecidable" ]; then
+        item "$name"
+        detail "no '- [ ]' and no '- [x]' anywhere: nothing here can tell whether this finished"
+      else
+        item "$name"
+        detail "$state task(s) still unchecked"
+      fi
       IFS='
 '
     done
@@ -548,6 +645,58 @@ self_test() {
   assert_out "hypotheses/: 0"
   assert_not_out "hypotheses/: absent"
 
+  # --- source 6: odd/tasks/. These cases exist because nothing else in this repository validates
+  # task-checkbox syntax, so the closure rule below is pinned here or nowhere.
+  CASE="an absent odd/tasks/ prints absent, not zero"
+  fixture; run_index
+  assert_rc 0
+  assert_out "odd/tasks/: absent"
+  assert_not_out "odd/tasks/: 0"
+
+  CASE="an ODD document with an unchecked task is open work"
+  fixture
+  write_fm "odd/tasks/alpha.md" "odd/alpha" "journal" "draft" "alpha"
+  printf '\n- [x] T0 a finished slice\n- [ ] T1 an open one\n' >> "$TMP/odd/tasks/alpha.md"
+  run_index
+  assert_rc 0
+  assert_out "across 7 source(s)"
+  assert_out "odd/tasks/: 1"
+  assert_out "alpha"
+  assert_out "1 task(s) still unchecked"
+
+  CASE="an ODD document with every task ticked is closed, not open work"
+  fixture
+  write_fm "odd/tasks/alpha.md" "odd/alpha" "journal" "draft" "alpha"
+  printf '\n- [x] T0 a finished slice\n- [x] T1 another one\n' >> "$TMP/odd/tasks/alpha.md"
+  run_index
+  assert_rc 0
+  assert_out "odd/tasks/: 0"
+  assert_not_out "alpha"
+  assert_not_out "task(s) still unchecked"
+
+  CASE="an ODD document with no task checkbox at all is undecidable and still listed"
+  fixture
+  write_fm "odd/tasks/beta.md" "odd/beta" "journal" "draft" "beta"
+  printf '\nProse that declares the work finished, and no boxes anywhere.\n' >> "$TMP/odd/tasks/beta.md"
+  run_index
+  assert_rc 0
+  assert_out "odd/tasks/: 1"
+  assert_out "beta"
+  assert_out "no '- [ ]' and no '- [x]' anywhere"
+  assert_out "1 of them carry no task checkbox"
+
+  CASE="a closed document among open ones counts once, and is not named"
+  fixture
+  write_fm "odd/tasks/alpha.md" "odd/alpha" "journal" "draft" "alpha"
+  printf '\n- [ ] T1 still owed\n' >> "$TMP/odd/tasks/alpha.md"
+  write_fm "odd/tasks/beta.md" "odd/beta" "journal" "draft" "beta"
+  printf '\n- [x] T0 all done\n' >> "$TMP/odd/tasks/beta.md"
+  run_index
+  assert_rc 0
+  assert_out "odd/tasks/: 1"
+  assert_out "alpha"
+  assert_not_out "beta"
+
   CASE="a backlog entry with no unblock condition is named as such"
   fixture
   write_fm "BACKLOG.md" "backlog" "index" "draft" "backlog"
@@ -617,6 +766,7 @@ BODY="$(
     "two independent records for the same demand are what build a block; see gaps/README.md"
   section_unratified
   section_sdd
+  section_odd
   section_not_settled
   printf '__TOTAL__%s\n' "$TOTAL"
   printf '__SOURCES__%s\n' "$SOURCES"

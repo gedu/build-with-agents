@@ -130,10 +130,17 @@ What it does **not** check: whether an `ASK.md` entry is any good, `targets` mem
 
 ### `./open-work.sh` — not a gate, and the exit codes say so
 
-The generated index of open work (ADR 0016, `draft`). It reads six structural sources — `BACKLOG.md`
-entries, `hypotheses/`, `gaps/`, `decisions/` at `status: draft`, `sdd/` outside `sdd/archive/`, and
-`## What is not settled` sections — and prints them to stdout. It writes nothing to disk, so there is
-no generated file to gitignore and nothing that can go stale between runs.
+The generated index of open work (ADR 0016, `draft`). It reads seven sources — `BACKLOG.md` entries,
+`hypotheses/`, `gaps/`, `decisions/` at `status: draft`, `sdd/` outside `sdd/archive/`, `odd/tasks/`,
+and `## What is not settled` sections — and prints them to stdout. It writes nothing to disk, so there
+is no generated file to gitignore and nothing that can go stale between runs.
+
+`odd/tasks/` is the one source read from **task-checkbox syntax**: open while one `- [ ]` remains,
+closed when every box is ticked. A document with no checkbox at all prints **UNDECIDABLE and is still
+listed**, because "no evidence it finished" is not "it finished" — the same distinction as `absent`
+versus `0`, one level down. Nothing in this repository validates that syntax (`./check.sh` reads
+frontmatter and the `skills/` obligation and nothing else), so the shape is pinned by
+`./open-work.sh --self-test`, which carries five cases for it and fails without them.
 
 | Exit | Meaning | What you must do |
 |---|---|---|
