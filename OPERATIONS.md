@@ -42,6 +42,7 @@ only some sessions need belongs behind a read-on-demand pointer rather than in a
 | Change `hooks/redaction-patterns.sh` | **both** hooks' `--self-test` | Yes. One list, two readers |
 | Change `check.sh` | `./check.sh --self-test` | Yes, same reason |
 | Change `open-work.sh` | `./open-work.sh --self-test` | Yes. Its cases assert the printed output, not only the exit code — for a generator the exit code is not the product |
+| Change `.github/workflows/verify.yml` | `actionlint <file>`, plus a planted mutant | Yes. A workflow that cannot be parsed is an absent gate that reports nothing; verify the linter fires before believing it passed |
 | Change `setup.sh` | `./setup.sh --self-test` | Yes. Its six cases assert the header's safety contract: a pre-existing real file kept, a foreign symlink kept, no unanchored `.gitignore` entry surviving, byte-identical re-runs, a dry run that writes nothing, and a `--hooks`-only run that leaves the managed block alone. Each of those failures is silent, and the first two cost a committed file |
 | Change shell | `sh -n <file>`, or `bash -n` for `setup.sh` and `hooks/pre-commit` | Yes. There is still no test *runner*, by decision — ADR 0013 |
 | Change Python | `python3 -m py_compile <file>` | Yes, same reason |
@@ -163,26 +164,43 @@ open", not "what should I do first". It also prints no path from outside the rep
 output is meant to be pasted into a session or an issue and ADR 0009 applies to anything that leaves
 the machine.
 
-### There is no CI. Every command above is yours to run
+### `.github/workflows/verify.yml` — the layer that always runs, and what it cannot do
 
-ADR 0014 decided this repository needs a server-side copy of these checks and records why it is
-deferred. Nothing on a server runs them today, so treat this section as the operating reality rather
-than a temporary note:
+The server-side copy ADR 0014 decided on is committed. It reads **nothing** about your machine and needs
+no setup step, which is the entire point: a collaborator who never ran `./setup.sh --hooks` is still
+scanned.
 
-- **Before any push**, run `./hooks/pre-commit --all` and `./check.sh`. Nothing will do it for you and
-  nothing will tell you that you skipped it.
-- **`--all` reads tracked files only.** A file you just wrote is invisible to it until you stage it.
-  Staging then rerunning is the check; writing then running is not.
-- **A clone has no gate at all** until somebody runs `./setup.sh --hooks`, and a worktree does not
-  inherit that install. Run `skills/checkout-isolation`'s gate check to see which `pre-commit` — if
-  any — actually guards the tree you are in.
+| Job | Self-test first | Then the check |
+|---|---|---|
+| redaction gate | `./hooks/pre-commit --self-test` | `./hooks/pre-commit --all` |
+| commit message gate | `./hooks/commit-msg --self-test` | `./hooks/commit-msg --range <from> <to>` |
+| structural invariants | `./check.sh --self-test` | `./check.sh` |
+| committed executables | `./setup.sh --self-test`, `./open-work.sh --self-test` | `./open-work.sh` — accepted only on exit 0 |
 
-`main` is protected by a repository ruleset: pull request required, force-push and deletion blocked,
-and **no required status check**, because there is no check for it to require. A pull request
-therefore merges on nobody having looked.
+Each self-test runs in the **same job** as the check it guards. Split across two jobs, a check could
+report clean in a green job while its own self-test failed in a red one — ADR 0014's non-negotiable
+list, and the reason `./open-work.sh` is run rather than merely self-tested: exit 2 there means *could
+not run*, and ADR 0014 forbids reporting that as a pass.
 
-Nothing in that file may `continue-on-error`, `|| true`, or skip its way to green. A job that cannot
-run its check must fail; that is the rule the whole file exists to hold.
+Three limits, stated because each one has already fooled somebody once:
+
+- **It detects; it does not prevent.** `on: push` runs after the content is published, and ADR 0009
+  says pushing is not reversible in any way that matters. The local hooks stay the only layer that
+  prevents. Nothing here makes them optional, and **`--all` still reads tracked files only** — stage
+  then rerun; write then run is not the check.
+- **Committed is not running.** A workflow file GitHub has never seen executes nothing, and the
+  repository's Actions API reports zero workflows until this file is pushed. Until then this section
+  describes an intention with a commit hash, not a guarantee. Verify it with
+  `gh api repos/<owner>/<repo>/actions/workflows` rather than by trusting the file's existence.
+- **A green job nobody requires is a report, not a gate.** `main` is protected by a repository ruleset
+  — pull request required, force-push and deletion blocked — with **no required status check**, so a
+  pull request still merges with these jobs red or never-run. Making them blocking is repository
+  configuration in a web UI; no committed file can ship it, and ADR 0014 says so about its own product.
+
+Nothing in that file may `continue-on-error`, `|| true`, or skip its way to green. A job that cannot run
+its check must fail; that is the rule the whole file exists to hold. When you edit it, run
+`actionlint` — and prove it fires by planting a broken mapping and an unquoted variable, because
+`actionlint` exits 0 on a file nobody can parse only if you never tried one.
 
 ### `bash -n` and `python3 -m py_compile`
 

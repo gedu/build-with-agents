@@ -128,7 +128,7 @@ Ordered by dependency, not by discovery. Work the frontier: any task whose block
     source), and this document. `journal/2026-08-19` also says "six sources" and was **not** edited — a
     dated record is provenance, not a pointer to maintain.
 
-- [ ] **T3 Land the server-side layer: one workflow, three jobs, each pairing its self-test with the
+- [x] **T3 Land the server-side layer: one workflow, four jobs, each pairing its self-test with the
   check it guards**
   - Blocked by: T2 (so the workflow can run T2's executable, and so `odd/` is visible to what it reports)
   - Seams: `hooks/pre-commit --self-test`, `hooks/commit-msg --range`, `check.sh --self-test`,
@@ -146,6 +146,35 @@ Ordered by dependency, not by discovery. Work the frontier: any task whose block
     selected this work knowing it.
   - Push, branch protection and required status checks stay the operator's — ADR 0014 is explicit that
     protection is a web-UI setting no committed file can ship.
+  - **Recovered, not rewritten.** Found by searching the object database before writing anything:
+    dangling commit `fcaae282` (2026-08-17) holds `.github/workflows/verify.yml`, 134 lines, and the
+    working-tree file is **byte-identical** to it — blob `2fc49e6521803d1fb91143b5c5abe84893d7695d` on
+    both sides. A `git commit` on a branch that never became a ref leaves the object reachable only by
+    `git fsck --lost-found`, so "decided and never built" was wrong in the direction of *already built*.
+    The search that found it is recorded in ADR 0014 as one command.
+  - **Four jobs, not three.** The task named three because ADR 0014's draft had three. Two committed
+    executables post-date that draft — `./setup.sh --self-test` and `./open-work.sh`, which did not exist
+    on 2026-08-17 — and ADR 0014's own non-negotiable list already requires CI to run every committed
+    executable's own test. The fourth job applies the decision; it adds none. Its one non-self-test step
+    runs `./open-work.sh` and accepts **only exit 0**, because exit 2 means *could not run* (forbidden as
+    a pass) while exit 0 proves nothing about content — the step must never fail a push for holding open
+    work. Verified rather than asserted: an index exiting 2 fails the step with **and** without `bash -e`.
+  - Evidence: `actionlint` 1.7.12 exit 0 on the file, **and it fires** — a broken mapping and an unquoted
+    variable each exit 1 (SC2086), so exit 0 here is a result and not a silence; `shellcheck` 0.11.0 was
+    present, which is the precondition for `actionlint` to have read the inline shell at all.
+    Independently verified the dependency pin: tag `v7.0.1` resolves to `3d3c42e5…`, commit message
+    "prep v7.0.1 release (#2531)", 2026-07-17 — the pin names a real release, not a mutable tag.
+    Command-level mutants for the jobs: `./hooks/pre-commit --all` with a planted home-path in a tracked
+    file → **exit 1**; `./check.sh` with a planted `type: thoery` → **exit 1**, naming file and field;
+    `commit-msg --range` over a leaky message is asserted by the hook's own suite (`hooks/commit-msg:299`).
+    `git check-ignore` exit 1 → the workflow is not ignored, and `setup.sh` ignores the narrow path
+    `/.github/copilot-instructions.md`, not the directory, so `--copilot` cannot hide this file.
+  - **What is NOT proven, stated as the gap it is.** S8 asked for a planted-violation *push* proving a
+    job goes red on the server. Not done: pushing is the operator's decision, so the end-to-end claim
+    "this workflow turns red on GitHub" is **unverified**, and command-level mutants are the strongest
+    available substitute. The repository's Actions API returns `total_count: 0` as measured today
+    (`gh api repos/<owner>/<repo>/actions/workflows`) — the workflow is committed and has never run.
+    "Committed" and "running" are written apart in every file this task touched, for that reason.
 
 - [ ] **T4 Measure the two timeout placeholders and replace them with measured values**
   - Blocked by: None (parallel with T2, disjoint files: `rig/run-pipeline.sh` only)
@@ -230,7 +259,8 @@ gate below is invoked by hand and its exit code is read.
 |---|---|---|---|
 | T1 | done | `2839cd6` | `./check.sh` 0 over the tree; `./check.sh --self-test` 0; `./hooks/pre-commit --all` 0; `./open-work.sh` printed 6 sources and did **not** list this document — T2's red reproduced before T2 was written |
 | T2 | done | this commit's hash is the next one's to record, per T1's self-reference note | `./open-work.sh --self-test` 0; **12 FAIL + exit 1** with the new section deleted (deletion-mutant, recount without truncation); `sh -n` 0; `./check.sh` 0; `./hooks/pre-commit --all` 0; index prints 16 items across 7 sources |
-| T3–T7 | not started | — | — |
+| T3 | done, **not yet running** | this commit's hash is the next one's to record | `actionlint` 1.7.12 exit 0, exit 1 on both planted mutants (broken mapping; unquoted var → SC2086) with `shellcheck` 0.11.0 present; recovered file byte-identical to blob `2fc49e65…`; `git check-ignore` exit 1; mutants of the job commands: `pre-commit --all` 1 with a planted path, `check.sh` 1 with a planted `type:`; `gh api …/actions/workflows` → `total_count: 0` |
+| T4–T7 | not started | — | — |
 
 ## Log
 
@@ -313,6 +343,32 @@ measured during the work, but a figure this document's own state produces must b
 plus its value at that commit, never as a standing claim.** It is the same property
 `sdd/archive/2026-08-27-run-input-provenance` exists to guarantee — a record must carry what it was
 measured against — arriving one level down, where what it was measured against is *itself, earlier*.
+
+**L9 — the thing ADR 0014 said was never built had been built, committed, and left in the object
+ database for two months (2026-10-14).** T3's own text instructed: recover first, rewrite only as a
+fallback. Recovering took one `git fsck --lost-found` loop over dangling commits, because the workflow
+was written, committed on a branch that never became a ref, and then abandoned — the blob outlived every
+story about it. Three consequences worth more than this task:
+
+1. **A decision file's "it is not committed" is a claim about one branch, not about the object database.**
+   The cost of believing it without checking was not a lost afternoon — it was a *second, worse*
+   implementation of a gate, written fresh, next to the verified one, with nothing saying which was which.
+   Before rewriting anything a decision file says exists-but-wasn't-shipped, search for it.
+2. **Byte-identity is what makes "recovered" a true sentence.** Comparing `git rev-parse <obj>:<path>`
+   against `git hash-object <path>` costs one command and is the only thing separating recovery from a
+   rewrite described as recovery. Without it, "I recovered it" and "I rewrote it the same way" are
+   indistinguishable, and only one of them carries the original's verification history.
+3. **The ADR's own rule was the source of the extra job, not a new idea.** ADR 0014 lists as
+   non-negotiable that CI runs every committed executable's own test; two executables were written after
+   the draft, so the file had silently stopped satisfying the decision it implements. A committed gate
+   can rot by the *repo growing around it*, which no self-test of the gate would ever report.
+
+**L10 — a limit found while writing about limits (2026-10-14).** `actionlint` exits 0 on a workflow whose
+inline shell it never analysed, because `shellcheck` was not installed to begin with. The tool that
+verifies a gate is itself subject to `theory/loops/verifier-availability.md`: an absent analyser produces
+a clean exit and reports nothing. So "actionlint passed" was not evidence until the analyser's presence
+was checked and two mutants were planted to show exit 1. The rule this leaves, which generalises S8
+beyond this repo: **verify the verifier is capable of failing before citing its silence as a pass.**
 
 Two findings that outlive T2 and belong to the repository, not to this task:
 

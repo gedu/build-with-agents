@@ -1,0 +1,166 @@
+# verify — the only layer of this repo a new collaborator needs nothing for.
+#
+# Every other guarantee here is local and opt-in. Git hooks live in .git/, which is never
+# cloned, and git deliberately runs nothing on clone, so a collaborator who has not run
+# `./setup.sh --hooks` has no redaction gate and nothing tells them. This workflow is the
+# server-side half. See decisions/0014-a-public-guarantee-cannot-be-opt-in.md, including
+# its honest limit: `on: push` runs AFTER the content is published, so it detects rather
+# than prevents. Prevention on a shared branch is a branch protection rule, which is
+# repository configuration and not a committed file.
+#
+# THE RULE EVERY JOB BELOW FOLLOWS
+# A job that cannot run its check must FAIL. `could not run` is not `passed`
+# (theory/loops/verifier-availability.md). Each executable here exits 2 for that state and
+# a non-zero exit fails the job, so the distinction survives into the CI result. Nothing
+# below is allowed to `|| true`, `continue-on-error`, or skip its way to green.
+#
+# WHY EACH JOB RUNS A SELF-TEST BEFORE THE CHECK
+# ADR 0013 — a committed executable carries its own test. The self-test and the check it
+# guards are steps of ONE job, in that order, on purpose: split across two jobs, the check
+# could report "clean" in a green job while its own self-test failed in a red one.
+
+name: verify
+
+on:
+  push:
+  pull_request:
+
+# Read-only is enough: nothing here comments, labels, pushes or publishes.
+permissions:
+  contents: read
+
+jobs:
+  redaction:
+    name: redaction gate
+    runs-on: ubuntu-latest
+    steps:
+      # Pinned to a commit, not a tag: a tag is mutable and this is the step that fetches
+      # the code every other step trusts.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # `--all` reads the working tree, not history. One commit is all it needs.
+          fetch-depth: 1
+      - name: Prove the gate works before trusting it
+        run: ./hooks/pre-commit --self-test
+      - name: Scan every tracked file
+        run: ./hooks/pre-commit --all
+
+  commit-messages:
+    name: commit message gate
+    runs-on: ubuntu-latest
+    # A branch or tag deletion carries no content and its ref is already gone. Every other
+    # event must produce a real result.
+    if: github.event.deleted != true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The range scan reads commit messages, so it needs the commits. A shallow clone
+          # would leave the range endpoints absent and send this job down its full-history
+          # fallback on every run.
+          fetch-depth: 0
+      - name: Prove the gate works before trusting it
+        run: ./hooks/commit-msg --self-test
+      - name: Scan the commit messages in this event's range
+        # Event fields are passed through the environment rather than interpolated into
+        # the script, so no value from the event is ever parsed as shell.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_AFTER: ${{ github.sha }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -eu
+
+          case "$EVENT_NAME" in
+            push)
+              TO="$PUSH_AFTER"
+              FROM="$PUSH_BEFORE"
+              # `before` is all zeros on a new branch, a new tag, and after some
+              # force-pushes. The range is then invalid, and `git rev-list <zeros>..<head>`
+              # would not quietly scan nothing — it would error — but neither outcome is
+              # allowed to become a pass. Fall back to the full reachable history and say
+              # so in the log.
+              case "$FROM" in
+                '')
+                  echo "::notice::this push event carried no 'before' revision; scanning every commit reachable from $TO instead"
+                  FROM='-'
+                  ;;
+                *[!0]*)
+                  : # contains a non-zero character, so it is a real revision
+                  ;;
+                *)
+                  echo "::notice::'before' is all zeros (new branch, new tag, or force-push); scanning every commit reachable from $TO instead"
+                  FROM='-'
+                  ;;
+              esac
+              ;;
+            pull_request)
+              FROM="$PR_BASE"
+              TO="$PR_HEAD"
+              if [ -z "$FROM" ] || [ -z "$TO" ]; then
+                echo "::error::this pull_request event carried no base or head revision; refusing to report a pass for a range that could not be computed"
+                exit 2
+              fi
+              ;;
+            *)
+              echo "::error::unsupported event '$EVENT_NAME'; refusing to report a pass for a range that could not be computed"
+              exit 2
+              ;;
+          esac
+
+          # A force-push can also leave `before` pointing at a commit that is no longer
+          # reachable and therefore not in this checkout. Same fallback, same loud note.
+          if [ "$FROM" != '-' ] && ! git cat-file -e "${FROM}^{commit}" 2>/dev/null; then
+            echo "::notice::'$FROM' is not present in this checkout; scanning every commit reachable from $TO instead"
+            FROM='-'
+          fi
+
+          echo "range: ${FROM}..${TO}"
+          ./hooks/commit-msg --range "$FROM" "$TO"
+
+  structure:
+    name: structural invariants
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Frontmatter and the skills/ASK.md rule are properties of the tree, not of
+          # history.
+          fetch-depth: 1
+      - name: Prove the checker works before trusting it
+        run: ./check.sh --self-test
+      - name: Check the structural invariants
+        run: ./check.sh
+
+  # Two committed executables post-date the draft of this workflow: ./setup.sh grew its --self-test and
+  # ./open-work.sh did not exist. ADR 0014's non-negotiable list says every committed executable carries
+  # its own test and that CI runs it, so these two were already covered by the decision — they were only
+  # missing from the file. One job, because neither is a gate and neither may become one here.
+  #
+  # WHY ./open-work.sh IS RUN AND NOT ONLY SELF-TESTED
+  # It is not a gate and open work is not a violation, so its exit 0 proves nothing about this
+  # repository's content — running it must never be able to fail a push for holding open work. Its exit 2
+  # means 'could not run', which is exactly the state ADR 0014 forbids reporting as a pass. So the step
+  # asserts exit 0 specifically and treats any other code as the failure it is: `set -e` alone would
+  # already fail on 2, and it is kept that way on purpose.
+  #
+  # WHY THIS JOB IS THE FRESH-CLONE PROOF FOR TWO OF THEM
+  # `setup.sh --self-test` asserts the installer's safety contract (a pre-existing real file kept, a
+  # foreign symlink kept, no unanchored .gitignore entry surviving, byte-identical re-runs, a dry run
+  # that writes nothing). ./setup.sh and ./open-work.sh are POSIX-ish tools with no install step, so a
+  # runner that has installed nothing is the most honest environment they can be tested in.
+  executables:
+    name: committed executables
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # All three are properties of the tree. No history is read here.
+          fetch-depth: 1
+      - name: Prove the installer's own test passes
+        run: ./setup.sh --self-test
+      - name: Prove the open-work index behaves as specified
+        run: ./open-work.sh --self-test
+      - name: Run the index, and accept nothing but exit 0
+        run: ./open-work.sh

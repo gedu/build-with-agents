@@ -9,12 +9,15 @@ sources: ["journal/2026-08-17-three-rules-with-no-verifier.md", "AGENTS.md", "de
 
 # 0014 — A guarantee a public repo depends on cannot be opt-in and local
 
-`status: draft` — the decision is made, **half of it is implemented**, and the operator has not
-ratified it. Promotion to `validated` is the operator's act, not this file's.
+`status: draft` — the decision is made, **both layers are now implemented**, and the operator has not
+ratified it. Promotion to `validated` is the operator's act, not this file's, and this amendment does
+not attempt it: what changed on 2026-10-14 is *Implementation status*, not the status field.
 
-**Read "Implementation status" before citing this ADR.** The local layer shipped. The server-side
-layer, which is the half that answers the problem stated below, has not. Until it does, the finding
-in *Context* is still true of this repository: a fresh clone has no gate.
+**Read "Implementation status" before citing this ADR.** Both layers now exist in the tree. What still
+does not exist is the part no committed file can ship: a **required** status check. So the finding in
+*Context* is narrowed, not closed — a fresh clone gets scanned whether or not anybody installed
+anything, and a pull request still merges with the scan red. "No gate" became "a gate that reports and
+does not block"; read the three limits under *The limit* before treating either phrase as the other.
 
 ## Context
 
@@ -50,7 +53,7 @@ a problem before it exists; they stop being the only layer.
 
 | Layer | Covers | Force |
 |---|---|---|
-| A server-side job | Redaction over the tree, redaction over the pushed commit messages, structural invariants | Runs on the server. Nothing to install, nothing to opt into, no way to not have it. **Not implemented — see Implementation status** |
+| A server-side job | Redaction over the tree, redaction over the pushed commit messages, structural invariants, and the self-tests of every committed executable | Runs on the server. Nothing to install, nothing to opt into, no way to not have it. **Implemented** as `.github/workflows/verify.yml` — committed, and see its three limits: it detects after publication, committed is not running, and no check is required |
 | `hooks/pre-commit` | Redaction over staged files | Prevents. Requires `./setup.sh --hooks` |
 | `hooks/commit-msg` | Redaction over the proposed commit message | Prevents. Requires `./setup.sh --hooks` |
 | `./check.sh` | Frontmatter schema, and rule C | Reports. Run by hand or by CI |
@@ -78,25 +81,54 @@ Shipped in the same commit as this ADR:
 | `hooks/redaction-patterns.sh` | Implemented. Both gates source it; both exit 2 when it is missing |
 | `./check.sh` | Implemented, self-tested. Rules B and C now have a verifier |
 
-**Deferred: the server-side layer.** It was written and verified locally — three jobs, each pairing
-its self-test with the check it guards, a range step handling an all-zeros or unreachable `before` by
-scanning full history loudly rather than scanning nothing, and every event value passed through the
-environment so none of it is parsed as shell. It is not committed.
+**The server-side layer: deferred 2026-08-17, committed 2026-10-14.**
 
-The reason is not technical. Pushing a workflow file requires a token scope that permits writing code
-GitHub itself executes on its runners, and the operator declined to widen the token for a guarantee
-whose beneficiary — a second contributor — does not exist yet. That is a defensible call: this ADR's
-own rule against building for imagined demand applies to the ADR.
+What the deferral recorded was accurate and worth re-reading, because the artifact it described turned
+out to exist. The file was not lost and not rewritten: it was recovered **byte-identical** (blob
+`2fc49e65…` on both sides) from a dangling commit of 2026-08-17 that had never reached a branch and was
+still in the object database. The description below matched the object exactly — three jobs, each
+pairing its self-test with the check it guards, a range step handling an all-zeros or unreachable
+`before` by scanning full history loudly rather than scanning nothing, every event value passed through
+the environment so none of it is parsed as shell.
 
-**What that costs, stated plainly so nobody cites this ADR as if it were closed:**
+That is a fact about git worth keeping: `git commit` on a branch that is then abandoned leaves the
+object reachable only by `git fsck --lost-found`, and "we decided this and never built it" can be
+wrong in the direction of *already built*. Before rewriting something a decision file says was written
+and verified, search the object database. The search that found it took one command:
 
-- The fresh-clone guarantee **does not exist**. A collaborator who clones and does not run
-  `./setup.sh --hooks` still has no gate, exactly as *Context* describes.
-- Rules A, B and C now have verifiers, but every one of them is local and opt-in — the same class of
-  coverage this ADR was written to end.
-- The owner is covered only in a checkout where the hooks were installed **and** resolve to this tree.
-  `skills/checkout-isolation` exists because that is not automatic: this ADR was written in a worktree
-  whose gate reported `WRONG TREE`, and every check in it was run by hand.
+```sh
+git fsck --lost-found --no-reflogs | awk '/dangling commit/ {print $3}' | \
+  while read -r c; do git show --stat --format='%h %ad %s' "$c"; done
+```
+
+Two jobs were added on the way in, and they are this ADR's own rule applied rather than a new idea: its
+non-negotiable list says every committed executable carries its own test and CI runs it, and two
+executables post-date the draft — `./setup.sh --self-test` and `./open-work.sh`, which did not exist on
+2026-08-17. `./open-work.sh` is *run*, not only self-tested, and accepted only on exit 0: its exit 2
+means "could not run", which this ADR forbids reporting as a pass, while its exit 0 proves nothing
+about content — open work is not a violation, so the step must never be able to fail a push for
+holding any.
+
+The token-scope objection that deferred it is now moot in one direction and standing in the other. Moot:
+the operator selected this work knowing what it was, and the file is committed under ordinary repository
+policy. Standing: **committing is not running.** GitHub executes a workflow it has never seen, so until
+this file reaches the default branch the repository's Actions API reports zero workflows and this whole
+layer describes an intention with a commit hash. Verify with `gh api repos/<owner>/<repo>/actions/workflows`
+rather than by the file's presence in a tree.
+
+**What still costs, restated so nobody cites this ADR as if it were closed:**
+
+- The fresh-clone guarantee **now exists in the tree and not yet on the server.** Same sentence as
+  before, different reason: it was never about whether a clone installs anything.
+- Rules A, B and C have verifiers at two layers. Coverage stops being "local and opt-in", which is what
+  this ADR was written to end; it does not become *blocking*.
+- No status check is required, so a pull request merges with the scan red or never-run. That is
+  repository configuration in a web UI and it stays undone; *The limit* below says why this file cannot
+  ship it.
+- The owner is covered by a checkout's own hooks **only** where they are installed and resolve to that
+  tree. `skills/checkout-isolation` exists because that is not automatic — and it is still true today:
+  the commit that landed this layer was made in a worktree whose gate reported `WRONG TREE`, and every
+  check in it was run by hand. The workflow does not change that, because it runs after the push.
 
 Revisit when a second contributor arrives, or when running the gates by hand stops being reliable.
 The decision above does not need remaking; only the scope question does.
@@ -126,13 +158,13 @@ only layer that always runs. Neither substitutes for the other.
 
 | Consequence | Detail |
 |---|---|
-| A fresh clone would be covered without a setup step | **Not realised.** This is what the deferred server-side layer buys: jobs needing nothing installed, running on a collaborator's push whether or not that person read `OPERATIONS.md`. Until it lands, a fresh clone has no gate |
+| A fresh clone would be covered without a setup step | **Realised in the tree, not yet on the server** (2026-10-14). The jobs need nothing installed and run on a collaborator's push whether or not that person read `OPERATIONS.md`. What is still not realised is the two thirds a committed file cannot buy: GitHub executes no workflow it has never seen, so until this file reaches the default branch the Actions API reports zero; and no status check is required, so coverage is a report, not a block |
 | A second redaction gate exists, so the pattern list is now shared | `hooks/redaction-patterns.sh` is sourced by both hooks. Editing it means running both self-tests; each asserts a real finding through the list, and each asserts exit 2 when the file is missing |
 | The frontmatter schema became an interface with a checker | `./check.sh` names the file and the field. `AGENTS.md`'s "schema = doc" rule now has a third artifact to keep in step: change the fields and `check.sh` changes in the same commit |
-| A new skill without an `ASK.md` entry fails the build | The obligation in `skills/README.md` stops depending on somebody remembering |
+| A new skill without an `ASK.md` entry fails the build | The obligation in `skills/README.md` stops depending on somebody remembering — **once the workflow runs**, which is the same condition as above. `./check.sh` reports it locally either way |
 | CI must never grow a check that cannot fail | Every step either produces a result or exits non-zero. `continue-on-error`, `|| true` and a silently empty scan range are forbidden here by name |
 | A new-branch or force-push event scans more, never less | `github.event.before` is all zeros then, and the range is invalid. The workflow falls back to the full reachable history and logs that it did |
-| The repo gained a `.github/` directory it did not have | It holds workflows. `setup.sh --copilot` also generates a gitignored file there; the two do not collide |
+| The repo gained a `.github/` directory it did not have | It holds workflows. `setup.sh --copilot` also generates a gitignored file there; the two do not collide, because `setup.sh` ignores the **narrow path** `/.github/copilot-instructions.md`, not the directory — verified before committing a file that had to stay visible, since a wholesale `/.github/` ignore would have hidden this workflow in silence and reported nothing |
 
 ## Alternatives
 
