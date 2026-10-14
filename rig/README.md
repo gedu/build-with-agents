@@ -70,7 +70,20 @@ surface_preimage_sha256` (per-step, Face C — the one digest that is not arm-le
 multi-step arm's preimage file can change between steps). Named as a correction rather than silently overwritten, per this file's own record-not-erase
 discipline. A related gap this correction does **not** also fix, named rather than left implicit:
 `rig/check.sh`'s `check_component_self_test()` still has no bash arm, so `run-pipeline.sh --self-test`
-is never composed by the repo gate and must still be run by hand.
+is never composed by the repo gate.
+
+**Update (2026-10-14, `odd/tasks/verified-agent-delivery.md` T9).** The rest of that sentence — "and must
+still be run by hand" — is no longer true, and the missing bash arm is **not** what fixed it. CI now runs
+`rig/check.sh --self-test`, `rig/run-pipeline.sh --self-test` and the three modules' own `--self-test` in
+the `rig-self-tests` job of `.github/workflows/verify.yml`, discovered from the index rather than listed.
+The composition gap inside this gate is unchanged and stays open: adding a bash arm to
+`check_component_self_test()` would not have helped CI, because `rig/check.sh` dispatches
+`--self-test) self_test; exit $?` and the `check_component_self_test` calls sit *below* that exit —
+unreachable from the flag. Verified by logging every `python3` invocation during
+`rig/check.sh --self-test`: five synthetic-fixture heredocs, zero `--self-test` calls. So running it by
+hand is now a convenience, not the only layer, and composing it here remains a separate decision with its
+own trigger (this gate's real gate is the one thing CI must never run — see the workflow's comment for
+what it does to `rig/results/` in a tree with no `rig/runs/`).
 
 ## Does NOT belong here
 

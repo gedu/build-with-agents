@@ -101,13 +101,33 @@ git fsck --lost-found --no-reflogs | awk '/dangling commit/ {print $3}' | \
   while read -r c; do git show --stat --format='%h %ad %s' "$c"; done
 ```
 
-Two jobs were added on the way in, and they are this ADR's own rule applied rather than a new idea: its
-non-negotiable list says every committed executable carries its own test and CI runs it, and two
-executables post-date the draft — `./setup.sh --self-test` and `./open-work.sh`, which did not exist on
+One job was added on the way in, and it is this ADR's own rule applied rather than a new idea: its
+non-negotiable list says every committed executable carries its own test and CI runs it, and **two
+executables** post-date the draft — `./setup.sh --self-test` and `./open-work.sh`, which did not exist on
 2026-08-17. `./open-work.sh` is *run*, not only self-tested, and accepted only on exit 0: its exit 2
 means "could not run", which this ADR forbids reporting as a pass, while its exit 0 proves nothing
 about content — open work is not a violation, so the step must never be able to fail a push for
 holding any.
+
+*Correction, 2026-10-14.* This paragraph opened "Two jobs were added", which was wrong the day T3 wrote
+it: the recovered draft holds three jobs and T3 holds four, so T3 added one job covering two
+executables. Measured with `git show <rev>:.github/workflows/verify.yml` over `fcaae282` (3) and
+`a5f81c4` (4), counting the job keys under `jobs:`. Two executables, one job — the sentence counted the
+executables and named them jobs. Same class as `MAP.md`'s stale task count, one file over: a derived
+figure asserted instead of computed.
+
+**The rig's own tests: covered 2026-10-14, by a rule rather than a list.** Two more committed
+executables post-date the draft the same way `setup.sh` and `open-work.sh` did — `rig/check.sh` and
+`rig/run-pipeline.sh` — and no `rig/*` path appeared in the workflow at all. A fourth job now runs them,
+plus the three `rig/*.py` modules' own `--self-test` (mode `100644`, so outside this ADR's word
+"executable"; they are covered because ADR 0013 is their warrant and CI ran them nowhere, the only thing
+that composes them being inside `rig/check.sh`'s real gate). Two properties of that job are load-bearing
+beyond this ADR:
+
+| Property | Why it is stated here |
+|---|---|
+| Its targets are **discovered from the index**, not listed in the file: committed executables by mode `100755` under `rig/`, plus the tracked `rig/*.py` modules, both excluding `rig/fixtures/` | This ADR's rule rotted once by the repo growing around a hardcoded list. A new rig executable is covered the day it is committed; a commit that discovers zero targets exits 2 rather than passing |
+| It runs **`--self-test` dispatches only**, never `rig/check.sh`'s real gate | CI checks out a tree with no gitignored `rig/runs/`. There the real gate fails 5/18 **and truncates both committed `rig/results/*/runs.jsonl` to zero bytes**, then reports green against the wipe. The five self-tests are hermetic by measurement: 1.74 s total, goldens stay at 3 and 42 lines, `git status` empty |
 
 The token-scope objection that deferred it is now moot in one direction and standing in the other. Moot:
 the operator selected this work knowing what it was, and the file is committed under ordinary repository

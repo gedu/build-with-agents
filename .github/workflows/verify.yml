@@ -164,3 +164,121 @@ jobs:
         run: ./open-work.sh --self-test
       - name: Run the index, and accept nothing but exit 0
         run: ./open-work.sh
+
+  # ADR 0014's non-negotiable list says every committed executable carries its own test and CI runs it.
+  # The job above applies that to `./setup.sh` and `./open-work.sh`, which post-dated the draft. Two rig
+  # executables post-dated it the same way and were never picked up: `rig/check.sh` and
+  # `rig/run-pipeline.sh`. This job is the decision applied, not a new idea — and it does not repeat the
+  # archived SUGGESTION-1, whose disposition refuses to re-register the `check.sh` bash-arm gap. This
+  # rests on the ADR, and supplies the thing that disposition lacked: a named trigger, which is the push.
+  #
+  # WHY THE LIST IS DISCOVERED AND NOT WRITTEN DOWN
+  # The defect being fixed here is a hardcoded list that went stale while the repo grew around it, which
+  # no self-test of the gate can ever report (ADR 0014's own rule rotted that way once already). So the
+  # candidates come from the index: mode 100755 is git's own record of a committed executable, and a new
+  # rig executable is covered the day it is committed. Zero candidates exits 2 — a scan that examined
+  # nothing is `could not run`, never a pass (`gaps/0002`'s counterexample, a file list gathered with
+  # `|| true`).
+  #
+  # WHY THE .py MODULES ARE SEPARATE, AND WHY THEY ARE STILL HERE
+  # `rig/derive.py`, `rig/report.py` and `rig/collect.py` are mode 100644, so ADR 0014's word
+  # "executable" does not reach them — measured, not assumed. Their warrant is ADR 0013 plus a fact: in
+  # CI their `--self-test` runs nowhere at all, because the only thing that composes them is
+  # `check_component_self_test()` inside `rig/check.sh`'s REAL gate, and that gate cannot run here (see
+  # the next heading). Adding a bash arm to that function would not fix this job either: `rig/check.sh`
+  # dispatches `--self-test) self_test; exit $?`, so the composition lines sit below the exit and are
+  # unreachable from the flag. Verified by logging every `python3` invocation during
+  # `rig/check.sh --self-test`: five synthetic-fixture heredocs, zero `--self-test` calls.
+  #
+  # WHY THE REAL GATE IS NOT RUN HERE — THE ONE THING NOT TO "IMPROVE"
+  # CI checks out a tree with no gitignored `rig/runs/`. There, `rig/check.sh` fails 5/18 AND truncates
+  # both committed `rig/results/*/runs.jsonl` to zero bytes, reproducing the wipe in a clean checkout and
+  # then reporting green against it. Only `--self-test` dispatches are hermetic: all five run in a clean
+  # clone in 1.74 s, leave both goldens at 3 and 42 lines, and leave `git status` empty. Keep it that way.
+  #
+  # WHY A JOB OF ITS OWN AND NOT MORE STEPS IN THE JOB ABOVE
+  # ADR 0014 rejects running unrelated checks in one job in sequence: a failing early step skips the rest,
+  # so the log reports less than was checked. Separately, `python3` is a rig-only prerequisite
+  # (`decisions/0011`), and both rig self-tests exit 2 naming it when it is absent — measured with a PATH
+  # lacking `python3` — so a missing interpreter lands on the rig's result and nowhere else.
+  rig-self-tests:
+    name: rig self-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # `git ls-files` reads the index, not history, so one commit is enough — verified in a
+          # `--depth 1` clone, where the discovery below returns the same three executables.
+          fetch-depth: 1
+      - name: Run every rig executable's and module's own test
+        run: |
+          set -eu
+
+          executables=()
+          modules=()
+          while IFS= read -r p; do
+            executables+=("$p")
+          done < <(git ls-files -s 'rig/*' ':(exclude)rig/fixtures/' | awk '$1 == "100755" { print $4 }')
+          while IFS= read -r p; do
+            modules+=("$p")
+          done < <(git ls-files 'rig/*.py' ':(exclude)rig/fixtures/')
+
+          if [ "${#executables[@]}" -eq 0 ] && [ "${#modules[@]}" -eq 0 ]; then
+            echo "::error::discovered no rig executable or module in the index; refusing to report a pass for having tested nothing"
+            exit 2
+          fi
+
+          failed=0
+          ran=0
+          untested=()
+
+          probe() {
+            # $1 = label, rest = the command. Records the verdict and never aborts the loop, so one
+            # red test cannot hide the result of the test after it.
+            local label="$1"; shift
+            local rc=0
+            "$@" || rc=$?
+            ran=$((ran + 1))
+            if [ "$rc" -eq 0 ]; then
+              echo "ok: $label"
+            else
+              echo "::error::$label exited $rc -- non-zero fails, and exit 2 means could-not-run, never passed"
+              failed=1
+            fi
+          }
+
+          # Detection is a mention of the flag, which is deliberately generous: a file that claims the
+          # flag but does not implement it exits 2 and turns this job red, so detection fails CLOSED
+          # toward a failing job rather than open toward silence. A file with no mention at all is named
+          # below as untested instead of being skipped quietly, because `absent` is not `covered`.
+          if [ "${#executables[@]}" -gt 0 ]; then
+            for p in "${executables[@]}"; do
+              if grep -q -- '--self-test' "$p"; then
+                probe "./$p --self-test" "./$p" --self-test
+              else
+                untested+=("$p (committed executable, mode 100755)")
+              fi
+            done
+          fi
+
+          if [ "${#modules[@]}" -gt 0 ]; then
+            for p in "${modules[@]}"; do
+              if grep -q -- '--self-test' "$p"; then
+                probe "python3 $p --self-test" python3 "$p" --self-test
+              else
+                untested+=("$p (module, mode 100644)")
+              fi
+            done
+          fi
+
+          for u in ${untested[@]+"${untested[@]}"}; do
+            echo "::warning::$u carries no --self-test, so ADR 0013 is unmet for it. Named rather than counted as covered."
+          done
+
+          if [ "$ran" -eq 0 ]; then
+            echo "::error::$((${#executables[@]} + ${#modules[@]})) rig path(s) were discovered and none carries a --self-test; this job ran nothing"
+            exit 2
+          fi
+
+          echo "ran $ran rig self-test(s); ${#untested[@]} path(s) named as carrying none"
+          exit "$failed"
