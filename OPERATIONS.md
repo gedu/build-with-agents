@@ -210,9 +210,12 @@ Three limits, stated because each one has already fooled somebody once:
   seen executes nothing, so until a file reaches the default branch this section describes an intention
   with a commit hash, not a guarantee. Verify with `gh api repos/<owner>/<repo>/actions/workflows` rather
   than by trusting the file's existence. Measured on this repo: `verify.yml` was committed on a branch
-  that was never pushed, so its Actions count stayed `0` while the file existed in three clones and
-  several worktrees, and became `1` the day the branch was finally pushed — a green file that never
-  executed and a green file that did are the same exit code and different claims.
+  that was never pushed, so `gh api …/actions/workflows` reported **0 workflow definitions** while the
+  file existed in three clones and several worktrees, and **1** the day the branch was finally pushed —
+  a green file that never executed and a green file that did are the same exit code and different claims.
+  Do not read that number as an execution count: it is a count of **definitions**. Whether the workflow
+  actually ran is `gh api …/actions/runs | .total_count` (or `gh run list`), which reads **7** here; the
+  two integers answer different questions and both look like "activity".
 - **A green job nobody requires is a report, not a gate.** `main` is protected by a repository ruleset
   — pull request required, force-push and deletion blocked — with **no required status check**, so a
   pull request still merges with these jobs red or never-run. Making them blocking is repository

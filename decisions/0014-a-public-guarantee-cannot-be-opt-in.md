@@ -139,9 +139,19 @@ question — but it was the correct sentence when written, and *"running is not 
 the one that costs anything.
 
 Standing, in the narrower form: **running is not blocking.** Verify the state rather than reasoning from
-either phrase: `gh api repos/<owner>/<repo>/actions/workflows` counts runs this repo has ever had (`0`
-until 2026-10-14, `1` after), and `gh api repos/<owner>/<repo>/rulesets` shows which checks are required
-(none). Read *The limit* before treating "a gate" as one word: this layer reports, the local hooks
+either phrase, and name which number answers which question — three endpoints here return a confident
+integer for three different facts:
+
+| Question | Command | This repo, 2026-10-14 |
+|---|---|---|
+| Has GitHub ever **seen** the file? | `gh api …/actions/workflows \| .total_count` | **1** workflow definition. Was `0` until 2026-10-14 |
+| Has it ever **executed**? | `gh api …/actions/runs \| .total_count`, or `gh run list` | **7** runs |
+| Is any check **required**? | `gh api …/rulesets`, then that ruleset's `rules` | no `status_check` rule |
+
+`.total_count` from the *workflows* endpoint is the count of **definitions**, not of executions. An earlier
+draft of this amendment called it "runs this repo has ever had", which would tell a reader checking
+"did this ever run" that it ran once when it had run seven times. Same trap as the 404 two paragraphs
+below: the API answers, and the answer is about something else. Read *The limit* before treating "a gate" as one word: this layer reports, the local hooks
 prevent, and **`gh api …/branches/main/protection` answers 404 for a ruleset**, which is how this ADR's own
 shipping PR came to publish "main is not protected" about a ruleset that had been live 58 days.
 
