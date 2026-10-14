@@ -206,14 +206,27 @@ Three limits, stated because each one has already fooled somebody once:
   says pushing is not reversible in any way that matters. The local hooks stay the only layer that
   prevents. Nothing here makes them optional, and **`--all` still reads tracked files only** — stage
   then rerun; write then run is not the check.
-- **Committed is not running.** A workflow file GitHub has never seen executes nothing, and the
-  repository's Actions API reports zero workflows until this file is pushed. Until then this section
-  describes an intention with a commit hash, not a guarantee. Verify it with
-  `gh api repos/<owner>/<repo>/actions/workflows` rather than by trusting the file's existence.
+- **Committed is not running — and the reverse is also worth knowing.** A workflow file GitHub has never
+  seen executes nothing, so until a file reaches the default branch this section describes an intention
+  with a commit hash, not a guarantee. Verify with `gh api repos/<owner>/<repo>/actions/workflows` rather
+  than by trusting the file's existence. Measured on this repo: `verify.yml` was committed on a branch
+  that was never pushed, so its Actions count stayed `0` while the file existed in three clones and
+  several worktrees, and became `1` the day the branch was finally pushed — a green file that never
+  executed and a green file that did are the same exit code and different claims.
 - **A green job nobody requires is a report, not a gate.** `main` is protected by a repository ruleset
   — pull request required, force-push and deletion blocked — with **no required status check**, so a
   pull request still merges with these jobs red or never-run. Making them blocking is repository
   configuration in a web UI; no committed file can ship it, and ADR 0014 says so about its own product.
+- **Check protection with the ruleset API, not the legacy branch-protection API.** This repo's protection
+  is a *ruleset*, and `gh api repos/<owner>/<repo>/branches/main/protection` answers those with **HTTP 404
+  "Branch not protected"** — a wrong answer that reads like evidence. The check that resolves is
+  `gh api repos/<owner>/<repo>/rulesets` and then the ruleset's `rules`: `deletion`, `non_fast_forward`
+  and `pull_request` are present, and the absence of a `status_check` rule is what "no required check"
+  actually means. This was not a theoretical hazard: the PR that shipped this workflow asserted in its own
+  body that `main` "is **not protected**", from that 404, **58 days** after the ruleset went live
+  (created 2026-08-17; the PR merged 2026-10-14 — both read from `gh api`, after I had written "a month"
+  here from memory). Both files disagreeing about one fact is the failure `gaps/README.md` records — the
+  reader who pays is the one who trusts the cheaper-looking API.
 
 Nothing in that file may `continue-on-error`, `|| true`, or skip its way to green. A job that cannot run
 its check must fail; that is the rule the whole file exists to hold. When you edit it, run

@@ -174,12 +174,27 @@ Ordered by dependency, not by discovery. Work the frontier: any task whose block
     `commit-msg --range` over a leaky message is asserted by the hook's own suite (`hooks/commit-msg:299`).
     `git check-ignore` exit 1 → the workflow is not ignored, and `setup.sh` ignores the narrow path
     `/.github/copilot-instructions.md`, not the directory, so `--copilot` cannot hide this file.
-  - **What is NOT proven, stated as the gap it is.** S8 asked for a planted-violation *push* proving a
-    job goes red on the server. Not done: pushing is the operator's decision, so the end-to-end claim
-    "this workflow turns red on GitHub" is **unverified**, and command-level mutants are the strongest
-    available substitute. The repository's Actions API returns `total_count: 0` as measured today
-    (`gh api repos/<owner>/<repo>/actions/workflows`) — the workflow is committed and has never run.
-    "Committed" and "running" are written apart in every file this task touched, for that reason.
+  - **What was NOT proven at T3, and what closed it later.** S8 asked for a planted-violation *push*
+    proving a job goes red on the server. At T3 that was impossible — pushing is the operator's decision
+    — so the end-to-end claim "this workflow turns red on GitHub" was **unverified**, command-level mutants
+    were the strongest available substitute, and `gh api …/actions/workflows` returned `total_count: 0`:
+    committed, never run. **Closed 2026-10-14 when the operator authorised push, PR and merge** — see Log
+    L16, which also records the mutant run that turned exactly one job red on the server and named the
+    file and the field. What was written apart at T3 ("committed" versus "running") is now measured
+    together; the older sentence is kept because it is what T3 knew, and the amendment is what closed it.
+  - **The merge rewrote every hash in this document.** `ci/public-gate` merged to `main` by **rebase**
+    (the repo's own precedent: `6115b79` is a direct ancestor of `main`), so the eight commits above exist
+    on `main` under different hashes: `2839cd6`→`2734451`, `4ad47d7`→`642bb0b`, `a5f81c4`→`54cd6f0`,
+    `97d45eb`→`6f0b4ea`, `bcb37eb`→`2ceba20`, `439abbc`→`39c0256`, `1a1fd8e`→`3522762`,
+    `933b041`→`180d82a`. The map was **generated** by diffing the two `git log --format='%h %s'` listings
+    and asserting their subject sequences are identical, not typed by hand. The pre-rebase hashes in the
+    Progress table are left as written — they are what was measured and checked — and they still resolve
+    because `origin/ci/public-gate` was deliberately **not deleted**: a loop over every remote branch head
+    finds it the only branch containing them. GitHub also still serves `refs/pull/11/head` = `933b041`, but
+    that is no substitute: the default fetch refspec is `+refs/heads/*:refs/remotes/origin/*`, so a normal
+    clone never receives `refs/pull/*`. L15's rule binds — these are citations to fixed objects, and
+    deleting the branch would make eight evidence lines unresolvable in order to tidy a branch list. If
+    that branch is ever deleted, this table must be rewritten against the `main` hashes first.
 
 - [x] **T4 Measure the two timeout placeholders and replace them with measured values**
   - Blocked by: None (parallel with T2, disjoint files: `rig/run-pipeline.sh` only)
@@ -783,3 +798,87 @@ when they are read, which is exactly what makes a number unfalsifiable rather th
 message-count case adds the second half: when the measurement and the record are separated by a commit,
 the number belongs to the parent, and writing the child's hash next to it is a false attribution even
 though the child is where the sentence lives.
+
+**L16 — the operator authorised push, PR and merge, which closed T3's last open claim and created four
+new obligations (2026-10-14).**
+
+`ci/public-gate` → PR #11 → `main` by **rebase**, the repo's own precedent (`6115b79` is a direct ancestor
+of `main`). Three things this feature had been asserting about the workflow stopped being true the moment
+it ran: `total_count` went **0 → 1**, "committed and has never run" became false, and T3's
+*"the end-to-end claim 'this workflow turns red on GitHub' is unverified"* — the gap T3 deliberately
+refused to paper over — was closed. Both triggering runs (push and `pull_request`) went green: **five
+jobs, all `success`**, and the rig job's five self-tests each printed their own `ok:` line, which is the
+difference between a job that passed and a job that ran.
+
+**The S8 proof that T3 could not do was then run properly, and it is the result that matters most.** A
+throwaway branch planted one violation in a new file and pushed it: **`structural invariants` went red
+naming the file and the field** — `research/tmp-redproof/mutant.md: type: \`thoery\` is not one of theory,
+block, …` — while **the other four jobs stayed green**, the same property T9's row-1 mutant established
+locally, now on the server. The branch and its remote ref were deleted after. Two deliberate choices in
+the mutant: it broke the **frontmatter enum**, not the redaction gate, because publishing a string shaped
+like a home path to prove a redaction gate fires would violate the rule the gate defends — the repo
+describes the shape of a forbidden string and never contains an instance of it; and it ran on a
+**throwaway branch**, not on the PR, so no planted defect ever sat in a PR under review.
+
+**Four obligations the merge created, all discharged here:**
+
+| Obligation | How it was found | Where it went |
+|---|---|---|
+| T3's "unverified / never run" text | It is the *opposite* claim now | T3's body rewritten as "what was NOT proven at T3, and what closed it later" — the old sentence's reasoning kept, because it is what T3 knew |
+| All eight hashes changed on `main` | Rebase re-writes commits; every Progress row cites one | Generated map in T3's body (`git log --format='%h %s'` on both sides, subject sequences asserted identical). Then re-checked my own typed pairs against that map programmatically — 8/8, because five separate times this session a hand-typed count or hash was wrong |
+| Pre-rebase hashes must stay resolvable | `origin/ci/public-gate` is the **only** branch head containing them (looped over every remote head) | Branch deliberately **not deleted**; the PR head ref `refs/pull/11/head` also survives but a default clone's refspec is `+refs/heads/*:…`, so it fetches no `refs/pull/*` — the branch is what a reader actually needs. Deleting it would make eight evidence lines unresolvable to tidy a branch list |
+| ADR 0014's status prose | It described a workflow that had never executed | **I first wrote "no edit was owed" here, and that was false.** My grep used `never run\|total_count`; the live sentences say *"not yet on the server"* and *"until this file reaches the default branch"*. A conclusion-of-absence drawn from the wrong vocabulary — the same class as `rottud` and the 149, this time concluding *no work* instead of wrong work. Four sentences amended, dated, `verified:` left at 2026-08-17 per the 0016 precedent |
+
+**And one thing I did that is worth recording as a mistake, not a win.** I opened the hash-map edit by
+deleting the Progress table's `|---|---|---|---|` separator row — a markdown table's header/body divider,
+which `check.sh` does not validate — then restored it in the next call. Net effect zero, caught by
+`git diff --quiet` before it became a commit, but only because I checked the file state rather than
+trusting my own two edits. It is the L14 lesson applied to tooling instead of prose: **an edit is not
+verified by the intent behind it.** Nothing here changed behaviour, so no test could have caught it; the
+only defence was reading `git diff` after an edit made for no reason, which is the reason to not make it.
+
+**Post-merge CI on `main`: `180d82a` completed, `success`.** Goldens still 3 and 42 lines. The remaining
+unverified claim in this file is now only what no local or CI run can reach: whether a *redaction* job
+goes red on the server — deliberately not tested, because doing so honestly requires publishing the
+forbidden shape.
+
+**L17 — the merge's real cost was a false claim I had already published, and one I nearly caused again by
+truncating my own output (2026-10-14).**
+
+Sweeping the class of statements the merge invalidated turned up something the Progress table did not:
+**PR #11's own body asserts `main` is "not protected".** It is protected. `gh api
+repos/<owner>/<repo>/branches/main/protection` returns **404 "Branch not protected"** because this repo's
+protection is a **ruleset**, created 2026-08-17 — 58 days before that PR merged. The correct half of what I
+wrote stands (no *required status check*, so the workflow detects and does not block); the half about
+protection is wrong, and it is in a merged PR body, which is immutable. `OPERATIONS.md` had it right all
+along.
+
+Two general findings, both now in `OPERATIONS.md` and `MAP.md` so the next reader does not repeat it:
+
+1. **A ruleset and a branch-protection rule are different objects with different endpoints, and the wrong
+   one returns a confident answer rather than an error.** 404 reads as "not protected". The check that
+   resolves is `gh api …/rulesets` and then the ruleset's `rules` — here `deletion`, `non_fast_forward`,
+   `pull_request`, and the *absence* of `status_check`, which is the real meaning of "no required check".
+2. **No file in this repo named the endpoint.** The correct fact lived in prose (`OPERATIONS.md`) with no
+   recipe next to it, so the next person verifies it the cheap way and gets the 404. A fact whose
+   verification command is not written down is a fact that will be re-derived wrongly.
+
+**And the sweep almost missed one, because of how I ran it.** My grep truncated each hit at 155 characters
+and `MAP.md`'s `.github/` row is one long table cell — **the false claim was at the end of it**, past the
+cut. I read the empty-looking result, concluded the row was a harmless historical statement, and moved on.
+I only caught it by printing the same line again with the cell split out. The rule, which is S8 turned on my
+own tooling: **truncating command output is safe only when the truncation cannot hide the thing you are
+looking for** — for a class sweep, print matched regions, not fixed-width prefixes of lines.
+
+Both numbers in the first draft of the `OPERATIONS.md` note were asserted and both were wrong: "a month"
+for the ruleset's age (measured: **58 days**, created 2026-08-17, PR merged 2026-10-14) and "0 for a month"
+for the Actions count (measured: it was 0 from repo creation on 2026-08-04 until the push, i.e. never
+"recently"). Sixth time this session I have stated a derived number before deriving it. The correction
+quotes the measured values and says they were measured after I wrote the wrong ones, because that sequence
+is the finding.
+
+What this Log entry is evidence for, in T6's terms: **a change to one artifact invalidates sentences in
+artifacts that mention it, and no check enumerates those.** `OPERATIONS.md`, `MAP.md` and `decisions/0014`
+all described the workflow's runtime state; only one of the three was on the diff's radar. The ledger's
+class here is not "stale path citation" — it is **"live claim about a fact another file changed"**, and it
+is harder than the path case because it has no `path:line` form to match.
