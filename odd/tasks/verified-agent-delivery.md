@@ -241,24 +241,34 @@ Ordered by dependency, not by discovery. Work the frontier: any task whose block
     by hand from this worktree regardless, because a clean gate is not evidence about the half it
     cannot pattern-match.
 
-- [ ] **T8 Re-derive `rig/run.sh`'s `TIMEOUT_S` from its own committed rows**
+- [x] **T8 `rig/run.sh`'s `TIMEOUT_S`: the value was right, the comment's range was wrong at birth**
   - Blocked by: None (found while measuring for T4; not T4's surface — its task text scoped T4 to
     `rig/run-pipeline.sh` only, for disjointness with T2, and one commit must not move two
     independently-derived bounds on two different scripts)
-  - Seams: `rig/check.sh` (`bash -n run.sh` plus the manifests). **Weaker than it looks**: `rig/run.sh`
-    has no `--self-test`, so nothing asserts this bound — the value is read, never checked. That is T9's
-    subject, and T8 should say so rather than imply a guard it does not have.
-  - `rig/run.sh:68` sets `TIMEOUT_S=120`, justified in-comment by the tier-3 pilot's slowest wall of
-    **14.586 s** → `ceil(3×14.586/30)×30 = 60`, raised to the 120 s floor. The pilot's own range is stated
-    in the same comment as "11-52s", which already exceeds its own basis.
-  - The file's **own 42 committed rows** (`rig/results/tool-surface-v1/runs.jsonl`, all 42 carrying
-    `wall_ms`) say the slowest successful wall is **51.778 s** (`t3v2-scoped-03`); no row has `timed_out`
-    set. Applying the rule the file itself states: `ceil(3×51.778/30)×30 = 180`. Floor not engaged.
-  - So the bound is ~2.3x the slowest step it must contain, not 3x, and its stated basis is stale in a way
-    its stated *range* is not: the comment's "11-52s" was right, the 14.586 s that produced the number was
-    superseded by `t3v2`, which ran after the pilot with ~3.5x longer walls.
-  - The fix is the file's own instruction, *"Re-derive it, do not nudge it"* — re-derive from the
-    committed rows and cite the run id, as T4 did for its two values.
+  - Seams: `bash -n rig/run.sh`, `rig/check.sh`. **Weaker than it looks**: `rig/run.sh` has no
+    `--self-test`, so nothing asserts this bound — the value is read, never checked. That is T9's subject.
+  - **The premise this task was registered on was false, and my own note repeated it for two turns.**
+    As first written this task said the file's own rule "yields 180" and its 14.586 s basis was
+    "superseded". Both wrong. The rule names its population — `sdd/measurement-rig/tasks.md:242`:
+    *"Slowest of the six deliberate pilot runs is 14.586s (`t3-scoped-03`)"*. Those six
+    (`t3-broad-{01,02,03}`, `t3-scoped-{01,02,03}`) do max at **14586 ms**, verified from the raw
+    captures. So `120 = max(120, ceil(3×14.586/30)×30)` is a **correct** application of the rule to the
+    population the rule names. 180 came from applying the same rule to all 42 rows — a different
+    population, and the doc never makes that reading.
+  - What *is* false is the range in the same comment: *"Observed walls across the pilot were 11-52s"*.
+    The pilot is **11.0-14.6 s**. 11-52 s is the whole 42-row table — and at `134dbe8`, the commit that
+    wrote the sentence, that table **already held 42 rows, 27 of them `t3v2`** (`git show` verified).
+    Off by population at birth: the third instance of the class in one session, after `0002:38`'s
+    off-by-one and the `11-52s` range itself.
+  - "Nothing has ever timed out" was also weaker than it read — true and checkable (**0** rows carry
+    `void_reason=timeout`; all 42 raw captures record `timed_out=false`, `exit_code=0`), but **every one
+    of the 42 ran with `timeout_s: 300`**. The 120 bound has never been exercised by a single run.
+  - Decision taken with the operator: **leave 120, correct the prose.** `run.sh` drives
+    `tool-surface-v1` only (`task_id t1|t2|t3|t3v2`), `hypotheses/0001` is closed, T5's `s2` runs through
+    `run-pipeline.sh` — so raising the bound would calibrate for a run nobody has funded. The comment now
+    names the trigger instead: a future t3v2-class run re-derives first, where 51.778 s → 3× → **180**,
+    and 120 would sit at **2.32x** rather than the 3× `design.md` §5 calls "the point". The slowest wall
+    ever recorded is **43%** of the 120 bound.
 
 - [ ] **T9 Run the rig executables' own self-tests in CI — ADR 0014's rule, applied to the two it missed**
   - Blocked by: None. Not blocked by T8 (different file, different defect, no shared line).
@@ -313,8 +323,9 @@ gate below is invoked by hand and its exit code is read.
 | T1 | done | `2839cd6` | `./check.sh` 0 over the tree; `./check.sh --self-test` 0; `./hooks/pre-commit --all` 0; `./open-work.sh` printed 6 sources and did **not** list this document — T2's red reproduced before T2 was written |
 | T2 | done | `4ad47d7` (recorded by T4 — the self-reference note below resolves for every task but the one writing it) | `./open-work.sh --self-test` 0; **12 FAIL + exit 1** with the new section deleted (deletion-mutant, recount without truncation); `sh -n` 0; `./check.sh` 0; `./hooks/pre-commit --all` 0; index prints 16 items across 7 sources. **One derived obligation this task created went undischarged and was found later:** its own seams-table cite `open-work.sh:401` was moved to 498 by this very commit — the commit that documented why cites break moved one. Repaired at T4, L11. |
 | T3 | done, **not yet running** | `a5f81c4` (recorded by T4) | `actionlint` 1.7.12 exit 0, exit 1 on both planted mutants (broken mapping; unquoted var → SC2086) with `shellcheck` 0.11.0 present; recovered file byte-identical to blob `2fc49e65…`; `git check-ignore` exit 1; mutants of the job commands: `pre-commit --all` 1 with a planted path, `check.sh` 1 with a planted `type:`; `gh api …/actions/workflows` → `total_count: 0` |
-| T4 | done | this commit's hash is the next one's to record — still self-referential by design, and that is the shape of the note, not a gap: `2839cd6`/`4ad47d7`/`a5f81c4` are now filled in above | `rig/check.sh` **20/20** with `rig/runs/` copied in, both `rig/results/*/runs.jsonl` byte-intact after (`git diff -- rig/results/` empty); `bash -n` 0; invariant mutant `STEP=100/SUITE=150` → exit 2; `./check.sh` 0 over 117 content files; amplified suite measured 3× (1252/1258/1719 ms, 2,882 tests, 499 failed / 2,383 passed — matching `answer-key/s2.json`'s F0 exactly, which is what proves the sandbox replicated the route); `report_bytes` 2,790,891 vs `DEFAULT_MAX_REPORT_BYTES` 64 MiB = 24.0x |
-| T8, T9 | not started | — | — |
+| T4 | done | `97d45eb` (recorded by T8 — the first task whose hash became knowable at the *next* commit, which is the shape of the self-reference note, not a gap) | `rig/check.sh` **20/20** with `rig/runs/` copied in, both `rig/results/*/runs.jsonl` byte-intact after (`git diff -- rig/results/` empty); `bash -n` 0; invariant mutant `STEP=100/SUITE=150` → exit 2; `./check.sh` 0 over 117 content files; amplified suite measured 3× (1252/1258/1719 ms, 2,882 tests, 499 failed / 2,383 passed — matching `answer-key/s2.json`'s F0 exactly, which is what proves the sandbox replicated the route); `report_bytes` 2,790,891 vs `DEFAULT_MAX_REPORT_BYTES` 64 MiB = 24.0x. **Post-commit proof:** with `hypotheses/0002` clean at `97d45eb`, `rig/check.sh` returned to **20/20, exit 0** and both goldens stayed at 3 and 42 lines — the Hard Ordering Gate's refusal was the dirty-tree precondition, not a regression | `rig/check.sh` **20/20** with `rig/runs/` copied in, both `rig/results/*/runs.jsonl` byte-intact after (`git diff -- rig/results/` empty); `bash -n` 0; invariant mutant `STEP=100/SUITE=150` → exit 2; `./check.sh` 0 over 117 content files; amplified suite measured 3× (1252/1258/1719 ms, 2,882 tests, 499 failed / 2,383 passed — matching `answer-key/s2.json`'s F0 exactly, which is what proves the sandbox replicated the route); `report_bytes` 2,790,891 vs `DEFAULT_MAX_REPORT_BYTES` 64 MiB = 24.0x |
+| T8 | done, **value unchanged** | this commit's hash is the next one's to record | `bash -n rig/run.sh` 0; all eight numbers in the corrected comment re-verified against committed data (pilot six 10990-14586 ms; all-42 10990-51778 ms; 0 rows `void_reason=timeout`; 42 raw captures `timed_out=false` all under `timeout_s=300`; 51778/120000 = 43%; 120/51.778 = 2.32x; ceil(3×51.778/30)×30 = 180; the table already held 42 rows / 27 `t3v2` at `134dbe8`, checked with `git show`). The fix is prose: **`TIMEOUT_S` stays 120**, which is the rule applied to the population the rule names. `rig/check.sh` 20/20, goldens intact. |
+| T9 | not started | — | — |
 | T5, T6, T7 | not started | — | — |
 
 ## Log
@@ -471,12 +482,15 @@ Two judgement calls worth stating, because both could have gone the other way:
    the hypothesis rests on were re-read and still hold (`case "$ARM"` is top-level, `run_model_step()`
    issues one fresh invocation, `--resume` appears zero times in the file), but re-dating a
    pre-registration to the day before the run is exactly what pre-registration exists to forbid.
-2. **I reverted my own `rig/run.sh` fix.** I found it while measuring: its `TIMEOUT_S=120` is justified
-   in-comment by a 14.586 s tier-3 pilot wall, but its own 42 committed rows say 51.778 s, and the file's
-   own rule then yields 180. That is a real defect in the same class T4 closed — in a file T4's task
-   text explicitly scoped out (`rig/run-pipeline.sh` only, for disjointness with T2). Editing it inside
-   T4's commit would have made one commit change two independently-derived bounds on two different
-   scripts. It is its own work unit — **T8**, with the CI gap found the same way as **T9**.
+2. **I reverted my own `rig/run.sh` fix — and the defect I reverted it for was half false.** I found it
+   while measuring and recorded that the file's own rule "then yields 180". Reverting was right: T4's task
+   text scopes it to `rig/run-pipeline.sh` only (disjointness with T2), and one commit must not move two
+   independently-derived bounds on two different scripts. But *why* I reverted it was wrong — the rule
+   names six pilot runs as its population, they do max at 14.586 s, and 120 is correct. I held a false
+   premise through two turns of notes and a committed document because I had checked the **maximum**
+   (`51.778 s`, real) without checking **which population the rule was allowed to sample**. Re-verified
+   at T8 and corrected there. The general form, which is the one worth keeping: before calling a derived
+   constant stale, verify the set the rule is defined over, not just the biggest number in the data.
 
 **L12 — two follow-ups that this feature's own ADR says are already decided (2026-10-14).** While
 checking whether my new CI job satisfies ADR 0014, I counted committed executables and which of them CI
