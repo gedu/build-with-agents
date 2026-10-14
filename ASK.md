@@ -3,7 +3,7 @@ id: ask/index
 type: index
 targets: [any]
 status: draft
-verified: 2026-08-13
+verified: 2026-10-14
 sources: ["skills/checkout-isolation/SKILL.md", "skills/context-checkpoint/SKILL.md", "skills/hypothesis-cycle/SKILL.md", "skills/project-gap-analysis/SKILL.md", "skills/source-verdict/SKILL.md", "skills/README.md", "journal/2026-08-13-skills-nobody-could-ask-for.md"]
 ---
 
@@ -50,8 +50,10 @@ Takes a claim from said-out-loud to a verdict `theory/` can hold: classified by 
 a declared test, and stopped when it costs more than it is worth. `draft`.
 
 **"analyse <project> and tell me what it is missing"** → `project-gap-analysis`
-Seven checks against validated `theory/`. Full detail stays in a report **outside** this repo; only
-a de-identified record lands in `gaps/`. Two recorded runs. `draft`.
+Seven checks against validated `theory/`, each run in three states (clean, planted defect, empty input)
+where the gate is runnable. Full detail stays in a report **outside** this repo; only a de-identified
+record lands in `gaps/`, and only after ownership is established — a project owned by this operator
+adds no demand. Run count: `./open-work.sh`, source `gaps/`. `draft`.
 
 **"here is a link — worth building on?"** → `source-verdict`
 A verdict on a post, thread, paper or vendor doc by evidence rather than by author, written as the

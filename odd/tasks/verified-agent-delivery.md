@@ -47,7 +47,12 @@ The producer of the work never grades its own work.
 **S4 — four pieces selected, decided 2026-10-14, all selected, none deferred.** Graduate the runs that
 already exist and close the timeout placeholders (T4, T5); land the server-side layer ADR 0014 decided
 and never built (T3); build the obligation ledger (T6); run a gap analysis on a public Callstack RN
-repo to take verifier-availability from one occurrence to two (T7).
+repo (T7). **Amended 2026-10-14 by T7's own result:** the clause originally attached to T7 — *"to take
+verifier-availability from one occurrence to two"* — was a premise, not a requirement, and it was false
+twice over. Check 6's `partial` demand sat at **one** occurrence across `0001`–`0003`, not one each, and
+T7 added **zero**, because the target failed the independence test (`gaps/0004`). What S4 asked for was
+the analysis; the occurrence was a hoped-for by-product. Recorded here so the selection is quoted
+accurately, not upgraded after the fact.
 
 **S5 — the standing instruction about this repo.** *"no lo expandás con más teoría"* and *"fusionalo al
 stream, donde cada pieza nueva nace con su gate y su experimento"*. Accepted for the work; **not**
@@ -226,17 +231,47 @@ Ordered by dependency, not by discovery. Work the frontier: any task whose block
     `absent` is never `empty` (ADR 0016), and "cannot decide" is never "satisfied".
   - Scope it to one repository and one language first (this repo, shell and Python; or the fixture).
     The `gaps/0002` lesson binds: extract the shape from an example that already works, do not design
-    from the complaint. `repack-atlas`'s `npm run agent:check` and `npm run check:commits` are the
-    working prior art, and T7 is what records them as such.
+    from the complaint. `gaps/0004` is the working prior art, and T7 is what records it: the agent-sync
+    check (`scripts/agent-sync.mjs`, drift fails CI with exit 1) and the commit-range/commit-title checks
+    that its pull-request runners take. **Corrected 2026-10-14:** this row first cited
+    `npm run agent:check` and `npm run check:commits`, which appear **nowhere in the committed record** —
+    they came from the working report, which by design does not cross into this repo. A citation that
+    resolves only on the author's machine is the off-by-one-at-birth class from L11, one level up: it
+    named real things and pointed at nothing a reader can open.
 
-- [ ] **T7 `gaps/0004` — gap analysis of a public Callstack RN repo, via `skills/project-gap-analysis`**
+- [x] **T7 `gaps/0004` — gap analysis of a public Callstack RN repo, via `skills/project-gap-analysis`**
   - Blocked by: None (read-only, disjoint surface; it can run any time and feeds T6, not the reverse)
   - Seams: the skill's own checklist, and `./check.sh` on the record it writes
+  - **The premise this task was registered on was false, and it was false in two independent ways.** As
+    written this task said check 6 was `partial` *"at one occurrence across `0001`/`0002`/`0003`"* and that
+    *"a second occurrence is what licenses the first `blocks/` entry"*. Measured from the records: `0001`
+    scored check 6 `absent` (demand at 1), `0002` scored it `partial` and states in its own Demand table
+    *"1 — `0001` only"* — i.e. it declined to advance it — and `0003` calls it ***"First"* as a `partial`**.
+    So the demand sat at **one** occurrence, and T7 was to be the second. What actually happened is the
+    finding: the target failed `gaps/README.md`'s independence test, so **T7 adds zero occurrences** and
+    check 6 is still at one. The task's hoped-for output was never a requirement of S4; S4 asked for the
+    analysis. See S4's amendment.
   - Target chosen for a specific reason: `callstackincubator/repack-atlas` — public, `private: false`
-    verified 2026-10-14, named under the `gaps/README.md` exception S7 records — already ships
-    `npm run agent:check` and `npm run check:commits`. Check 6 (verifier availability) is `partial` at one occurrence across
-    `0001`/`0002`/`0003`; a second occurrence is what licenses the first `blocks/` entry, and
-    `gaps/0002` states the rule for how it is built — from the working example, extracted, not invented.
+    verified 2026-10-14, named under the `gaps/README.md` exception S7 records — already ships an
+    agent-sync drift check and commit-range/commit-title gates. **Its value turned out to be the opposite
+    of what was expected.** It is the operator's own repository: 142 commits under two identities that are
+    both the operator's, and its own design document lists this operator's tooling — and `0003`'s project
+    — as borrowed sources. So it is a **dependent** observation: worked patterns and a transfer test, not
+    demand. Five of seven checks came out at or above what the backing docs ask for, which is the
+    strongest evidence in this repo that these practices *transfer*, and recording that as a demand would
+    have been the error.
+  - The two findings that outlive the record: **check 4 `absent` would have been its fourth occurrence and
+    is not counted** (fourth appearance, zero occurrences), and **check 6's `partial` here arrived for a
+    reason no earlier record had** — `scripts/agent-sync.mjs` parses no flags, so a one-character typo in
+    `--check` falls through to *repair* mode. Measured on a drifted tree: correct flag → exit 1; typo →
+    recreated the deleted symlink, printed "5 skills in sync", exit 0, and the real check afterwards then
+    exited 0. **Zero swallow shapes in `.github/` and `scripts/`**, which is exactly why a pattern scan —
+    the method runs 1–3 used, and the right method for defects that leave a mark — would have reported
+    `present`. Found only by running the gate in three states.
+  - **Our own gate does the same thing, and it is now measured:** `./hooks/commit-msg --range HEAD HEAD`
+    prints "clean across 0 commit message(s)" and **exits 0**. A range naming zero commits is
+    *could-not-run*; we report a pass. Same class, in this repo, on the gate that audits this task's own
+    commits.
   - Naming is licensed by S7 and by the exception `gaps/README.md` records; the redaction gate is run
     by hand from this worktree regardless, because a clean gate is not evidence about the half it
     cannot pattern-match.
@@ -371,8 +406,8 @@ gate below is invoked by hand and its exit code is read.
 | Python syntax | `python3 -m py_compile` on every touched `.py` | 0 |
 | Self-tests | `./check.sh --self-test`, `./open-work.sh --self-test`, `./hooks/pre-commit --self-test`, `./hooks/commit-msg --self-test` | 0 each |
 | Structural | `./check.sh` | 0 |
-| Redaction, whole tree | `./hooks/pre-commit --all` | 0 |
-| Redaction, messages | `./hooks/commit-msg --range - HEAD` | 0 |
+| Redaction, whole tree | `./hooks/pre-commit --all` | 0. **Scans `git ls-files` only**, so a brand-new file is invisible to it until it is tracked or `git add -N`'d — found the hard way on T7, whose whole subject was one untracked file. Run it once before adding and once after (`git add -N <new files>`), and plant a mutant *in the new file* to prove the gate can fail on content no prior run ever saw |
+| Redaction, messages | `./hooks/commit-msg --range - HEAD` | 0. `-` means no lower bound (every reachable commit). **Never `<same> <same>`**: a zero-commit range prints "clean across 0 commit message(s)" and exits 0 — measured, and the vacuous-pass class `gaps/0004` was written about. The count printed must be non-zero or the step scanned nothing |
 | Rig integrity | `rig/check.sh` | 0, and `git diff -- rig/` empty after the byte-identical re-derive. **Copy `rig/runs/` in from the primary checkout first** — it is gitignored, so a worktree has none, and with none this gate truncates both committed `rig/results/*/runs.jsonl` to zero lines and then reports green against the wipe (L11) |
 | Index honesty | `./open-work.sh` | reads its COVERAGE block; `absent` distinguished from `0` |
 
@@ -386,7 +421,8 @@ gate below is invoked by hand and its exit code is read.
 | T4 | done | `97d45eb` (recorded by T8 — the first task whose hash became knowable at the *next* commit, which is the shape of the self-reference note, not a gap) | `rig/check.sh` **20/20** with `rig/runs/` copied in, both `rig/results/*/runs.jsonl` byte-intact after (`git diff -- rig/results/` empty); `bash -n` 0; invariant mutant `STEP=100/SUITE=150` → exit 2; `./check.sh` 0 over 117 content files; amplified suite measured 3× (1252/1258/1719 ms, 2,882 tests, 499 failed / 2,383 passed — matching `answer-key/s2.json`'s F0 exactly, which is what proves the sandbox replicated the route); `report_bytes` 2,790,891 vs `DEFAULT_MAX_REPORT_BYTES` 64 MiB = 24.0x. **Post-commit proof:** with `hypotheses/0002` clean at `97d45eb`, `rig/check.sh` returned to **20/20, exit 0** and both goldens stayed at 3 and 42 lines — the Hard Ordering Gate's refusal was the dirty-tree precondition, not a regression | `rig/check.sh` **20/20** with `rig/runs/` copied in, both `rig/results/*/runs.jsonl` byte-intact after (`git diff -- rig/results/` empty); `bash -n` 0; invariant mutant `STEP=100/SUITE=150` → exit 2; `./check.sh` 0 over 117 content files; amplified suite measured 3× (1252/1258/1719 ms, 2,882 tests, 499 failed / 2,383 passed — matching `answer-key/s2.json`'s F0 exactly, which is what proves the sandbox replicated the route); `report_bytes` 2,790,891 vs `DEFAULT_MAX_REPORT_BYTES` 64 MiB = 24.0x |
 | T8 | done, **value unchanged** | this commit's hash is the next one's to record | `bash -n rig/run.sh` 0; all eight numbers in the corrected comment re-verified against committed data (pilot six 10990-14586 ms; all-42 10990-51778 ms; 0 rows `void_reason=timeout`; 42 raw captures `timed_out=false` all under `timeout_s=300`; 51778/120000 = 43%; 120/51.778 = 2.32x; ceil(3×51.778/30)×30 = 180; the table already held 42 rows / 27 `t3v2` at `134dbe8`, checked with `git show`). The fix is prose: **`TIMEOUT_S` stays 120**, which is the rule applied to the population the rule names. `rig/check.sh` 20/20, goldens intact. |
 | T9 | done | this commit's hash is the next one's to record | `actionlint` 1.7.12 **exit 0** with `shellcheck` 0.11.0 present, and **exit 1 on the first draft** (`SC2329`, dead helper) so the pass is a result not a silence; both inline `run:` blocks `shellcheck` clean; step run in a real clone: baseline **exit 0, 5 ran**, four planted mutants **exit 1/1/2/2**, two guards held (new executable auto-discovered → **6 ran**; empty `untested` under `set -u` → **exit 0**); hermetic in a clone with no `rig/runs/` — **1.74 s**, goldens stay **3 and 42**, `git status` empty; both rig self-tests **exit 2 naming `python3`** on a `PATH` without it; discovery confirmed in a genuine `--depth 1` `file://` clone. Full battery after the edit: `check.sh --self-test` 0, `open-work.sh --self-test` 0, `pre-commit --self-test` 0, `commit-msg --self-test` 0, `./check.sh` 0 (117 content files, 5 skills), `pre-commit --all` 0 (196 tracked files), `commit-msg --range - HEAD` 0 (149 messages), `rig/check.sh` **20/20**, `open-work.sh` 0 |
-| T5, T6, T7 | not started | — | — |
+| T7 | done, **and the premise it was registered on was false** | this commit's hash is the next one's to record | Battery of 22 gate invocations, each run unpiped with `$?` read on the next line, **all exit 0**: `bash -n` × 8 committed executables, `py_compile` × 5 tracked modules, `check.sh --self-test`, `open-work.sh --self-test`, `pre-commit --self-test`, `commit-msg --self-test`, `./check.sh` (**118** content files, 5 skills), `pre-commit --all`, `commit-msg --range - HEAD` (**150** messages), `rig/check.sh` **20/20**, `open-work.sh` (17 items / 7 sources, `gaps/: 4`). **Two holes closed rather than reported green:** (1) `pre-commit --all` scanned 196 tracked files and *missed this task's entire subject* — `gaps/0004` was untracked — so it was re-run with the file in scope (**197**, exit 0) and **mutant-proved on that file, on both trees it was edited on** — before and after this unit's edits to it: a planted home path → **exit 1** naming `gaps/0004-repack-atlas.md:329` both times, file restored **byte-identical** each time (`sha256 01e5be81…` pre-edit, `1a409691…` on the committed final text); (2) the `--range <same> <same>` vacuous pass reproduced on our own gate, **exit 0 on 0 messages**. Goldens stayed **3 and 42 lines**, `git status --short -- rig/` empty. Spec-premise re-check from the records: `0002`'s own Demand row reads *"1 — `0001` only"* and `0003`'s reads ***"First"***, so check 6 sat at **one** occurrence and T7 added **zero** — see S4's amendment and L14. |
+| T5, T6 | not started | — | — |
 
 ## Log
 
@@ -648,3 +684,70 @@ The order of discovery is the finding: **`./hooks/pre-commit` exited 0 on this f
 was found.** "A clean gate is not evidence about that half" is a sentence `AGENTS.md` and `gaps/README.md`
 both already carry, met from the inside, on the file written to obey it. It is also S8 in miniature — the
 gate fired, and what it proved was narrower than a green exit reads as.
+
+**L14 — T7 closed, and the correction I was told to write needed correcting too (2026-10-14).**
+
+T7's own premise was false, in two independent ways, and both were in the committed task text. Check 6
+was registered as `partial` "at one occurrence across `0001`/`0002`/`0003`" with "a second occurrence …
+what licenses the first `blocks/` entry". The records say otherwise, in their own words: `0001` scored
+check 6 `absent`; `0002` scored it `partial` and its Demand row reads **"1 — `0001` only"**, declining to
+advance it; `0003`'s row reads **"First"** as a `partial`. So the demand was at **one** occurrence and T7
+was to be the second — and T7 added **zero**, because the target failed `gaps/README.md`'s independence
+test (142 commits under two identities that are both the operator's; its own design document names this
+operator's tooling, and `0003`'s project, as borrowed sources). S4 is amended rather than quietly
+re-read: what S4 asked for was the analysis, the occurrence was a hoped-for by-product.
+
+Three of the corrections I was handed for `gaps/README.md` were themselves false, and each was cheap to
+check. Sweeping every commit in this branch's ancestry — 79 commits carrying the count sentence, stated
+count vs records on disk at that same commit:
+
+| Claim I was given | Measured | Consequence |
+|---|---|---|
+| "no number is hand-stated in this file" is false because line 85 says "three outcomes" | True that it is false, wrong about why: the same **paragraph** hand-states the demand accounting, and that one is irreducible — `open-work.sh` counts files, not owners, so "two *independent* occurrences" cannot be derived | Rewritten to name which numbers are hand-stated and why they must stay. The replacement enumerates them instead of counting them: a count of the counts is this failure one level down |
+| "a hand-stated count here rotted twice already" — and `df8af55`'s "Three analyses recorded" was **correct** | **Zero** rotted, but the arithmetic was wrong twice. Exactly **1** of 79 commits disagreed with its own tree: `df8af55`, which stated three beside **two** files — `0003` first appears in its *child* `6115b79`. Wrong **at birth**, not by drift, and that one is in this branch. (`b55f86a` and `79f5532` also mismatch; both are outside this ancestry — a stash and a parallel branch.) | The rot story is gone; the birth defect and the *sibling* file's real rot replace it, with the sweep stated so a reader can re-run it |
+| "`rottud`" was a misspelling in the text | **Never existed before this document.** `git log --all -S 'rottud'` → **0 commits**; the working tree had 0 files. The only two occurrences anywhere now are this Log entry and its callback below, which name the word in order to record that it was never written — a self-referential hit, so re-running that grep returns 1 file and must be read as this file only | Recorded because the sentence was deleted anyway, and a false reason for a correct deletion is still a false reason |
+
+The real rot was `ASK.md`'s "Two recorded runs": true on 2026-08-13 the day it was written, stale from
+the third record on 2026-08-20 until today — **55 days across 22 published commits** (`6115b79..origin/main`), during which `ASK.md` was edited **zero** times, so no human ever re-read the line while
+it lied. It is also the first case in this feature where the second copy of a number was never even
+*looked at*, which is a different failure from the drift L11 records. `ASK.md`'s `verified:` → 2026-10-14
+because its entry's prose was rewritten and re-checked. `MAP.md`'s stays `2026-08-13`: precedent inside
+this feature — `4ad47d7`, `97d45eb` and `439abbc` each edited that row and none bumped it — and this unit
+replaces a hand-count in that cell with a pointer to the generator, which removes a claim rather than
+re-verifying one.
+
+**Two of the eleven gates scanned less than they read, and both were closed before the battery was
+called green.** `./hooks/pre-commit --all` builds its list from `git ls-files`, so the first run
+("clean across 196 tracked files") had **never seen this task's entire subject** — `gaps/0004` was
+untracked. Per S8 an exit 0 on content it did not read is not a pass: re-ran with the file in scope
+(**197**, exit 0), then planted a home path *in the new file* → **exit 1** naming
+`gaps/0004-repack-atlas.md:329`, restored **byte-identical** each time (`sha256 01e5be81…` before that
+edit, `1a409691…` on the final text — the sha the evidence line first quoted was the pre-edit file's, so
+the mutant was re-run rather than the number left to rot). Separately, `./hooks/commit-msg --range HEAD HEAD` prints "clean across 0 commit message(s)" and
+**exits 0** — our own gate committing the exact class `gaps/0004` was written about, now measured on our
+own tree instead of asserted. Both are now in the Checks table with what makes each non-vacuous.
+
+**The derived obligations this closing created, and where each went.** `decisions/0017` cited "three
+projects, **three owners**" as the strongest demand in the repo; under the rule T7 just wrote into
+`gaps/README.md`, ownership was established for **none** of the three and `0001`'s target is
+*unestablished*. The count survives (`0002` and `0003` are independent on recorded evidence —
+organisation-owned, `0003` created 2016-08-24 a decade before the operator's tooling existed, code search
+**0** hits vs **30**/**329** controls), so the ADR's decision is unchanged; it carries a dated amendment
+with `verified:` left at `2026-08-27` per the `0016` precedent, because bumping it would claim the
+original sentence still holds. `gaps/0004:251` said "the three prior occurrences stand on their own" —
+true at `0004`'s own writing, contradicted by the rule this unit adds; now two-established plus one
+unestablished. And **T6's task text cited `npm run agent:check` and `npm run check:commits`, which appear
+nowhere in any committed file** — they came from the working report, which by design never crosses into
+this repo. A citation that resolves only on the author's machine is L11's off-by-one-at-birth class one
+level up: it named real things and pointed at nothing a reader can open.
+
+**The rule this run earns, which is about the correction rather than the finding:** a correction arrives
+as a bundle — the true fact, the false claim it replaces, and a history justifying it — and the third
+part is the part nobody re-derives, because it looks like background. Here the background was the false
+part twice (`df8af55` was not correct; `rottud` never existed) while the deletion it justified was
+correct anyway. **Verify a correction's history with the same command you would use to verify its
+conclusion** — here one loop over `git rev-list` comparing a stated count against `git ls-tree` at the
+same commit, which costs seconds and is the only thing that has ever worked on this class (L11, again).
+My own first draft of that replacement text then hand-stated "28 commits" for a rot window of **22
+published** ones, counting six unpushed commits of my own into a published-history claim. Caught by
+computing it before committing, which remains the only method that works.

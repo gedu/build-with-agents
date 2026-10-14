@@ -37,6 +37,20 @@ records as the outcome the demand rule is *supposed* to produce when the answer 
 Waiting for the prescriptive layer therefore waits on an output the mechanism does not reliably
 produce.
 
+**Amended 2026-10-14 by `gaps/0004`.** One clause above is unsupported: *"three owners"* was never
+established for any of the three, and run 1's target still has no ownership evidence anywhere in
+`gaps/` — it is **unestablished**, not independent. The count survives; the owner did not. Applying
+`gaps/README.md`'s ownership rule retroactively, check 4's demand rests on `0002` and `0003`, which are
+independently owned **on recorded evidence** (an organisation-owned repository of hundreds of
+contributors; an organisation-owned project created 2016-08-24, a decade before the operator's own
+tooling existed, with a code search for that tooling's organisation returning **0** hits against **30**
+and **329** for control terms in the same repository). Two independent occurrences, so the demand this
+ADR cites still stands, and the decision below is unchanged. Read the amendment before citing
+"three owners" — that phrase is now the example of the failure, not evidence of the demand. The same
+amendment applies to *"three independent occurrences"* in **Alternatives**: the count is three, the
+established-independence count is two. `verified:` deliberately stays `2026-08-27`, per the `0016`
+amendment precedent — bumping it would assert the original sentence was re-checked and still holds.
+
 Decided by the operator on 2026-08-27, on the question the journal entry above left open.
 
 ## Decision

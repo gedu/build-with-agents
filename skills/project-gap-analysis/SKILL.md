@@ -3,7 +3,7 @@ id: skills/project-gap-analysis
 type: skill
 targets: [any]
 status: draft
-verified: 2026-08-20
+verified: 2026-10-14
 sources: ["AGENTS.md", "MAP.md", "decisions/0009-redaction-is-a-repo-wide-rule.md", "decisions/0011-rig-produces-evidence-not-truth.md", "gaps/README.md", "theory/agents/capability-load-cost.md", "theory/agents/instruction-provenance.md", "theory/agents/tool-surface-design.md", "theory/llm/context-degradation-at-length.md", "theory/loops/reading-and-running-find-different-defects.md", "theory/loops/verifier-availability.md", "theory/orchestration/delegation-and-context-boundaries.md"]
 ---
 
@@ -15,8 +15,9 @@ without ever bringing that project's identity into a public repository.
 This is goal (c) in `AGENTS.md`. Its output is also the demand signal for goal (b): `blocks/` gets
 built from gaps that recurred, never from gaps that were imagined.
 
-`status: draft` — three recorded runs, every one of which changed this skill. It executes, and it
-is not settled: run 3 found as many gaps as run 1. See **Recorded runs**.
+`status: draft` — four recorded runs, every one of which changed this skill. It executes, and it
+is not settled: run 3 found as many gaps as run 1, and run 4 invalidated the rule this skill's whole
+output depends on. See **Recorded runs**.
 
 ## The rule this skill exists to prevent
 
@@ -151,6 +152,24 @@ reporting "not run". Does every gate distinguish *could not run* from *passed*?
 Look at: gates, hooks and CI steps that swallow a non-zero status — `|| true`, `|| :`,
 `2>/dev/null` on the thing being checked, a loop whose per-item status never reaches its caller.
 
+**A scan is not sufficient, and run 4 is the proof.** Runs 1–3 found real defects by pattern-scanning,
+which is the right method for defects that leave a mark. A vacuous pass leaves none: a checker whose
+flag parsing falls through to *repair* mode has no swallowed status, no `|| true`, no discarded
+stderr — nothing a grep can see, and it is strictly worse than a swallow, because it can destroy the
+very drift it was meant to detect while printing "in sync". So each gate gets **three states**, not
+one read:
+
+| State | Question | Catches |
+|---|---|---|
+| clean | does it exit 0 on an untouched tree | baseline; a gate that is red on nothing is not a gate |
+| planted defect | does it exit non-zero on a real violation | the check has teeth |
+| empty / unrecognised input | does it exit non-zero on an empty set, an empty range, or a mistyped flag | **the vacuous pass** — the only state that finds a check which cannot fail |
+
+Where the gate is runnable, run it. Where it is not (a server-side job, a protected-branch setting),
+say which of the three states you could not reach rather than marking the verdict from the scan alone.
+And when a *negative* result rests on a tool reporting nothing, prove the tool can report something:
+search for a term you expect to hit in the same repository before citing the zero you did not get.
+
 Worked example, from this repo rather than a hypothetical: `hooks/pre-commit` collapsed grep's three
 exit states with `|| :`, so an unreadable tracked file was skipped in silence while the run printed
 "clean across N tracked files" and exited 0. A redaction gate reporting a pass on content it never
@@ -177,13 +196,26 @@ why it does not project onto a target project.
 
 1. **Confirm scope with the owner.** Which project, and are you permitted to read it. Do not
    analyse a repository you were not pointed at.
-2. **Ask how the project may be referred to.** Before writing a single line. A path does not tell
-   you whether something is public. This is the one question that must precede the work.
-3. **Reconcile the checklist** against `theory/`, per above.
-4. **Run the seven checks**, recording the observation that decided each verdict.
-5. **Write the working report**, in full detail, outside this repo.
-6. **Write the gap record** in `gaps/`, de-identifying as you write.
-7. **Record the run** in the table below.
+2. **Establish independence, before any verdict is written.** The demand rule in `gaps/README.md`
+   needs *different owners*, not just different projects, and a gap analysis reads exactly like
+   independent evidence whether or not it is. Run the cheap checks and record the result in the
+   record: commit identities (`git log --format='%an|%ae' | sort -u`), repository age against this
+   repo's own tooling, the owning org, and whether the project's docs list this operator's tooling as
+   a borrowed source — projects routinely do, in print.
+   Three outcomes, never two. **Independent**, and the verdicts count. **Dependent** (the operator's
+   own work, or derived from their published tooling), and the record adds **zero** occurrences — its
+   value is then worked patterns and a transfer test, which is still worth writing. **Unestablished**,
+   and it is reported as unestablished; `absent` is not `empty`, and an untested ownership claim is
+   not a passed one. Run 4 found a *dependent* project only because it ran these queries on its own
+   initiative — no step asked, and the record would otherwise have licensed a `blocks/` entry from a
+   mirror of this repository.
+3. **Ask how the project may be referred to.** Before writing a single line. A path does not tell
+   you whether something is public. This is the one question that must precede the writing.
+4. **Reconcile the checklist** against `theory/`, per above.
+5. **Run the seven checks**, recording the observation that decided each verdict.
+6. **Write the working report**, in full detail, outside this repo.
+7. **Write the gap record** in `gaps/`, de-identifying as you write.
+8. **Record the run** in the table below.
 
 ## Output shape — the gap record
 
@@ -246,6 +278,7 @@ answer lives here, in the file nothing supersedes.
 | 1 | 2026-08-11 | React Native + Expo mobile wallet, timeboxed, agent-built | `gaps/0001-rn-expo-wallet-timeboxed.md` | **Yes, with two gaps in the skill itself** — see below |
 | 2 | 2026-08-12 | Large open-source React Native app, 6 years, hundreds of contributors | `gaps/0002-expensify-app.md` | **Yes, with two more gaps** — and the demand rule fired for the first time |
 | 3 | 2026-08-20 | Open-source cloud security platform, 10 years, Python monorepo with a React UI | `gaps/0003-prowler.md` | **Yes, with two more gaps** — and the first project analysed whose agent practice was already mature |
+| 4 | 2026-10-14 | Public TypeScript CLI/studio tooling for React Native Module Federation, first and last commit seven days apart, one author — **the operator's own repository** | `gaps/0004-repack-atlas.md` | **It executed, and the run's finding is about the skill, not the project** — first analysed project that failed the independence test, so it adds zero occurrences |
 
 Run 1 produced a complete record with all seven checks decided and no unstatable findings. Two
 things the skill did not cover, both found by running it and both now fixed above:
@@ -297,7 +330,45 @@ the backing `theory/` doc asks for, and one of those is a pattern this repo coul
 from its own material. A skill that only records absences would have thrown all three away and
 reported a project with two problems.
 
-Promotion to `status: validated` needs recorded runs, not a better rationale. Three runs, every one of
+Run 4 was chosen for a property none of the others had and that nobody thought to test: **who owns it**.
+It is the operator's own repository, and says so — its design document lists this operator's tooling
+among its borrowed sources, next to `0003`'s project, which it also cites. Two gaps, both fixed above:
+
+- **Independence was a judgment at selection time, never a step with a recorded result.**
+  `gaps/README.md` has required "different owners" since run 1, and runs 2 and 3 each say in their own
+  opening that the project was *chosen* for a different owner — so the question was not never asked. It
+  was asked once, about the wrong thing: **the choice of target, not the finding.** Nothing established
+  ownership of the project actually analysed, nothing recorded the evidence, and run 1's target has no
+  ownership statement anywhere in `gaps/`. That asymmetry is how a dependent project reaches the middle
+  of the series undetected: the rule was satisfied by intent, and intent is not observable in a record.
+  The failure mode is the skill's whole product — a dependent observation reads exactly like an
+  independent one, so a mirror of this repository would have licensed a `blocks/` entry. Now step 2,
+  with three outcomes including *unestablished*, because run 1's target is unestablished and pretending
+  otherwise to keep a count tidy is the error the rule exists to prevent.
+
+  **The retroactive question, answered with the arithmetic rather than waved away.** Does the new rule
+  un-license the demands already counted? Worst case — run 1 also fails — check 4's surviving pair is
+  `0002` and `0003`: a hundreds-of-contributors organisation-owned repository and an
+  organisation-owned project created 2016-08-24, a decade before this operator's tooling existed
+  (2026-02-27), with a code search for that tooling's organisation inside it returning **0** hits
+  against **30** and **329** for control terms in the same repository. Two independent records remain,
+  so the demand stands. Run 4 adds nothing and subtracts nothing; it converts an assumed condition into
+  a checked one.
+- **Check 6 was written as a scan**, and this run's decisive defect is invisible to any scan. The
+  three-state table above is the fix, plus the control: prove a negative-reporting tool can report
+  something before citing its silence (same lesson L10 records for `actionlint`).
+
+**This run found nothing to demand, and that is a result.** Five of seven checks came out at or above
+what the backing docs ask for — the strongest evidence in this repository that these practices
+*transfer*, since this project copied them from published documents and they survived the same seven
+checks. Recording it as a demand would have been the error, not the finding.
+
+The rule this run earns, which is about the reader rather than the run: **a gap record's value is
+bounded by a fact the skill never used to check about itself.** `absent` is not `empty`, an
+unverified channel is not a missing one, and an unexamined owner is not an independent one.
+
+Promotion to `status: validated` needs recorded runs, not a better rationale. Four runs, every one of
 which changed the skill, is evidence that it executes and evidence that it is not settled. The rate is
-not falling: run 3 found as many gaps as run 1. Record failures
+not falling: run 3 found as many gaps as run 1, and run 4 found a defect in the rule that decides
+whether any of them count. Record failures
 with the same care as successes: a skill that only records its wins has a habit, not a criterion.
