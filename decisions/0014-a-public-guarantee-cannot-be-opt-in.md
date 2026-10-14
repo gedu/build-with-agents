@@ -53,7 +53,7 @@ a problem before it exists; they stop being the only layer.
 
 | Layer | Covers | Force |
 |---|---|---|
-| A server-side job | Redaction over the tree, redaction over the pushed commit messages, structural invariants, and the self-tests of every committed executable | Runs on the server. Nothing to install, nothing to opt into, no way to not have it. **Implemented** as `.github/workflows/verify.yml` — committed, and see its three limits: it detects after publication, committed is not running, and no check is required |
+| A server-side job | Redaction over the tree, redaction over the pushed commit messages, structural invariants, and the self-tests of every committed executable | Runs on the server. Nothing to install, nothing to opt into, no way to not have it. **Implemented** as `.github/workflows/verify.yml`, and **running** since 2026-10-14 — see its two remaining limits: it detects after publication, and no check is required |
 | `hooks/pre-commit` | Redaction over staged files | Prevents. Requires `./setup.sh --hooks` |
 | `hooks/commit-msg` | Redaction over the proposed commit message | Prevents. Requires `./setup.sh --hooks` |
 | `./check.sh` | Frontmatter schema, and rule C | Reports. Run by hand or by CI |
@@ -131,15 +131,25 @@ beyond this ADR:
 
 The token-scope objection that deferred it is now moot in one direction and standing in the other. Moot:
 the operator selected this work knowing what it was, and the file is committed under ordinary repository
-policy. Standing: **committing is not running.** GitHub executes a workflow it has never seen, so until
-this file reaches the default branch the repository's Actions API reports zero workflows and this whole
-layer describes an intention with a commit hash. Verify with `gh api repos/<owner>/<repo>/actions/workflows`
-rather than by the file's presence in a tree.
+policy. **Amended 2026-10-14, same day, by the push that closed it.** Two sentences below were written
+while the workflow had never run; it has run now, on both a `push` and a `pull_request` event, five jobs
+green, and a planted frontmatter violation turned exactly one of them red on the server naming the file and
+the field while the other four stayed green. So *"committing is not running"* stopped being the live
+question — but it was the correct sentence when written, and *"running is not blocking"* replaced it as
+the one that costs anything.
+
+Standing, in the narrower form: **running is not blocking.** Verify the state rather than reasoning from
+either phrase: `gh api repos/<owner>/<repo>/actions/workflows` counts runs this repo has ever had (`0`
+until 2026-10-14, `1` after), and `gh api repos/<owner>/<repo>/rulesets` shows which checks are required
+(none). Read *The limit* before treating "a gate" as one word: this layer reports, the local hooks
+prevent, and **`gh api …/branches/main/protection` answers 404 for a ruleset**, which is how this ADR's own
+shipping PR came to publish "main is not protected" about a ruleset that had been live 58 days.
 
 **What still costs, restated so nobody cites this ADR as if it were closed:**
 
-- The fresh-clone guarantee **now exists in the tree and not yet on the server.** Same sentence as
-  before, different reason: it was never about whether a clone installs anything.
+- The fresh-clone guarantee **exists in the tree and now runs on the server** (amended 2026-10-14). It was
+  never about whether a clone installs anything — it was about whether GitHub ever saw the file. That half
+  closed; the blocking half below did not.
 - Rules A, B and C have verifiers at two layers. Coverage stops being "local and opt-in", which is what
   this ADR was written to end; it does not become *blocking*.
 - No status check is required, so a pull request merges with the scan red or never-run. That is
@@ -178,7 +188,7 @@ only layer that always runs. Neither substitutes for the other.
 
 | Consequence | Detail |
 |---|---|
-| A fresh clone would be covered without a setup step | **Realised in the tree, not yet on the server** (2026-10-14). The jobs need nothing installed and run on a collaborator's push whether or not that person read `OPERATIONS.md`. What is still not realised is the two thirds a committed file cannot buy: GitHub executes no workflow it has never seen, so until this file reaches the default branch the Actions API reports zero; and no status check is required, so coverage is a report, not a block |
+| A fresh clone would be covered without a setup step | **Realised in the tree, and running on the server since 2026-10-14** (amended the same day it was written). The jobs need nothing installed and run on a collaborator's push whether or not that person read `OPERATIONS.md`. The part a committed file cannot buy is now one third, not two: GitHub has seen the workflow and executes it, and what remains undone is that **no status check is required**, so coverage is a report, not a block |
 | A second redaction gate exists, so the pattern list is now shared | `hooks/redaction-patterns.sh` is sourced by both hooks. Editing it means running both self-tests; each asserts a real finding through the list, and each asserts exit 2 when the file is missing |
 | The frontmatter schema became an interface with a checker | `./check.sh` names the file and the field. `AGENTS.md`'s "schema = doc" rule now has a third artifact to keep in step: change the fields and `check.sh` changes in the same commit |
 | A new skill without an `ASK.md` entry fails the build | The obligation in `skills/README.md` stops depending on somebody remembering — **once the workflow runs**, which is the same condition as above. `./check.sh` reports it locally either way |
