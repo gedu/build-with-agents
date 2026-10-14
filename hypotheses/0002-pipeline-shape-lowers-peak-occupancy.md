@@ -30,15 +30,22 @@ ever-growing conversation across collection, diagnosis and repair.
 Not a measured number — none exists yet, which is the entire point of registering this before the run —
 but a structural fact about the harness itself, verified by reading `rig/run-pipeline.sh`:
 
-- MONOLITHIC's `STEPS` array (`run-pipeline.sh:346`) is a single model step (`01-monolith`). Its
+Pointer correction 2026-10-14: the four `path:line` cites below were re-anchored after `rig/run-pipeline.sh`
+grew. **`verified` is deliberately left at 2026-08-13** — re-dating it would move the pre-registration,
+and this edit checked locators, not the claim. The three structural facts it depends on were re-read and
+still hold (`case "$ARM"` is top-level, `run_model_step()` issues one fresh invocation, `--resume` appears
+zero times in the file). One pointer was not merely stale: the PIPELINE cite below said `:346`, which at
+`4eddfe9` was MONOLITHIC's line, so it was **wrong the day it was written**.
+
+- MONOLITHIC's `STEPS` array (`run-pipeline.sh:733`) is a single model step (`01-monolith`). Its
   transcript must carry the collector's findings, the diagnostic reasoning and the fix, all in one
   conversation, so its occupancy grows monotonically toward the end of the run — already observed on the
   unrelated tool-surface-v1 captures (spec R-F5.3's own scenario: "Both sampled captures were monotone,
   making peak the final turn").
-- PIPELINE's `STEPS` array (`run-pipeline.sh:346`) alternates code steps (`01-collect`, `99-verify`) with
+- PIPELINE's `STEPS` array (`run-pipeline.sh:734`) alternates code steps (`01-collect`, `99-verify`) with
   **two separate** model steps (`02-diagnose`, `03-apply`). Each model step is launched by
-  `run_model_step()` (`run-pipeline.sh:563`) as its own fresh `claude -p "$prompt_text"` invocation
-  (`run-pipeline.sh:614`) — there is no `--resume` or session-carry between steps. Each step's occupancy
+  `run_model_step()` (`run-pipeline.sh:987`) as its own fresh `claude -p "$prompt_text"` invocation
+  (`run-pipeline.sh:1044`) — there is no `--resume` or session-carry between steps. Each step's occupancy
   therefore resets near zero at its own start, so PIPELINE's **peak** (the max across both of its
   independent, shorter conversations) is bounded by whichever single step grows the most — never by the
   sum of both.

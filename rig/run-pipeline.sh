@@ -82,11 +82,60 @@ NODE_FLOOR_MAJOR=18
 # Per-step timeout, and the suite-collection timeout nested inside a code
 # step's collect.py call — R-F9.2/design.md 9b: the suite timeout must be
 # separate from, and smaller than, the arm's; collect.py "can only enforce
-# the value it is given" (--help). Both PLACEHOLDERS pending task 5.7's real
-# wall-clock measurement (not run by this unit) — rig/run.sh:59-67's own
-# TIMEOUT_S derivation precedent ("re-derive it, do not nudge it").
-STEP_TIMEOUT_S=180
-SUITE_TIMEOUT_S=150
+# the value it is given" (--help).
+#
+# MEASURED 2026-10-14, replacing the 180/150 placeholders the two archived cycles
+# each named as the one thing standing between them and a countable run. Derivation
+# is `rig/run.sh`'s own rule, unchanged — ceil(3 x slowest_successful_wall_s / 30) x 30,
+# floor 120s — because that file's comment says "re-derive it, do not nudge it", and a
+# second formula for the same bound would be a second thing to keep honest.
+#
+# STEP_TIMEOUT_S — this one value bounds TWO different things, because STEP_TIMEOUT_S is
+# passed to `timeout` at both call sites: the model step (`exec timeout ... claude -p`, and
+# the code step that runs collect.py. So its basis is the slowest SUCCESSFUL step of either
+# kind, not just the model's. From the three committed `void/shakedown` rows — void as a
+# verdict, real as a wall clock; a voided row's timing is still a timing:
+#   model steps  101475 (s1-monolithic-01)  89539 (s1-monolithic-9054)
+#                 88486, 120207 (s2-pipeline-9054: 02-diagnose, 03-apply)
+#   code steps     951, 1057, 1194 (verify)  1681 (s2-pipeline-9054: 01-collect)
+# Slowest of either kind = 120207 ms, the 03-apply model step. The code steps clear it by
+# two orders of magnitude, so the model step is the binding constraint and the collect step
+# never threatens it even at the 2,882-test amplification measured below (1719 ms).
+#   3 x 120.207 = 360.621 -> ceil(360.621/30) = 13 -> 13 x 30 = 390. Floor not engaged.
+#   Headroom over the slowest step ever observed: 3.24x. A runaway guard, not a budget.
+#
+# SUITE_TIMEOUT_S — basis per design.md 9b: "derived from a measured clean-fixture wall
+# (x3, floor stated, the rig's existing derivation rule)". **A clean-fixture wall is not
+# obtainable from this tree**: the committed `failure-flood/v2/src/` IS the injected
+# substrate (base-only suite measures 11 failed / 48 passed / 6 suites), so the clean
+# baseline exists only as the `C` block inside answer-key/s2.json, never as runnable
+# source. That gap is stated rather than papered over, and it does not change the
+# answer — every candidate basis reaches the floor:
+#   unamplified injected, measured here (1 sample) 0.889 s -> 3x 2.667 -> quantum 30 -> FLOOR 120
+#   amplified, measured here, slowest of 3         1.719 s -> 3x 5.157 -> quantum 30 -> FLOOR 120
+#   amplified, the committed void row's own value  1.681 s -> 3x 5.043 -> quantum 30 -> FLOOR 120
+# So SUITE_TIMEOUT_S = 120 is set BY THE FLOOR, not by measurement, and the 69.8x
+# headroom over the slowest amplified suite ever observed (1.719 s) is a property of the
+# floor, not a measurement of margin. Re-derive from a real clean wall if one is ever
+# committed; do not nudge this.
+#
+# Amplified-suite wall measured 2026-10-14 by replicating this script's own route in a
+# machine-local sandbox (ADR 0015 Clause A — nothing installed inside the committed
+# tree): generate-cases.py -> npm ci -> materialize -> collect.py. Three samples of
+# 2,882 tests / 6 suites: 1252, 1258, 1719 ms, agreeing with the committed void row's
+# 1681 ms. Totals matched answer-key/s2.json's F0 exactly (499 failed / 2383 passed /
+# 2882 tests / 6 of 6 suites), which is what proves the sandbox replicated the route
+# rather than a resemblance of it. Report size measured 2,790,891 bytes against the
+# ceiling collect.py enforces — DEFAULT_MAX_REPORT_BYTES = 64 MiB (collect.py:133),
+# 67,108,864 bytes = 24.0x headroom, exit 2 report-too-large above it.
+# design.md 9b predicted "order 5-20 MB"; the estimate was high by ~1.8x against its own
+# lower bound, and the two errors partially cancelled: the flood is 5.0x smaller than the
+# premise (499 failures vs ~2,500) while each failure is heavier than assumed — 5,592 bytes
+# against the 1.5-4 KB stated, so 1.4x the top of that range. The smaller flood is what the
+# ceiling is sized for; R-F9.2's ratio question stays open, this only says the report stays
+# two orders of magnitude below the point where the collector would refuse.
+STEP_TIMEOUT_S=390
+SUITE_TIMEOUT_S=120
 if [ "$SUITE_TIMEOUT_S" -ge "$STEP_TIMEOUT_S" ]; then
   printf 'BUG: SUITE_TIMEOUT_S (%s) must be strictly smaller than STEP_TIMEOUT_S (%s) — design.md 9b.\n' \
     "$SUITE_TIMEOUT_S" "$STEP_TIMEOUT_S" >&2
