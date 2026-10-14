@@ -26,7 +26,9 @@ recorded" beside two files) was wrong at birth by one commit, not by drift: the 
 its child, `6115b79`. The rot was in the other file that restates the same number, and it was
 contiguous. `ASK.md` carried "Two recorded runs" — true on 2026-08-13, the day it was written — stale
 from the third record on 2026-08-20 until 2026-10-14: **55 days across 22 published commits**
-(`6115b79..origin/main`), over which `ASK.md` was edited zero times, so nothing ever re-read the line.
+(`6115b79..57faaf3`, both fixed commits — deliberately **not** `origin/main`, which is a moving ref that
+would silently grow the moment anything is pushed to it, rotting this very sentence). Over that range
+`ASK.md` was edited zero times, so nothing ever re-read the line.
 Found on 2026-10-14 by accident, while writing an unrelated sentence about the same run. A number
 restated in a second file is a second obligation, and no check was watching either.
 
