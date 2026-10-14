@@ -3,7 +3,7 @@ id: gaps/index
 type: index
 targets: [any]
 status: draft
-verified: 2026-08-20
+verified: 2026-10-14
 sources: ["AGENTS.md", "MAP.md", "decisions/0009-redaction-is-a-repo-wide-rule.md", "decisions/0011-rig-produces-evidence-not-truth.md", "decisions/0012-a-hypothesis-is-never-citable.md", "skills/project-gap-analysis/SKILL.md"]
 ---
 
@@ -14,7 +14,25 @@ Gap analyses of existing projects, measured against this repo's validated practi
 
 Produced by `skills/project-gap-analysis`. One file per analysis, `NNNN-<slug>.md`.
 
-Three analyses recorded. One demand has reached three occurrences and resolved to an existing draft skill rather than to a new block; a second is at one. Nothing has been built here yet.
+**The record count is printed by `./open-work.sh` (source `gaps/`) and is not hand-stated here.** What
+this file *does* state by hand is the demand accounting below, and deliberately so: `open-work.sh`
+counts files, not owners, so "two *independent* occurrences" is not derivable from anything
+machine-readable. Those figures are named rather than counted, because a count of the counts is this
+failure one level down.
+
+The derived count is not a repair story — it has never rotted. The single commit in this branch's
+history whose stated number disagreed with the records on disk (`df8af55`, 2026-08-20, "Three analyses
+recorded" beside two files) was wrong at birth by one commit, not by drift: the third record landed in
+its child, `6115b79`. The rot was in the other file that restates the same number, and it was
+contiguous. `ASK.md` carried "Two recorded runs" — true on 2026-08-13, the day it was written — stale
+from the third record on 2026-08-20 until 2026-10-14: **55 days across 22 published commits**
+(`6115b79..origin/main`), over which `ASK.md` was edited zero times, so nothing ever re-read the line.
+Found on 2026-10-14 by accident, while writing an unrelated sentence about the same run. A number
+restated in a second file is a second obligation, and no check was watching either.
+
+Nothing has been built here yet: one demand has reached its two independent occurrences and resolved to
+an existing draft skill rather than a new block, a second is at one, and a fourth analysis contributed
+neither.
 
 ## No project is identifiable here
 
@@ -70,6 +88,22 @@ cited as one observation, labelled as one.
 
 **A block is built when the same demand appears in at least two independent gap records** — different
 projects, different owners, analysed separately. Until then the demand is recorded and waits.
+
+**"Different owners" is a fact to establish, not an intention to hold.** This clause has been here since
+the first record, and run 4 (2026-10-14) found a project that failed it — the operator's own repository,
+whose design document names this operator's tooling as a borrowed source. Runs 2 and 3 each state that
+their target was *chosen* for a different owner, which is a statement about picking a target, not about
+the finding: nothing established ownership of the project analysed, and nothing recorded the evidence.
+A dependent observation reads exactly like an independent one, so the failure is silent in the only
+direction that matters — it manufactures a second occurrence out of a mirror of this repository.
+
+So ownership is checked **before verdicts are written**, evidence recorded in the record, with three
+outcomes: **independent** (counts), **dependent** (adds zero occurrences; its value is worked patterns,
+not demand), **unestablished** (reported as unestablished — `absent` is not `empty`, and an unexamined
+owner is not an independent one). `skills/project-gap-analysis` step 2 carries the queries. Applying the
+rule to the existing records leaves the counted demand standing: `0002` and `0003` are independently
+owned on evidence, and run 1's target is **unestablished** — which is recorded as unestablished rather
+than assumed either way.
 
 One analysis plus enthusiasm produces a `blocks/` directory full of things that solved one project's
 problem and are described as reusable practice. That is inventing knowledge with extra steps, which
