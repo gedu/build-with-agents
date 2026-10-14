@@ -432,7 +432,7 @@ gate below is invoked by hand and its exit code is read.
 |---|---|---|---|
 | T1 | done | `2839cd6` | `./check.sh` 0 over the tree; `./check.sh --self-test` 0; `./hooks/pre-commit --all` 0; `./open-work.sh` printed 6 sources and did **not** list this document — T2's red reproduced before T2 was written |
 | T2 | done | `4ad47d7` (recorded by T4 — the self-reference note below resolves for every task but the one writing it) | `./open-work.sh --self-test` 0; **12 FAIL + exit 1** with the new section deleted (deletion-mutant, recount without truncation); `sh -n` 0; `./check.sh` 0; `./hooks/pre-commit --all` 0; index prints 16 items across 7 sources. **One derived obligation this task created went undischarged and was found later:** its own seams-table cite `open-work.sh:401` was moved to 498 by this very commit — the commit that documented why cites break moved one. Repaired at T4, L11. |
-| T3 | done, **not yet running** | `a5f81c4` (recorded by T4) | `actionlint` 1.7.12 exit 0, exit 1 on both planted mutants (broken mapping; unquoted var → SC2086) with `shellcheck` 0.11.0 present; recovered file byte-identical to blob `2fc49e65…`; `git check-ignore` exit 1; mutants of the job commands: `pre-commit --all` 1 with a planted path, `check.sh` 1 with a planted `type:`; `gh api …/actions/workflows` → `total_count: 0` |
+| T3 | done, **running since 2026-10-14** (was "not yet running" until PR #11 merged; see L16) | `a5f81c4` (recorded by T4) | `actionlint` 1.7.12 exit 0, exit 1 on both planted mutants (broken mapping; unquoted var → SC2086) with `shellcheck` 0.11.0 present; recovered file byte-identical to blob `2fc49e65…`; `git check-ignore` exit 1; mutants of the job commands: `pre-commit --all` 1 with a planted path, `check.sh` 1 with a planted `type:`; `gh api …/actions/workflows` → `total_count: 0` |
 | T4 | done | `97d45eb` (recorded by T8 — the first task whose hash became knowable at the *next* commit, which is the shape of the self-reference note, not a gap) | `rig/check.sh` **20/20** with `rig/runs/` copied in, both `rig/results/*/runs.jsonl` byte-intact after (`git diff -- rig/results/` empty); `bash -n` 0; invariant mutant `STEP=100/SUITE=150` → exit 2; `./check.sh` 0 over 117 content files; amplified suite measured 3× (1252/1258/1719 ms, 2,882 tests, 499 failed / 2,383 passed — matching `answer-key/s2.json`'s F0 exactly, which is what proves the sandbox replicated the route); `report_bytes` 2,790,891 vs `DEFAULT_MAX_REPORT_BYTES` 64 MiB = 24.0x. **Post-commit proof:** with `hypotheses/0002` clean at `97d45eb`, `rig/check.sh` returned to **20/20, exit 0** and both goldens stayed at 3 and 42 lines — the Hard Ordering Gate's refusal was the dirty-tree precondition, not a regression | `rig/check.sh` **20/20** with `rig/runs/` copied in, both `rig/results/*/runs.jsonl` byte-intact after (`git diff -- rig/results/` empty); `bash -n` 0; invariant mutant `STEP=100/SUITE=150` → exit 2; `./check.sh` 0 over 117 content files; amplified suite measured 3× (1252/1258/1719 ms, 2,882 tests, 499 failed / 2,383 passed — matching `answer-key/s2.json`'s F0 exactly, which is what proves the sandbox replicated the route); `report_bytes` 2,790,891 vs `DEFAULT_MAX_REPORT_BYTES` 64 MiB = 24.0x |
 | T8 | done, **value unchanged** | `bcb37eb`. **Recorded late by two, measured rather than reasoned.** Its hash was knowable the moment `bcb37eb` itself landed, so the first commit that could carry it was its child `439abbc` (`git rev-parse 439abbc^` = `bcb37eb`) — chance #1, which named it zero times; `1a1fd8e` is chance #2, also zero mentions; this commit is chance #3. A first draft of this cell said "late by one" — a count written from the feel of the sequence instead of from `git show <rev> | grep -c bcb37eb`, which is the same failure L11 and L14 record, arriving again in a sentence about counts. The self-reference note explains why a cell cannot carry its own hash; it does not excuse skipping the next commit, and `439abbc` had both the hash and the free-text space to write | `bash -n rig/run.sh` 0; all eight numbers in the corrected comment re-verified against committed data (pilot six 10990-14586 ms; all-42 10990-51778 ms; 0 rows `void_reason=timeout`; 42 raw captures `timed_out=false` all under `timeout_s=300`; 51778/120000 = 43%; 120/51.778 = 2.32x; ceil(3×51.778/30)×30 = 180; the table already held 42 rows / 27 `t3v2` at `134dbe8`, checked with `git show`). The fix is prose: **`TIMEOUT_S` stays 120**, which is the rule applied to the population the rule names. `rig/check.sh` 20/20, goldens intact. |
 | T9 | done | `439abbc` — knowable only once `1a1fd8e` existed, so this is the first commit that could carry it: on time. **Its evidence figures belong to `bcb37eb`, not to it.** 117 content files, 196 tracked files and 149 messages are values in the tree the battery actually ran against — `439abbc`'s parent — because a task measures the tree *before* its own commit lands, never the commit that records it. The message count is what proves this: `git rev-list --count` gives 149 at `bcb37eb`, 150 at `439abbc`, 151 at `1a1fd8e`, so "149" can only be the parent's tree. A first draft of this cell anchored all three to `439abbc` — a false attribution made by reasoning that "the commit that names them" must be "the commit they were measured in", which is the off-by-one-at-birth class from L11 arriving in my own fresh sentence about staleness. All three are counters over reachable repository state and move with any later commit; read them as value-at-`bcb37eb`, never as standing claims, and they are deliberately not chased forward | `actionlint` 1.7.12 **exit 0** with `shellcheck` 0.11.0 present, and **exit 1 on the first draft** (`SC2329`, dead helper) so the pass is a result not a silence; both inline `run:` blocks `shellcheck` clean; step run in a real clone: baseline **exit 0, 5 ran**, four planted mutants **exit 1/1/2/2**, two guards held (new executable auto-discovered → **6 ran**; empty `untested` under `set -u` → **exit 0**); hermetic in a clone with no `rig/runs/` — **1.74 s**, goldens stay **3 and 42**, `git status` empty; both rig self-tests **exit 2 naming `python3`** on a `PATH` without it; discovery confirmed in a genuine `--depth 1` `file://` clone. Full battery after the edit: `check.sh --self-test` 0, `open-work.sh --self-test` 0, `pre-commit --self-test` 0, `commit-msg --self-test` 0, `./check.sh` 0 (117 content files, 5 skills), `pre-commit --all` 0 (196 tracked files), `commit-msg --range - HEAD` 0 (149 messages), `rig/check.sh` **20/20**, `open-work.sh` 0 |
@@ -804,7 +804,9 @@ new obligations (2026-10-14).**
 
 `ci/public-gate` → PR #11 → `main` by **rebase**, the repo's own precedent (`6115b79` is a direct ancestor
 of `main`). Three things this feature had been asserting about the workflow stopped being true the moment
-it ran: `total_count` went **0 → 1**, "committed and has never run" became false, and T3's
+it ran: the Actions workflow count went **0 → 1** (that endpoint counts **definitions**, not executions —
+see L18; the execution count was **7** by the time I noticed I had been citing it as "runs"),
+"committed and has never run" became false, and T3's
 *"the end-to-end claim 'this workflow turns red on GitHub' is unverified"* — the gap T3 deliberately
 refused to paper over — was closed. Both triggering runs (push and `pull_request`) went green: **five
 jobs, all `success`**, and the rig job's five self-tests each printed their own `ok:` line, which is the
@@ -872,13 +874,47 @@ looking for** — for a class sweep, print matched regions, not fixed-width pref
 
 Both numbers in the first draft of the `OPERATIONS.md` note were asserted and both were wrong: "a month"
 for the ruleset's age (measured: **58 days**, created 2026-08-17, PR merged 2026-10-14) and "0 for a month"
-for the Actions count (measured: it was 0 from repo creation on 2026-08-04 until the push, i.e. never
-"recently"). Sixth time this session I have stated a derived number before deriving it. The correction
-quotes the measured values and says they were measured after I wrote the wrong ones, because that sequence
-is the finding.
+for the Actions count (measured: that endpoint reports **workflow definitions**, and it read 0 from repo
+creation on 2026-08-04 until the push — so "recently" was wrong twice over, in the value *and* in what the
+number measures; see L18).
+
+**And "sixth time this session" in that same sentence was itself an uncounted count** — the ninth instance
+by the time the list is actually made, and L11 alone contributes four. Enumerated instead of counted, which
+is the only form that has ever held: L11's "5-line edit" (really +54/−5), "6 live cites" (7), "413 lines of
+drift" (424), "the ceiling is right by 23x" (24.0x); L14's "28 commits" (22 published); L15's "late by one"
+(late by two); L17's "a month" (58 days) and its Actions-count gloss; and L18's `total_count`-as-runs. A
+running total of a recurring failure is the same hand-stated derived figure as every other one this Log has
+recorded, and it rotted inside the commit that described it.
+The correction quotes the measured values and says they were measured after I wrote the wrong ones, because
+that sequence is the finding.
 
 What this Log entry is evidence for, in T6's terms: **a change to one artifact invalidates sentences in
 artifacts that mention it, and no check enumerates those.** `OPERATIONS.md`, `MAP.md` and `decisions/0014`
 all described the workflow's runtime state; only one of the three was on the diff's radar. The ledger's
 class here is not "stale path citation" — it is **"live claim about a fact another file changed"**, and it
 is harder than the path case because it has no `path:line` form to match.
+
+**L18 — I published a wrong API semantic on `main`, two paragraphs from the entry warning about exactly
+that class (2026-10-14).**
+
+The amendment correcting a false "main is not protected" claim introduced a new one: it described `gh api
+…/actions/workflows | .total_count` as counting *"runs this repo has ever had"*. It counts **workflow
+definitions**. Measured side by side: `total_count` = **1**, `…/actions/runs | .total_count` = **7**,
+`…?branch=main` = **2**. A reader asking "has this workflow ever run?" and trusting my sentence would
+conclude it ran once, from an endpoint that does not answer that question at all.
+
+The shape is worth naming because it is not a typo. `total_count` is the same field name, in the same
+response shape, returning a plausible small integer from both endpoints — so the wrong one is
+**indistinguishable from the right one by inspection**, and the 0→1 transition I had really observed made
+the wrong reading feel confirmed. It is the ruleset 404 two paragraphs lower in the same file, wearing the
+opposite costume: there, an absent protection answered "not protected"; here, an execution question
+answered with a definition count. Both are confident, both are integers, neither is what was asked.
+
+Fix in `decisions/0014` and `OPERATIONS.md`: a three-row table naming which endpoint answers which
+question, each with its measured value, and the instruction that both numbers look like "activity".
+
+What this is evidence for, for T6: the ledger cannot just check that a citation *resolves* (L11) or that a
+count is *generated not typed* (L15). A third property is needed — **a claim about a tool's output must
+name the field and the endpoint whose semantics it asserts**, because "the API returned 1" is unfalsifiable
+about "it ran once". Both defects in this Log entry were caught by the same cheap move: **re-run the
+command and read the field you are citing**, not the number you remember.
