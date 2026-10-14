@@ -34,7 +34,7 @@ where to look and what you are allowed to trust.
 | `check.sh` | Structural invariants: the frontmatter schema, and every `skills/` directory having an `ASK.md` entry. Redaction is not its job | Yes | active |
 | `open-work.sh` | The generated index of open work. Enumerates seven sources and reports its own coverage; prints to stdout and writes nothing | Yes | active, ADR 0016 **draft**. Seventh source (`odd/tasks/`) added 2026-10-14 — the event ADR 0016 predicted and its COVERAGE block did not catch |
 | `hooks/` | Committed git hooks. `pre-commit` and `commit-msg` are the ADR 0009 redaction gates, over files and over the message | Yes | 2 hooks + `redaction-patterns.sh`, the list both read |
-| `.github/` | Would hold CI workflows — the layer a fresh clone gets without installing anything. Today it holds only the gitignored Copilot entrypoint `setup.sh --copilot` generates | Yes | **no workflow.** ADR 0014 decided one and records why it is deferred |
+| `.github/` | CI workflows — the layer a fresh clone gets without installing anything. `setup.sh --copilot` also generates a gitignored entrypoint here; the two do not collide | Yes | `verify.yml` committed 2026-10-14: 4 jobs, each pairing its self-test with the check it guards. **Committed is not running** — until it is pushed GitHub has never seen it — and no status check is required, so it detects and does not block (ADR 0014) |
 | `skills/` | Tool-neutral skills, one dir per skill (`SKILL.md` + optional `assets/`, `references/`) | Yes, when `validated` | 5 skills (`checkout-isolation` draft, `context-checkpoint` draft, `hypothesis-cycle` draft, `project-gap-analysis` draft, `source-verdict` validated) |
 | `theory/llm/` | How models behave: context, tokens, sampling, failure modes | Yes, when `validated` | 1 doc (`context-degradation-at-length`, validated) |
 | `theory/agents/` | Single-agent design: tools, memory, context isolation | Yes, when `validated` | 3 docs (`capability-load-cost`, `instruction-provenance`, `tool-surface-design`) |
@@ -108,7 +108,7 @@ Do not create a target directory before there is validated content to put in it.
 | "What do real projects actually lack?" | `gaps/` — and a demand needs two independent records before it builds anything |
 | "What can I actually ask for?" | `ASK.md` — the five skills in plain request form. The only file written for the human |
 | "Which tool entrypoints exist?" | `setup.sh --help`; nothing generated is committed |
-| "Does this repo still match its own rules?" | `./check.sh` for structure, `./hooks/pre-commit --all` for redaction. Both are local and must be run by hand — nothing runs them for you (ADR 0014) |
+| "Does this repo still match its own rules?" | `./check.sh` for structure, `./hooks/pre-commit --all` for redaction. Both are local and must be run by hand. `.github/workflows/verify.yml` runs the same checks where nobody has to remember — where it detects rather than prevents (ADR 0014) |
 | "What do I run, and when?" | `OPERATIONS.md` |
 
 Every table in this repo is either generated or does not exist. This file is the one

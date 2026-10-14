@@ -61,11 +61,12 @@ reasoning.
 Half of this is enforced. `hooks/pre-commit` blocks a commit whose staged files contain an absolute
 home path or a known secret shape, and `hooks/commit-msg` blocks the same shapes in the commit
 message — install both with `./setup.sh --hooks`, audit the whole tree with `./hooks/pre-commit --all`.
-Both are local and opt-in, and **there is no server-side copy yet** — ADR 0014 decided there should be
-one and records why it is deferred. So a clone that never runs `./setup.sh --hooks` has no gate at
-all: assume nothing about a checkout you did not install into. The other half, a private name written
-as a bare word, **cannot** be pattern-matched and stays a judgment call. A clean check is not
-evidence about that half.
+Both are local and opt-in, and they are the only layer that *prevents*: a clone that never runs
+`./setup.sh --hooks` has no preventive gate — assume nothing about a checkout you did not install into.
+A server-side copy now exists (`.github/workflows/verify.yml`, ADR 0014) and needs nothing installed,
+but it detects **after** publication and no status check is required yet, so it neither prevents nor
+blocks a merge. The other half, a private name written as a bare word, **cannot** be pattern-matched and
+stays a judgment call. A clean check is not evidence about that half.
 
 | Never commit | Write instead |
 |---|---|
