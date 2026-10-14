@@ -176,11 +176,29 @@ scanned.
 | commit message gate | `./hooks/commit-msg --self-test` | `./hooks/commit-msg --range <from> <to>` |
 | structural invariants | `./check.sh --self-test` | `./check.sh` |
 | committed executables | `./setup.sh --self-test`, `./open-work.sh --self-test` | `./open-work.sh` — accepted only on exit 0 |
+| rig self-tests | *(nothing follows it — the rig's real gate must not run here)* | `./rig/check.sh --self-test`, `./rig/run-pipeline.sh --self-test`, `python3 rig/{derive,report,collect}.py --self-test`, discovered from the index |
+
+The rig job runs **`--self-test` dispatches and nothing else**, and that is not an oversight to fix later:
+CI checks out a tree with no gitignored `rig/runs/`, and `rig/check.sh`'s real gate there fails 5/18 *and
+truncates both committed `rig/results/*/runs.jsonl` to zero bytes*, then reports green against the wipe.
+Its targets are **discovered from the index** rather than written down: committed executables by mode
+`100755` under `rig/`, plus the tracked `rig/*.py` modules, both excluding `rig/fixtures/` (frozen
+measurement inputs, and the same exclusion `check.sh` and `open-work.sh` already apply). So a new rig
+executable is covered the day it lands; discovering none exits 2 rather than passing.
 
 Each self-test runs in the **same job** as the check it guards. Split across two jobs, a check could
 report clean in a green job while its own self-test failed in a red one — ADR 0014's non-negotiable
 list, and the reason `./open-work.sh` is run rather than merely self-tested: exit 2 there means *could
 not run*, and ADR 0014 forbids reporting that as a pass.
+
+The rig job is the one row with **no check after its self-tests**, deliberately, and the pairing rule is
+kept by choosing which gate is runnable rather than by skipping one: the check `rig/check.sh --self-test`
+would guard is `rig/check.sh`'s real gate, and that one cannot run in CI at all — see **Why the real gate
+is not run here** in `.github/workflows/verify.yml`, which names what it does to `rig/results/` in a tree
+with no `rig/runs/`. So the job tests the instruments and leaves the measurement alone. It is a job of its
+own rather than more steps under *committed executables* for the reason ADR 0014 already gives — checks
+run in sequence in one job, and a failing early step skips the rest, so the log reports less than was
+checked.
 
 Three limits, stated because each one has already fooled somebody once:
 

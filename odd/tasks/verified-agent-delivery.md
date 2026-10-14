@@ -270,7 +270,7 @@ Ordered by dependency, not by discovery. Work the frontier: any task whose block
     and 120 would sit at **2.32x** rather than the 3× `design.md` §5 calls "the point". The slowest wall
     ever recorded is **43%** of the 120 bound.
 
-- [ ] **T9 Run the rig executables' own self-tests in CI — ADR 0014's rule, applied to the two it missed**
+- [x] **T9 Run the rig executables' own self-tests in CI — ADR 0014's rule, applied to the two it missed**
   - Blocked by: None. Not blocked by T8 (different file, different defect, no shared line).
   - Seams: `actionlint` with `shellcheck` present (the shape T3 established: exit 0 on the file, exit 1 on
     each planted mutant — S8 binds, so a mutant is required, not optional)
@@ -281,12 +281,72 @@ Ordered by dependency, not by discovery. Work the frontier: any task whose block
   - Warrant is ADR 0014's non-negotiable list, not a new idea; its Implementation section already applied
     the same rule to `setup.sh` and `open-work.sh` for post-dating the draft. See L12 for the disposition
     that binds here — this must **not** be filed as a restatement of the archived SUGGESTION-1.
-  - Two questions to settle in the task, not assume: whether "every committed executable" reaches the three
-    `100644` rig `.py` files run via `python3`; and whether the fix belongs in `rig/check.sh`'s
-    `check_component_self_test()` (which hardcodes `python3` and has no bash arm) or as its own CI step.
-  - **Forbidden by evidence**: do not add `rig/check.sh`'s real gate. A clean checkout has no gitignored
-    `rig/runs/`, and there it fails 5/18 **and truncates both committed goldens to zero bytes** (L11).
-    Only `--self-test` dispatches are hermetic; verified in a clean `git archive`.
+  - **Question 1, settled: no — and the modules are covered on a different warrant anyway.** The three
+    `.py` files are mode `100644`, so ADR 0014's word "executable" does not reach them (measured: the
+    six-file mode listing). They are in the job on ADR 0013 plus a fact about this workflow: CI ran them
+    **nowhere**, because the only thing that composes their `--self-test` is `check_component_self_test()`
+    inside `rig/check.sh`'s **real gate** — which is the forbidden one. So excluding them on a technicality
+    would have shipped a job that looks complete and still never tests the three most-edited rig files.
+    Naming the warrant separately matters: this does not quietly widen "executable", which later readers
+    rely on for the 8/7/5 counts above.
+  - **Question 2, settled: the bash arm cannot fix this, and the spec's framing was wrong.** Not a choice
+    between two designs — one of them does not work. `rig/check.sh` dispatches `--self-test) self_test;
+    exit $?`, and the three `check_component_self_test` calls sit at 507-509, **below** that exit. Adding a
+    bash arm there changes nothing CI can reach, because CI cannot run the real gate. Verified by
+    instrumenting `python3` on `PATH` to log every invocation during `rig/check.sh --self-test`: five
+    synthetic-fixture heredocs, **zero** `--self-test` calls. Own CI step, therefore — and a *job*, not
+    steps appended to `executables`, which is ADR 0014's own stated reason (sequential checks in one job
+    let a failing early step skip the rest, so the log reports less than was checked).
+  - **The design choice the task did not name, made deliberately: discovery, not a list.** Targets come
+    from the index — mode `100755` under `rig/`, plus tracked `rig/*.py`, both excluding `rig/fixtures/`
+    (the same exclusion `check.sh` and `open-work.sh` already apply to frozen measurement inputs). The
+    defect being fixed *is* a hardcoded list that rotted while the repo grew, so a file written with the
+    two names in it reintroduces the failure class at the moment it closes the instance. Zero discovered
+    exits 2; discovered-but-none-carries-the-flag exits 2; a path with no `--self-test` is named as
+    untested rather than skipped in silence (`absent` is not `covered`).
+  - **Evidence (S8: four mutants fired, two guards held).** `actionlint` 1.7.12 exit 0 with `shellcheck`
+    0.11.0 present, and it **caught real dead code** in the first draft (`SC2329`, a helper I left
+    uncalled) — the linter was demonstrably capable of failing before its silence meant anything, per L10.
+    Both inline `run:` blocks then `shellcheck` clean. Step executed in a real clone (`has .git`, no
+    `rig/runs/`). Counted honestly rather than rounded up: **four planted mutants, each observed to make
+    the step non-zero**, plus **two guards that hold on the happy path** and a baseline control. A first
+    draft of this line said "six mutants, each observed to fire", which is false — two of the six did not
+    fire, because they are not mutants; they are the positive checks that discovery and `set -u` behave.
+
+    | # | Intervention | Observed | Kind |
+    |---|---|---|---|
+    | — | none (as-is) | exit 0, **5 self-tests ran** | control |
+    | 1 | `classify_manifest` expectation inverted in `rig/check.sh` | **exit 1**, other four still ran | mutant, fired |
+    | 2 | new mode-`100755` `rig/newtool.sh` committed | **6 ran**, picked up with no workflow edit | guard: discovery |
+    | 3 | same file, own `--self-test` exits 1 | **exit 1** naming it | mutant, fired |
+    | 4 | discovery pathspec pointed at nothing | **exit 2**, "refusing to report a pass for having tested nothing" | mutant, fired |
+    | 5 | six paths found, none carrying the flag | **exit 2**, "this job ran nothing" | mutant, fired |
+    | 6 | `untested` array empty under `set -u` | **exit 0**, no unbound-variable crash | guard: `set -u` |
+
+    Row 1 is the S8 property that matters most here: the failing test did **not** stop the other four, so
+    one red instrument cannot hide the state of the rest. Hermeticity re-measured in that clone, not
+    inherited from L11's archive: all five self-tests in **1.74 s**, both goldens stay at **3 and 42
+    lines**, `git status` empty afterwards. Both rig self-tests **exit 2 naming `python3`** when `PATH`
+    lacks it (measured), so a missing interpreter lands as could-not-run, never as a pass — the property
+    the workflow header claims. Discovery verified at the CI's real depth in a genuine `--depth 1` clone
+    over `file://` (a local clone silently ignores `--depth`, which is what made an earlier run of this
+    check worthless): same 3 executables, same 3 modules.
+  - **Derived obligations created by this change, all discharged in the same commit:** `MAP.md`'s `.github/`
+    row claimed "4 jobs, each pairing its self-test with the check it guards" — both halves went stale, and
+    the second is now *deliberately* violated by one row, so the row states the exception rather than a
+    count (a count there is exactly the hand-stated figure L11 says to delete, not update);
+    `OPERATIONS.md`'s CI job table (new row) and its "Each self-test runs in the same job as the check it
+    guards" paragraph (needed the exception named); `rig/README.md`'s live claim that
+    `run-pipeline.sh --self-test` "must still be run by hand" — **false as of this commit**, corrected to
+    say the composition gap inside the gate is unchanged while CI coverage is new, which is the
+    distinction SUGGESTION-1's disposition turns on; `decisions/0014` Implementation status. No `path:line`
+    citation into any file this change edits (`hypotheses/0002`'s four cites point into
+    `rig/run-pipeline.sh`, which T9 does not touch), verified by grep before editing rather than after.
+  - Forbidden by evidence, and respected: `rig/check.sh`'s real gate is **not** in CI. A clean checkout has
+    no gitignored `rig/runs/`, and there it fails 5/18 **and truncates both committed goldens to zero
+    bytes** (L11). Only `--self-test` dispatches run here; the job's comment says so in the file, because
+    the tempting "improvement" is to add the real gate and every signal would then go green.
+
 
 ## Explicitly not in this feature
 
@@ -325,7 +385,7 @@ gate below is invoked by hand and its exit code is read.
 | T3 | done, **not yet running** | `a5f81c4` (recorded by T4) | `actionlint` 1.7.12 exit 0, exit 1 on both planted mutants (broken mapping; unquoted var → SC2086) with `shellcheck` 0.11.0 present; recovered file byte-identical to blob `2fc49e65…`; `git check-ignore` exit 1; mutants of the job commands: `pre-commit --all` 1 with a planted path, `check.sh` 1 with a planted `type:`; `gh api …/actions/workflows` → `total_count: 0` |
 | T4 | done | `97d45eb` (recorded by T8 — the first task whose hash became knowable at the *next* commit, which is the shape of the self-reference note, not a gap) | `rig/check.sh` **20/20** with `rig/runs/` copied in, both `rig/results/*/runs.jsonl` byte-intact after (`git diff -- rig/results/` empty); `bash -n` 0; invariant mutant `STEP=100/SUITE=150` → exit 2; `./check.sh` 0 over 117 content files; amplified suite measured 3× (1252/1258/1719 ms, 2,882 tests, 499 failed / 2,383 passed — matching `answer-key/s2.json`'s F0 exactly, which is what proves the sandbox replicated the route); `report_bytes` 2,790,891 vs `DEFAULT_MAX_REPORT_BYTES` 64 MiB = 24.0x. **Post-commit proof:** with `hypotheses/0002` clean at `97d45eb`, `rig/check.sh` returned to **20/20, exit 0** and both goldens stayed at 3 and 42 lines — the Hard Ordering Gate's refusal was the dirty-tree precondition, not a regression | `rig/check.sh` **20/20** with `rig/runs/` copied in, both `rig/results/*/runs.jsonl` byte-intact after (`git diff -- rig/results/` empty); `bash -n` 0; invariant mutant `STEP=100/SUITE=150` → exit 2; `./check.sh` 0 over 117 content files; amplified suite measured 3× (1252/1258/1719 ms, 2,882 tests, 499 failed / 2,383 passed — matching `answer-key/s2.json`'s F0 exactly, which is what proves the sandbox replicated the route); `report_bytes` 2,790,891 vs `DEFAULT_MAX_REPORT_BYTES` 64 MiB = 24.0x |
 | T8 | done, **value unchanged** | this commit's hash is the next one's to record | `bash -n rig/run.sh` 0; all eight numbers in the corrected comment re-verified against committed data (pilot six 10990-14586 ms; all-42 10990-51778 ms; 0 rows `void_reason=timeout`; 42 raw captures `timed_out=false` all under `timeout_s=300`; 51778/120000 = 43%; 120/51.778 = 2.32x; ceil(3×51.778/30)×30 = 180; the table already held 42 rows / 27 `t3v2` at `134dbe8`, checked with `git show`). The fix is prose: **`TIMEOUT_S` stays 120**, which is the rule applied to the population the rule names. `rig/check.sh` 20/20, goldens intact. |
-| T9 | not started | — | — |
+| T9 | done | this commit's hash is the next one's to record | `actionlint` 1.7.12 **exit 0** with `shellcheck` 0.11.0 present, and **exit 1 on the first draft** (`SC2329`, dead helper) so the pass is a result not a silence; both inline `run:` blocks `shellcheck` clean; step run in a real clone: baseline **exit 0, 5 ran**, four planted mutants **exit 1/1/2/2**, two guards held (new executable auto-discovered → **6 ran**; empty `untested` under `set -u` → **exit 0**); hermetic in a clone with no `rig/runs/` — **1.74 s**, goldens stay **3 and 42**, `git status` empty; both rig self-tests **exit 2 naming `python3`** on a `PATH` without it; discovery confirmed in a genuine `--depth 1` `file://` clone. Full battery after the edit: `check.sh --self-test` 0, `open-work.sh --self-test` 0, `pre-commit --self-test` 0, `commit-msg --self-test` 0, `./check.sh` 0 (117 content files, 5 skills), `pre-commit --all` 0 (196 tracked files), `commit-msg --range - HEAD` 0 (149 messages), `rig/check.sh` **20/20**, `open-work.sh` 0 |
 | T5, T6, T7 | not started | — | — |
 
 ## Log
@@ -541,6 +601,40 @@ Two things T9 must **ask**, not assume: whether ADR 0014's "every committed exec
 means composing the bash arm inside `rig/check.sh`, or adding a CI step, since those leave different
 things true. And `rig/run.sh`'s missing `--self-test` is a separate gap from T8's stale number — same file,
 two independent defects, one about a value, one about a gate.
+
+**L13 — T9 closed, and the spec's own framing of it was the most expensive thing to check (2026-10-14).**
+
+T9 was written as a choice between two designs. Only one of them works, and the one that does not is the
+one the task text leaned toward. `rig/check.sh` dispatches `--self-test) self_test; exit $?`, and the three
+`check_component_self_test` calls sit **below** that exit — so adding the missing bash arm would have
+changed nothing CI can reach, because CI cannot run the real gate. Reading the dispatch would have told me
+this in ten seconds; I nearly built it anyway because the task said "or as its own CI step" and that `or`
+made both options look live. **The check that worked was instrumenting `python3` on `PATH` to log its own
+invocations**: five synthetic-fixture heredocs during `--self-test`, zero `--self-test` calls. Control flow
+read by eye is a hypothesis; a logged invocation is a measurement.
+
+Three findings worth more than the job:
+
+| Finding | Evidence | Consequence |
+|---|---|---|
+| ADR 0014's "Two jobs were added on the way in" was false the day my own T3 wrote it | recovered draft has **3** jobs, `a5f81c4` has **4** — one job was added, covering **two executables**. Counted the executables, named them jobs | Corrected in the ADR, dated, with the recipe (`git show <rev>:…` over `fcaae282` vs `a5f81c4`). Third instance of the hand-stated-count class, and the first one inside a **decision file** — the artifacts other files cite as authority |
+| My first T9 evidence line said "six mutants, each observed to fire" | Four mutants fire. Two of the six are positive guards (discovery picks up a new executable; empty array survives `set -u`) — they do not "fire" because they are not mutants | Recounted into a table with a Kind column. Caught by recounting before committing, the one method that has ever worked on this class (L11) |
+| Two sentences I wrote **minutes** earlier were defective | "(previous paragraph)" pointed at the pairing-rule paragraph while the wipe warning it cited was two paragraphs up; "discovered from the index (mode `100755`…)" under-described the set, since the `100644` modules are also run | Both fixed by naming what they resolve to (a heading in the workflow file; the full two-rule set). This is the *citation resolves to what it names* discipline applied to prose cross-references, not just `path:line` — the off-by-one-at-birth class from L11, arriving in my own fresh sentences about other people's staleness |
+
+The design decision the task never named, made deliberately: **discovery over a list.** The defect being
+fixed *is* a hardcoded list that rotted while the repo grew (ADR 0014's rule rotted exactly that way once).
+A job that names `rig/check.sh` and `rig/run-pipeline.sh` in prose closes this instance and leaves the
+failure class loaded for the next executable. So the targets come from the index — `100755` under `rig/`
+plus tracked `rig/*.py`, both excluding `rig/fixtures/` — and the mutant that proves it is the one that
+matters most: a newly committed `rig/newtool.sh` was picked up with **no edit to the workflow**. Zero
+discovered exits 2, because a scan that examined nothing is `could not run` (`gaps/0002`'s counterexample).
+
+Two things that did **not** change, named so nobody reads this as more than it is: the composition gap
+inside `rig/check.sh` is untouched — `run-pipeline.sh --self-test` is still not composed by this repo's own
+rig gate, and `rig/README.md` now says the gap is open while CI coverage is new, which is exactly the
+distinction SUGGESTION-1's disposition turns on. And `rig/run.sh` still has no `--self-test` at all: the
+job names it as untested rather than counting it as covered. Whether to give it one is a separate decision
+with its own trigger, not a footnote to this one.
 
 **L6 — two defects in this document's own first draft, found by re-reading it against the rules it cites,
 not by any gate (2026-10-14).**
