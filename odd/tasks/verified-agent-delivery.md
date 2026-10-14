@@ -80,12 +80,12 @@ what it claims.
 
 | Seam | What it proves | Prior art |
 |---|---|---|
-| `./open-work.sh --self-test` exit code per case | a new enumeration source reports what it sees, and reports `absent` when the directory is gone | `open-work.sh:401` self-test; asserts printed output, not only exit code |
+| `./open-work.sh --self-test` exit code per case | a new enumeration source reports what it sees, and reports `absent` when the directory is gone | its own `self_test()` (was `open-work.sh:401`; my T2 edit moved it to 498 — see L11); asserts printed output, not only exit code |
 | `./check.sh --self-test` | a planted frontmatter violation is reported, one invariant at a time | `check.sh` self-test, the shape S8 generalises |
 | `./hooks/pre-commit --all` / `--self-test` | a planted leak fails the gate; a missing pattern list exits 2 | `hooks/pre-commit:142` builds a throwaway repo and asserts the fail |
 | `bash -n` / `python3 -m py_compile` | syntax gate for a file whose behaviour costs a real run to reach | `OPERATIONS.md` decision table |
 | `rig/check.sh` | seconds-long: manifests, composed `--self-test`s, byte-identical re-derive | added by the failure-flood cycle for this exact purpose |
-| `rig/run-pipeline.sh --self-test` | the pipeline runner's extractable functions, runnable without a model call | `rig/run-pipeline.sh:103` |
+| `rig/run-pipeline.sh --self-test` | the pipeline runner's extractable functions, runnable without a model call | its own dispatch, `--self-test) SELF_TEST=1` |
 | `python3 rig/report.py --experiment <name>` | the aggregate table a cell's verdict is read from | the table `hypotheses/0001`'s Result section was written from |
 
 No new seam is created by this feature. Every task is exercised through one of the seven above.
@@ -176,18 +176,34 @@ Ordered by dependency, not by discovery. Work the frontier: any task whose block
     (`gh api repos/<owner>/<repo>/actions/workflows`) — the workflow is committed and has never run.
     "Committed" and "running" are written apart in every file this task touched, for that reason.
 
-- [ ] **T4 Measure the two timeout placeholders and replace them with measured values**
+- [x] **T4 Measure the two timeout placeholders and replace them with measured values**
   - Blocked by: None (parallel with T2, disjoint files: `rig/run-pipeline.sh` only)
   - Seams: `rig/check.sh`, `rig/run-pipeline.sh --self-test`
-  - `rig/run-pipeline.sh:88-89` hold `STEP_TIMEOUT_S=180` and `SUITE_TIMEOUT_S=150`, marked
-    *"PLACEHOLDERS pending task 5.7's real wall-clock measurement"*. The archive-report calls them
-    *"undone configuration with no stated trigger"* — there is no blocker, nobody ran the measurement.
+  - Held `STEP_TIMEOUT_S=180` and `SUITE_TIMEOUT_S=150`, marked *"PLACEHOLDERS pending task 5.7's real
+    wall-clock measurement"*. The archive-report called them *"undone configuration with no stated
+    trigger"* — there was no blocker, nobody ran the measurement. Now **390 / 120**.
   - The measurement is the fixture suite's wall clock under the pinned runtime, taken N times, not a
-    guess with margin. Record how many samples, and keep the invariant the script already enforces:
-    suite timeout strictly smaller than step timeout, or exit 2.
+    guess with margin. Recorded: 3 amplified samples (1252, 1258, 1719 ms over 2,882 tests / 6 suites),
+    1 unamplified (889 ms), plus the four committed model-step walls the script's own rows carry
+    (101475, 89539, 88486, 120207 ms). Derivation is `rig/run.sh`'s existing rule, unchanged.
+  - Invariant kept and mutant-proved: suite timeout strictly smaller than step timeout, or exit 2.
+    `STEP=100 / SUITE=150` exits 2 naming design.md 9b.
+  - **One of the two values is not measurement-backed and the file says so**: a *clean*-fixture wall is
+    unobtainable from this tree — committed `failure-flood/v2/src/` IS the injected substrate, so the
+    clean baseline exists only as the `C` block in `answer-key/s2.json`, never as runnable source. Every
+    candidate basis lands under the 120 s floor, so `SUITE_TIMEOUT_S` is set **by the floor**. Re-derive
+    if a clean wall is ever committed; do not nudge it.
+  - Derived obligations this change created, all discharged in the same commit: the **7** live `path:line`
+    citations into `rig/run-pipeline.sh` that existed at `a5f81c4` and which the edit invalidated
+    (`hypotheses/0002` ×4, `MAP.md`'s `sdd/` row, this document's seams table and its own T4 body), the
+    claim that the values are still placeholders (`MAP.md`), and the hand-stated closed-task count in
+    `MAP.md`'s `odd/` row that T4 closing made stale. See L11 — 49 of the drift lines are mine, the rest
+    predates this session, and one citation was wrong the day it was written.
 
 - [ ] **T5 Found the first countable run: `failure-flood` stage 2, both arms, N=5 per cell**
-  - Blocked by: T4
+  - Blocked by: ~~T4~~ closed 2026-10-14. Both archives named the timeout placeholders as *the* concrete
+    prerequisite for a countable run; with T4 done, the only thing left is the operator's decision to
+    fund the spend. Nothing in the rig is configured-by-placeholder any more.
   - Seams: `rig/run-pipeline.sh`, `python3 rig/derive.py`, `python3 rig/report.py --experiment failure-flood-v1`
   - This is the only task here that spends real model credit and needs the `claude` CLI. `s2` exists in
     the fixture (`failure-flood/v2`) and `hypotheses/0002`/`0003` are both **registered and open,
@@ -225,6 +241,43 @@ Ordered by dependency, not by discovery. Work the frontier: any task whose block
     by hand from this worktree regardless, because a clean gate is not evidence about the half it
     cannot pattern-match.
 
+- [ ] **T8 Re-derive `rig/run.sh`'s `TIMEOUT_S` from its own committed rows**
+  - Blocked by: None (found while measuring for T4; not T4's surface — its task text scoped T4 to
+    `rig/run-pipeline.sh` only, for disjointness with T2, and one commit must not move two
+    independently-derived bounds on two different scripts)
+  - Seams: `rig/check.sh` (`bash -n run.sh` plus the manifests). **Weaker than it looks**: `rig/run.sh`
+    has no `--self-test`, so nothing asserts this bound — the value is read, never checked. That is T9's
+    subject, and T8 should say so rather than imply a guard it does not have.
+  - `rig/run.sh:68` sets `TIMEOUT_S=120`, justified in-comment by the tier-3 pilot's slowest wall of
+    **14.586 s** → `ceil(3×14.586/30)×30 = 60`, raised to the 120 s floor. The pilot's own range is stated
+    in the same comment as "11-52s", which already exceeds its own basis.
+  - The file's **own 42 committed rows** (`rig/results/tool-surface-v1/runs.jsonl`, all 42 carrying
+    `wall_ms`) say the slowest successful wall is **51.778 s** (`t3v2-scoped-03`); no row has `timed_out`
+    set. Applying the rule the file itself states: `ceil(3×51.778/30)×30 = 180`. Floor not engaged.
+  - So the bound is ~2.3x the slowest step it must contain, not 3x, and its stated basis is stale in a way
+    its stated *range* is not: the comment's "11-52s" was right, the 14.586 s that produced the number was
+    superseded by `t3v2`, which ran after the pilot with ~3.5x longer walls.
+  - The fix is the file's own instruction, *"Re-derive it, do not nudge it"* — re-derive from the
+    committed rows and cite the run id, as T4 did for its two values.
+
+- [ ] **T9 Run the rig executables' own self-tests in CI — ADR 0014's rule, applied to the two it missed**
+  - Blocked by: None. Not blocked by T8 (different file, different defect, no shared line).
+  - Seams: `actionlint` with `shellcheck` present (the shape T3 established: exit 0 on the file, exit 1 on
+    each planted mutant — S8 binds, so a mutant is required, not optional)
+  - Measured from `git ls-files -s`, excluding `rig/fixtures/`: **8** committed executables (mode 100755),
+    **7** implement a `--self-test` dispatch (`rig/run.sh` does not), and `.github/workflows/verify.yml`
+    runs **5** of them — no `rig/*` path appears in the workflow at all. The 2 uncovered: `rig/check.sh
+    --self-test`, `rig/run-pipeline.sh --self-test`.
+  - Warrant is ADR 0014's non-negotiable list, not a new idea; its Implementation section already applied
+    the same rule to `setup.sh` and `open-work.sh` for post-dating the draft. See L12 for the disposition
+    that binds here — this must **not** be filed as a restatement of the archived SUGGESTION-1.
+  - Two questions to settle in the task, not assume: whether "every committed executable" reaches the three
+    `100644` rig `.py` files run via `python3`; and whether the fix belongs in `rig/check.sh`'s
+    `check_component_self_test()` (which hardcodes `python3` and has no bash arm) or as its own CI step.
+  - **Forbidden by evidence**: do not add `rig/check.sh`'s real gate. A clean checkout has no gitignored
+    `rig/runs/`, and there it fails 5/18 **and truncates both committed goldens to zero bytes** (L11).
+    Only `--self-test` dispatches are hermetic; verified in a clean `git archive`.
+
 ## Explicitly not in this feature
 
 | Not here | Why |
@@ -250,7 +303,7 @@ gate below is invoked by hand and its exit code is read.
 | Structural | `./check.sh` | 0 |
 | Redaction, whole tree | `./hooks/pre-commit --all` | 0 |
 | Redaction, messages | `./hooks/commit-msg --range - HEAD` | 0 |
-| Rig integrity | `rig/check.sh` | 0, and `git diff -- rig/` empty after the byte-identical re-derive |
+| Rig integrity | `rig/check.sh` | 0, and `git diff -- rig/` empty after the byte-identical re-derive. **Copy `rig/runs/` in from the primary checkout first** — it is gitignored, so a worktree has none, and with none this gate truncates both committed `rig/results/*/runs.jsonl` to zero lines and then reports green against the wipe (L11) |
 | Index honesty | `./open-work.sh` | reads its COVERAGE block; `absent` distinguished from `0` |
 
 ## Progress and evidence
@@ -258,9 +311,11 @@ gate below is invoked by hand and its exit code is read.
 | Task | Outcome | Commit | Check observed |
 |---|---|---|---|
 | T1 | done | `2839cd6` | `./check.sh` 0 over the tree; `./check.sh --self-test` 0; `./hooks/pre-commit --all` 0; `./open-work.sh` printed 6 sources and did **not** list this document — T2's red reproduced before T2 was written |
-| T2 | done | this commit's hash is the next one's to record, per T1's self-reference note | `./open-work.sh --self-test` 0; **12 FAIL + exit 1** with the new section deleted (deletion-mutant, recount without truncation); `sh -n` 0; `./check.sh` 0; `./hooks/pre-commit --all` 0; index prints 16 items across 7 sources |
-| T3 | done, **not yet running** | this commit's hash is the next one's to record | `actionlint` 1.7.12 exit 0, exit 1 on both planted mutants (broken mapping; unquoted var → SC2086) with `shellcheck` 0.11.0 present; recovered file byte-identical to blob `2fc49e65…`; `git check-ignore` exit 1; mutants of the job commands: `pre-commit --all` 1 with a planted path, `check.sh` 1 with a planted `type:`; `gh api …/actions/workflows` → `total_count: 0` |
-| T4–T7 | not started | — | — |
+| T2 | done | `4ad47d7` (recorded by T4 — the self-reference note below resolves for every task but the one writing it) | `./open-work.sh --self-test` 0; **12 FAIL + exit 1** with the new section deleted (deletion-mutant, recount without truncation); `sh -n` 0; `./check.sh` 0; `./hooks/pre-commit --all` 0; index prints 16 items across 7 sources. **One derived obligation this task created went undischarged and was found later:** its own seams-table cite `open-work.sh:401` was moved to 498 by this very commit — the commit that documented why cites break moved one. Repaired at T4, L11. |
+| T3 | done, **not yet running** | `a5f81c4` (recorded by T4) | `actionlint` 1.7.12 exit 0, exit 1 on both planted mutants (broken mapping; unquoted var → SC2086) with `shellcheck` 0.11.0 present; recovered file byte-identical to blob `2fc49e65…`; `git check-ignore` exit 1; mutants of the job commands: `pre-commit --all` 1 with a planted path, `check.sh` 1 with a planted `type:`; `gh api …/actions/workflows` → `total_count: 0` |
+| T4 | done | this commit's hash is the next one's to record — still self-referential by design, and that is the shape of the note, not a gap: `2839cd6`/`4ad47d7`/`a5f81c4` are now filled in above | `rig/check.sh` **20/20** with `rig/runs/` copied in, both `rig/results/*/runs.jsonl` byte-intact after (`git diff -- rig/results/` empty); `bash -n` 0; invariant mutant `STEP=100/SUITE=150` → exit 2; `./check.sh` 0 over 117 content files; amplified suite measured 3× (1252/1258/1719 ms, 2,882 tests, 499 failed / 2,383 passed — matching `answer-key/s2.json`'s F0 exactly, which is what proves the sandbox replicated the route); `report_bytes` 2,790,891 vs `DEFAULT_MAX_REPORT_BYTES` 64 MiB = 24.0x |
+| T8, T9 | not started | — | — |
+| T5, T6, T7 | not started | — | — |
 
 ## Log
 
@@ -382,6 +437,96 @@ Two findings that outlive T2 and belong to the repository, not to this task:
    checkboxes". Fixed by disjoint classes: 3 + 1 + 1 + 2 = 7. The general form, which is the one worth
    keeping: a partition counts each item once, and an item that belongs to two descriptions means the
    descriptions are the bug, not the item.
+
+**L11 — closing T4 spent more effort on what the closing broke than on the measurement (2026-10-14).**
+
+The measurement itself was cheap: 8 seconds in a machine-local sandbox, no model credit, and its totals
+reproduced the answer key exactly. Everything hard came after, from the +49-line change that recorded it.
+
+Three of the numbers in the first draft of this entry were wrong, and all three were wrong the same way:
+I wrote "my 5-line edit", "6 live cites", and "413 lines of drift" from memory of the edit rather than
+from a measurement of it. The true values are +54/−5 (net 49), 7, and 424. A fourth — "the ceiling is
+right by 23x" in the code comment — was a ratio I asserted without computing. Same session, same failure,
+third time stating a derived number before deriving it; the row below is written about one of them and is
+not exempt. What caught all four was running the grep and the blob comparison, which is the only check
+that has ever worked on this class.
+
+| Finding | Evidence | Where it went |
+|---|---|---|
+| A gate in this repo truncates the evidence it grades | Running `rig/check.sh` twice in this worktree cut both committed `rig/results/*/runs.jsonl` to **0 lines** (`failure-flood-v1` 3 rows, `tool-surface-v1` 42). Reproduced independently in a clean `git archive`: **5/18 failed and both goldens 0 lines**. Cause is structural: `rig/runs/` is gitignored, a worktree has none, `derive.py` globs zero run dirs and `open("w")` truncates before writing nothing. Restored by `git checkout -- rig/results/`, then the documented workaround: copy `rig/runs` in. | The Checks table above now names the precondition. My CI does **not** invoke `rig/*`, so no CI exposure — verified, not assumed. |
+| I did not search memory before running it | Engram obs 370 (2026-09-03) predicts this exactly, workaround included. It was one `mem_search` away and I ran the gate anyway. Second-order version of the trap: the first run reports 4/18, the second reports fewer, because run one already rewrote what run two compares against. | Recorded here rather than only in the private log, because the fix is in a file. |
+| My comment asserted a ratio I had not computed | I wrote "the ceiling is right by 23x". There is no ceiling in `run-pipeline.sh` at all; the real one is `DEFAULT_MAX_REPORT_BYTES = 64 MiB` at `collect.py:133`, and the ratio is **24.0x**. Second time in one session I stated a computed number without computing it — the first was calling the committed `wall_ms=1681` impossible. | Corrected in the comment with the constant's name and value. |
+| Citation drift: I owned 49 lines of a 424-line move | **7** live `path:line` cites into this file existed at `a5f81c4`. My change is +54/−5, net **+49**, so it shifted every later line by 49 — not the "5-line edit" I first wrote here, and the number of cites was 7, not 6. `run_model_step()` sat at 563 when `0002` was written, 938 at `a5f81c4`, 987 now: of its 424-line total drift, **375 predate this session** (the provenance cycle grew the file, nobody re-anchored). Measured per-symbol against the blobs at `4eddfe9` and `a5f81c4`, not estimated. | Re-anchored to `:733`/`:734`, `:987`, `:1044`. |
+| Two citations anchored to prose, not symbols | `MAP.md` cited `:85`, which at `origin/main` was the *comment* saying PLACEHOLDERS — a correct anchor that my edit deleted along with the prose. This document's seams table cited `:103`, the `usage()` text mentioning `--self-test`. Both resolved honestly when written; neither survives a rewrite of unrelated prose. | `MAP.md`'s claim rewritten with no line cite; the seams row now names the dispatch (`--self-test) SELF_TEST=1`) instead of a number. |
+| A citation wrong the day it was written | `0002:38` cites `:346` for PIPELINE's `STEPS` array. At `4eddfe9`, line 346 was **MONOLITHIC's** array; PIPELINE's was 347. Not drift — an off-by-one at birth, 375 lines of drift never touched it. | Fixed, and named as a distinct defect: **a drift checker cannot catch this class.** It is T6 evidence, and it argues the ledger must verify a citation *resolves to what it names*, not merely that it has not moved. |
+| A hand-stated derived count rotted inside one commit | `MAP.md`'s `odd/` row said "2 of 7 tasks closed"; T4 closing made it 3. This document predicted exactly that at L8 about its *own* checkbox count. | The count is **deleted** from `MAP.md`, not updated — `AGENTS.md`: tables are generated or absent, and `open-work.sh` prints the number. |
+| Two ordinals for one source | `MAP.md` called `odd/tasks/` the *seventh* source and, three rows below, *source 6* — both written by me. `open-work.sh`'s own header already records that inserting a source renumbers the others and leaves a sentence that reads fine. I read that warning and wrote the bug into two rows anyway. | Ordinals replaced with names, in prose and in this document. |
+| The Hard Ordering Gate refused my own edit, correctly | With `hypotheses/0002` modified, `rig/check.sh` reports **1/20, exit 1**, naming `preflight:v2 -- COULD NOT RUN: tracked_but_dirty` — not a failure and not a pass, which is exactly the distinction ADR 0014 demands. Proved deterministic: reverting that one file to `HEAD` gives **20/20, exit 0**; restoring the edit returns 1/20. Cause is `answer-key/prereg.json`, whose `check` block requires `must_be_clean: true` on the two globs it freezes — *"uncommitted edits to a hypothesis file are not frozen support/refute conditions (ADR 0012)"*. It also fixes `verified: 2026-08-13` as a field: bumping it to the day before the run is the exact move the gate exists to make expensive. | Accepted as correct, and it dictates the shape of this work unit rather than its order: `must_be_clean` reads the **working tree**, so the rig gate cannot go green again until the pointer fix is *committed* — while it sits uncommitted, `preflight:v2` refuses and `rig/check.sh` stays 1/20. Re-running to 20/20 after the commit is the proof. `verified:` stays 2026-08-13. |
+| Four numbers in this entry were asserted, not computed | "my 5-line edit" (really +54/−5, net 49), "6 live cites" (7), "413 lines of drift" (424), and "the ceiling is right by 23x" in the code comment (24.0x). All four were cheap to measure and none was measured before being written. | Corrected from `git show`/blob line numbers and `collect.py:133`. The check that worked was the grep, every time. |
+
+Two judgement calls worth stating, because both could have gone the other way:
+
+1. **`hypotheses/0002`'s `verified:` field was left at 2026-08-13.** Bumping it to today would move the
+   pre-registration date, and the edit checked four locators, not the claim. The three structural facts
+   the hypothesis rests on were re-read and still hold (`case "$ARM"` is top-level, `run_model_step()`
+   issues one fresh invocation, `--resume` appears zero times in the file), but re-dating a
+   pre-registration to the day before the run is exactly what pre-registration exists to forbid.
+2. **I reverted my own `rig/run.sh` fix.** I found it while measuring: its `TIMEOUT_S=120` is justified
+   in-comment by a 14.586 s tier-3 pilot wall, but its own 42 committed rows say 51.778 s, and the file's
+   own rule then yields 180. That is a real defect in the same class T4 closed — in a file T4's task
+   text explicitly scoped out (`rig/run-pipeline.sh` only, for disjointness with T2). Editing it inside
+   T4's commit would have made one commit change two independently-derived bounds on two different
+   scripts. It is its own work unit — **T8**, with the CI gap found the same way as **T9**.
+
+**L12 — two follow-ups that this feature's own ADR says are already decided (2026-10-14).** While
+checking whether my new CI job satisfies ADR 0014, I counted committed executables and which of them CI
+runs their own test. First count said "5 of 11" and was wrong twice over: I counted the three rig `.py`
+files, which are mode `100644` — not executables — and I matched `basename rig/check.sh` against the
+`./check.sh --self-test` line, reporting `rig/check.sh` as covered when **no `rig/*` path appears anywhere
+in `.github/workflows/verify.yml`**. Measured from `git ls-files -s`, excluding `rig/fixtures/`:
+
+| | count | which |
+|---|---|---|
+| Committed executables (mode 100755, outside fixtures) | **8** | `check.sh`, `open-work.sh`, `setup.sh`, `hooks/pre-commit`, `hooks/commit-msg`, `rig/check.sh`, `rig/run-pipeline.sh`, `rig/run.sh` |
+| Implement a `--self-test` dispatch | **7** | all but `rig/run.sh` — which has none; the string I first matched is help text, and invoking it exits 2 |
+| CI runs their own test | **5** | `check.sh`, `open-work.sh`, `setup.sh`, `hooks/pre-commit`, `hooks/commit-msg` |
+| **Not run by CI** | **2** | `rig/check.sh --self-test`, `rig/run-pipeline.sh --self-test` — both exist, both exit 0, both hermetic |
+
+ADR 0014's non-negotiable list already says *every committed executable carries its own test and CI runs
+it*, and its Implementation section applies that rule to two executables that post-date the draft. The two
+rig executables post-date it the same way. So T9 is not a proposal, it is the ADR's own rule applied.
+
+The reason it was skipped is worth keeping, and my first version of it was wrong. The "Does NOT belong
+here" prose of `rig/README.md` — a **live, committed** file — already names the gap: `check_component_self_test()` "still has no bash arm, so
+`run-pipeline.sh --self-test` is never composed by the repo gate and must still be run by hand." The
+archive's disposition of it (SUGGESTION-1) refuses to re-register it: *"Explicitly out of scope by a spec
+decision made during this cycle, not a new discovery… Restating it as a fresh backlog entry would
+manufacture a trigger this cycle never decided on."* That judgement was correct, and it binds me: I may
+not launder it into a new proposal by rediscovering it.
+
+So T9 is not that suggestion restated. It rests on a different warrant: **ADR 0014's non-negotiable list**
+says every committed executable carries its own test and CI runs it, and that ADR's Implementation section
+already applied the rule to two executables that post-dated the draft. `rig/check.sh` and
+`rig/run-pipeline.sh` post-date it the same way. A decision does not need occurrence-weight the way an
+observation does — and the ADR itself already required this of the copy of the rule it ships.
+
+What SUGGESTION-1 leaves genuinely unresolved is quoted in its own disposition: `design.md` left open
+*"whether the check.sh bash-arm gap is registered here or its own cycle"* **without naming a trigger for
+either**. T9 supplies the thing that was missing — a named trigger — rather than repeating the complaint.
+
+The CI job must encode one distinction: **self-test versus gate**. `rig/check.sh`'s real gate cannot go in
+CI, because CI checks out a tree with no gitignored `rig/runs/`, and L11 reproduces what that does — 5/18
+failed, both committed goldens truncated to zero bytes, verified in a clean `git archive` rather than
+inferred. Each executable's own `--self-test` is safe: `rig/run-pipeline.sh` 0.98 s, `rig/check.sh` 0.29 s,
+the three `.py` suites 0.37 s together, all exit 0 in that same clean archive, leaving
+`rig/results/*/runs.jsonl` at 3 and 42 lines. Same line ADR 0014 draws between could-not-run and passed,
+drawn one level down.
+
+Two things T9 must **ask**, not assume: whether ADR 0014's "every committed executable" covers the three
+`100644` rig `.py` files invoked via `python3` (the ADR does not answer it); and whether fixing the gate
+means composing the bash arm inside `rig/check.sh`, or adding a CI step, since those leave different
+things true. And `rig/run.sh`'s missing `--self-test` is a separate gap from T8's stale number — same file,
+two independent defects, one about a value, one about a gate.
 
 **L6 — two defects in this document's own first draft, found by re-reading it against the rules it cites,
 not by any gate (2026-10-14).**
