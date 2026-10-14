@@ -106,17 +106,27 @@ Ordered by dependency, not by discovery. Work the frontier: any task whose block
     a schema change, not a doc task.
   - Not done by T1: `open-work.sh` cannot see `odd/`. That gap is T2, and it is Log L5.
 
-- [ ] **T2 Make the generated index of open work see `odd/tasks/` — RED first**
+- [x] **T2 Make the generated index of open work see `odd/tasks/` — RED first**
   - Blocked by: T1
   - Seams: `./open-work.sh --self-test`
-  - First observation must be RED: with `odd/tasks/verified-agent-delivery.md` present and no new
-    source, the index prints six sources and does not list this document. That red is the task's
-    reproduction, not a hypothetical.
-  - Then add the source with its own self-test cases, and the `## WHAT IT READS` header list in the
-    same commit (ADR 0016: enumeration from structure; ADR 0013: a committed executable carries its
-    own test).
-  - Decides on the way: does an ODD document count as open work until its checklist is all-checked, or
-    always? State which, in the header, with the reason.
+  - RED observed before any edit: with this document present and no new source, the index printed
+    *15 item(s) across 6 source(s)* and zero mentions of `odd/`. Reproduced, not hypothetical.
+  - Closure rule decided and stated in the executable's header, as this task required: **open while one
+    `- [ ]` remains**; closed when every box is ticked; a document with **no checkbox at all is
+    UNDECIDABLE and is still listed**. The reason for the third state is this repo's own rule — "absent
+    is not empty", one level down. Absence of evidence of completion is not completion, and a checklist
+    nobody wrote is precisely the case to surface rather than to skip.
+  - Cases added first (5), then verified by deletion: with the section removed the suite reports **12
+    FAIL and exit 1**, so the cases test the behaviour and not each other.
+  - Evidence: `./open-work.sh --self-test` 0 restored / 1 mutant; `sh -n` 0; `./check.sh` 0 over 117
+    content files; `./hooks/pre-commit --all` 0 over 195 tracked files; the index now prints *16 items
+    across 7 source(s)* and names this document with its unchecked-task count (**5**, at this commit —
+    see L8, that figure is derived from this document's own checkboxes and rots one tick later).
+  - Derived obligations this change created, discharged in the same commit: `MAP.md` (row + how-to-query
+    line + correction), `OPERATIONS.md` (source list and the closure rule), `decisions/0016` (amendment:
+    its count, its table, its "five of the six" claim, and its predicted-but-unmitigated seventh
+    source), and this document. `journal/2026-08-19` also says "six sources" and was **not** edited — a
+    dated record is provenance, not a pointer to maintain.
 
 - [ ] **T3 Land the server-side layer: one workflow, three jobs, each pairing its self-test with the
   check it guards**
@@ -218,8 +228,9 @@ gate below is invoked by hand and its exit code is read.
 
 | Task | Outcome | Commit | Check observed |
 |---|---|---|---|
-| T1 | done | recorded by T2's commit — see the note in T1's evidence line | `./check.sh` 0 over the tree; `./check.sh --self-test` 0; `./hooks/pre-commit --all` 0; `./open-work.sh` printed 6 sources and did **not** list this document — T2's red reproduced before T2 was written |
-| T2–T7 | not started | — | — |
+| T1 | done | `2839cd6` | `./check.sh` 0 over the tree; `./check.sh --self-test` 0; `./hooks/pre-commit --all` 0; `./open-work.sh` printed 6 sources and did **not** list this document — T2's red reproduced before T2 was written |
+| T2 | done | this commit's hash is the next one's to record, per T1's self-reference note | `./open-work.sh --self-test` 0; **12 FAIL + exit 1** with the new section deleted (deletion-mutant, recount without truncation); `sh -n` 0; `./check.sh` 0; `./hooks/pre-commit --all` 0; index prints 16 items across 7 sources |
+| T3–T7 | not started | — | — |
 
 ## Log
 
@@ -267,6 +278,54 @@ open work while looking complete — ADR 0016's failure class, and `verifier-ava
 gate that never was one. This is T2, and it is the feature's cheapest real lesson: **a tracking mechanism
 the index cannot see is not a record.** It is also the argument for T6 in one sentence — an obligation
 created by an act nobody enumerates is exactly an unmet obligation that reports nothing.
+*Closed by T2 the same day; the class of gap it describes is still open and ADR 0016 now says so.*
+
+**L7 — writing T6's justification for it, before T6 exists (2026-10-14).** Doing T2 produced a stream of
+derived obligations, and the way they were found is the evidence T6 needs to be built from measurement
+rather than from imagination:
+
+| Obligation | How it was found | Was anything watching? |
+|---|---|---|
+| `MAP.md` said "six structural sources", twice | Grepped the number before editing | No — I happened to grep |
+| `OPERATIONS.md` listed the sources by name | Same grep | No |
+| `decisions/0016` counted them and claimed a total | Same grep | No |
+| `journal/2026-08-19` says "six sources" too | Same grep | No — and correctly **not** changed: a dated record is provenance |
+| My own draft of the 0016 amendment summed to **8 over 7 sources** | Added my numbers up, one step before committing | **No.** Nothing would have caught this. |
+| My own draft claimed "six of seven inherit a checked input" | Recounted against `check.sh`, which enforces exactly two things | No |
+| A header sentence that said "Source 6" and silently pointed at the new source after insertion | Read it after renumbering | No |
+
+Five of seven were caught by a grep I chose to run and six of seven by a check I chose to perform. That
+is not a process, it is a habit, and the one that mattered most — the arithmetic — arrived one step
+before a commit by accident. S8's premise is that every gate must prove it fires; the honest statement of
+where this repository actually stands is that **the highest-value checks in this commit were all
+optional and none of them fired.** T6's scope is therefore narrow and specific: not "verify the agent's
+work", but *enumerate the places a changed string or count is repeated, and name them when the change
+touches one.* That is a grep over a repo with no build step, and it is decidable.
+
+**L8 — a count in the tracking document that the tracking document itself produces went stale in the
+same commit that recorded it (2026-10-14).** T2's evidence line said *6 task(s) still unchecked* —
+measured while T2 was open, which is exactly when a writer is looking. Ticking `- [x] T2` made it 5. The
+first draft of that line also said *15 items*, the RED figure, next to the GREEN one, which is correct as
+history and reads as a contradiction unless the two moments are named.
+
+The rule this earns, stated as a rule so it survives the number: **an evidence line may cite a figure
+measured during the work, but a figure this document's own state produces must be written as the rule
+plus its value at that commit, never as a standing claim.** It is the same property
+`sdd/archive/2026-08-27-run-input-provenance` exists to guarantee — a record must carry what it was
+measured against — arriving one level down, where what it was measured against is *itself, earlier*.
+
+Two findings that outlive T2 and belong to the repository, not to this task:
+
+1. **ADR 0016 predicted this event and its remedy did not fire.** Its consequences table says a seventh
+   source appearing later is invisible until someone adds it, and names the COVERAGE block as the
+   mitigation. `odd/tasks/` appeared, COVERAGE printed its usual two counts, nothing noticed. What did
+   catch it was the author of the new directory asking a question on the day of creation — a question
+   that is written nowhere as a gate. Recorded in ADR 0016's amended row.
+2. **The correction carried the defect it was correcting.** My amendment to a non-summing total summed
+   to 8 over 7, because I classified `odd/tasks/` as both "a directory listing" and "a directory with
+   checkboxes". Fixed by disjoint classes: 3 + 1 + 1 + 2 = 7. The general form, which is the one worth
+   keeping: a partition counts each item once, and an item that belongs to two descriptions means the
+   descriptions are the bug, not the item.
 
 **L6 — two defects in this document's own first draft, found by re-reading it against the rules it cites,
 not by any gate (2026-10-14).**
