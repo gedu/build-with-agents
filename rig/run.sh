@@ -62,9 +62,24 @@ SURFACES_ROOT="$REPO_ROOT/rig/surfaces"
 # tasks.md Phase 6) had a slowest wall of 14.586s in t3-scoped-03:
 # ceil(3 x 14.586 / 30) x 30 = 60, raised to the 120s floor.
 #
-# Observed walls across the pilot were 11-52s and nothing has ever timed out,
-# so this bound is a runaway guard, not a budget. Re-derive it, do not nudge
-# it, if a future tier's walls approach it.
+# The six deliberate pilot runs measured 11.0-14.6 s, so this bound is a runaway
+# guard, not a budget. Re-derive it, do not nudge it, if a future tier's walls
+# approach it.
+#
+# Corrected 2026-10-14: this sentence used to read "across the pilot were 11-52s".
+# 11-52 s is not the pilot — it is the whole 42-row tool-surface-v1 table, 27 rows of
+# them t3v2, and that table was already 42 rows wide at 134dbe8, the commit that wrote
+# the sentence. Off by population at birth, same class as the 0002 STEPS cite fixed the
+# same day: a locator that names the right file and the wrong set.
+#
+# "Nothing has ever timed out" was also weaker than it read. True and checkable — zero
+# rows carry void_reason=timeout, and all 42 raw captures record timed_out=false — but
+# every one of those 42 ran with timeout_s=300, so none of them ever tested THIS bound.
+# The slowest wall on record (51.778 s, t3v2-scoped-03) is 43% of 120 s. Under a future
+# t3v2-class run the rule re-derived on that population gives ceil(3x51.778/30)x30 = 180,
+# and 120 would sit at 2.32x rather than the 3x design.md Decision 5 calls "the point".
+# Left at 120 deliberately: run.sh drives tool-surface-v1 only (t1|t2|t3|t3v2), that
+# hypothesis is closed, and no such run is funded. Re-derive when one is.
 TIMEOUT_S=120
 
 usage() {
