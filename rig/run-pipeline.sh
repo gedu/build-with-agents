@@ -368,12 +368,12 @@ PY
 
 # read_back_init <stream.jsonl> — prints "<surface_sha256> <permission_mode>
 # <model_actual>" (empty fields when no init event was emitted). surface_sha256
-# reuses rig/derive.py:87-91's surface_digest() convention exactly:
+# reuses derive.py's surface_digest() convention exactly (anchored by name, not
 # sha256(sorted(set(tool_names))), so task 5.8's row builder can compare it
 # to rig/surfaces/failure-flood.txt without a second algorithm. This file
 # RECORDS the comparison inputs; it does not decide surface-mismatch (or,
-# now, model-mismatch) itself — every existing precedent (rig/derive.py:
-# 456-464, never rig/run.sh) puts that decision in derive.py, so
+# now, model-mismatch) itself — every existing precedent (derive.py's build_row()
+# void chain, never rig/run.sh) puts that decision in derive.py, so
 # failure-flood-v1 keeps the same split. model_actual mirrors mode exactly:
 # both are read from the SAME init event, by the SAME function, the same way
 # permission_mode_actual has always been read back — model pinning (ADR 0010,
