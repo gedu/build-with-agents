@@ -159,6 +159,12 @@ Two things to actually read rather than skim:
   more than half the repository and therefore ranks nothing. A convention nobody has written down yet
   is invisible to this index, and those counts are the only warning you get.
 
+`--list-content` is the seam that keeps this repository from growing a second enumerator: it prints
+the content list described in the COVERAGE block, one repository-relative path per line and nothing
+else, so a consumer counts files with `wc -l` instead of re-deriving the rule. Its exit contract is the
+same table above — a tree with no content files is exit 2, never exit 0 with an empty list, because a
+scan that read nothing must not be able to report success.
+
 It does not rank, and that is the decision rather than a gap — the problem it answers is "what is
 open", not "what should I do first". It also prints no path from outside the repository, because this
 output is meant to be pasted into a session or an issue and ADR 0009 applies to anything that leaves

@@ -74,8 +74,27 @@
 #
 # USAGE
 #   ./open-work.sh              print the index
+#   ./open-work.sh --list-content  print the content .md list this index reads, one
+#                              repository-relative path per line, and nothing else
 #   ./open-work.sh --self-test  build a throwaway repository and assert the output
 #   ./open-work.sh --help       this header
+#
+# WHY --list-content EXISTS
+#   So that no second enumerator is ever written. `./check.sh` and this file already agree on what
+#   counts as content - tracked AND untracked-not-ignored, minus `rig/fixtures/`, minus generated
+#   symlink entrypoints - and that rule is subtle enough to be worth owning exactly once: a file
+#   written and not yet staged is repository content, an empty directory is not a source, and a
+#   generated symlink must not be scanned as if it were prose. The consumer this flag exists for is
+#   the obligation ledger added in this same change, which needs the same list and must not
+#   reimplement the rule. It is named by role rather than by filename because a filename cited one
+#   commit before the file exists resolves to nothing - the machine-local-citation class in time
+#   rather than in space. A second
+#   copy of an enumeration rule drifts the way `hooks/redaction-patterns.sh` exists to prevent:
+#   two gates enforcing one rule from two lists, where the weaker copy is the one that fires.
+#   It prints paths and nothing else - no counts, no header, no COVERAGE block - so it can be piped.
+#   The count is `wc -l` at the caller, never a second total to keep honest. A tree with no content
+#   files exits 2 (could not run), never 0 with an empty list: `absent` is not `empty`, and a scan
+#   that read nothing must not be able to report success.
 #
 # SELF-TEST
 #   ADR 0013 - a committed executable carries its own test, exposed as a flag on that
@@ -107,6 +126,21 @@ show_help() {
 die_cannot_run() {
   printf '\n  OPEN-WORK INDEX COULD NOT RUN: %s\n  This is exit 2, not an empty index.\n' "$1" >&2
   exit 2
+}
+
+list_content() {
+  # Resolved here rather than at the shared ROOT/cd below. The dispatch must keep `--help` and
+  # `--self-test` usable outside a repository, and `git ls-files` is relative to the working
+  # directory - so a list emitted from a subdirectory would name paths a reader cannot open.
+  LC_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" \
+    || die_cannot_run "this is not a git repository, so there is nothing to enumerate"
+  cd "$LC_ROOT" || die_cannot_run "could not enter the repository root"
+  collect_content
+  # `CONTENT` already terminates every entry with a newline, so `%s` yields exactly one line per
+  # file. `%s\n` would add a trailing blank line, and a consumer counting lines over-counts by one
+  # - the off-by-one this feature's own Log keeps meeting. No filter is applied here, because a
+  # filter would be a second rule layered on the one this flag exists to publish.
+  printf '%s' "$CONTENT"
 }
 
 head_row() {
@@ -518,6 +552,16 @@ self_test() {
     set -e
   }
 
+  # The same invocation with the seam flag, so the list is tested through the real dispatch rather
+  # than by calling collect_content directly - a helper called in a test can pass while the flag
+  # that is supposed to reach it is unreachable.
+  run_list() {
+    set +e
+    OUT="$( cd "$TMP" && "$SELF" --list-content 2>&1 )"
+    RC=$?
+    set -e
+  }
+
   ok()   { printf '  ok    %s\n' "$1"; }
   bad()  { printf '  FAIL  %s - %s\n' "$CASE" "$1" >&2; FAILED=1; }
 
@@ -732,6 +776,73 @@ self_test() {
   OUT=''
   assert_rc 2
 
+  CASE="--list-content prints the content list and nothing but the list"
+  fixture; run_list
+  assert_rc 0
+  assert_out "BACKLOG.md"
+  assert_out "gaps/0001-a-project.md"
+  assert_out "journal/2026-08-19-a-note.md"
+  assert_not_out "rig/fixtures/proj/notes.md"
+  assert_not_out "OPEN WORK"
+  assert_not_out "COVERAGE"
+  assert_absent_quiet "$TMP" "the checkout's absolute path"
+
+  CASE="--list-content emits no blank line, so a line count is a file count"
+  fixture; run_list
+  assert_rc 0
+  # Counted through the real pipe, never through $OUT. Command substitution strips trailing
+  # newlines, so a trailing blank line - the exact bug this case exists to catch - is already gone
+  # by the time $OUT exists. A first version of this case compared two counts both taken from $OUT
+  # and PASSED on the mutant it was written for; a test cannot observe what its own input already
+  # removed. Piping the executable twice is the only way to see the bytes a consumer sees.
+  RAW="$( cd "$TMP" && "$SELF" --list-content 2>/dev/null | wc -l | tr -d ' ' )"
+  NONBLANK="$( cd "$TMP" && "$SELF" --list-content 2>/dev/null \
+    | sed '/^[[:space:]]*$/d' | wc -l | tr -d ' ' )"
+  if [ "$RAW" -gt 0 ] && [ "$RAW" -eq "$NONBLANK" ]; then
+    ok "--list-content: $RAW lines, none blank"
+  else
+    bad "expected a non-empty list with no blank line, got $RAW lines, $((RAW - NONBLANK)) of them blank"
+  fi
+
+  # An independent oracle, so a wrong LIST is caught and not merely a blank line: ask git directly
+  # for the same population. The fixture contains no symlinks and no deleted files, so git's own
+  # listing minus the excluded prefix is the same set reached by a path that does not go through
+  # collect_content - comparing the function against itself would pass on any bug inside it.
+  ORACLE="$( cd "$TMP" && git -c core.quotePath=false ls-files --cached --others --exclude-standard \
+    -- '*.md' | grep -v "^$EXCLUDED_PREFIX" | wc -l | tr -d ' ' )"
+  if [ "$RAW" -eq "$ORACLE" ]; then
+    ok "--list-content: $RAW lines equals git's own count of the same population"
+  else
+    bad "expected $ORACLE paths (git ls-files minus ${EXCLUDED_PREFIX}), got $RAW"
+  fi
+
+  CASE="--list-content lists a committed file and a never-staged one, by the same rule"
+  fixture
+  ( cd "$TMP" && git add -A >/dev/null 2>&1 \
+      && git -c user.email=t@example.invalid -c user.name=t commit -qm tracked >/dev/null 2>&1 )
+  write_fm "journal/2026-08-20-untracked.md" "journal/untracked" "journal" "draft" "untracked note"
+  run_list
+  assert_rc 0
+  assert_out "journal/2026-08-19-a-note.md"
+  assert_out "journal/2026-08-20-untracked.md"
+
+  CASE="--list-content with no content files exits 2, never 0 with an empty list"
+  fixture
+  find "$TMP" -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
+  run_list
+  assert_rc 2
+  assert_out "OPEN-WORK INDEX COULD NOT RUN"
+
+  CASE="--list-content outside a git repository cannot run"
+  NOGIT2="$(mktemp -d)" || die_cannot_run "could not create a temporary directory"
+  set +e
+  ( cd "$NOGIT2" && "$SELF" --list-content ) >/dev/null 2>&1
+  RC=$?
+  set -e
+  rm -rf "$NOGIT2"
+  OUT=''
+  assert_rc 2
+
   [ "$FAILED" -eq 0 ] || {
     printf '\n  SELF-TEST FAILED - this generator is not behaving as specified.\n' >&2
     exit 1
@@ -742,9 +853,10 @@ self_test() {
 
 case "${1:-}" in
   "")           : ;;
-  --help)       show_help; exit 0 ;;
-  --self-test)  self_test ;;
-  *)            die_cannot_run "unknown argument '$1'. Use no argument, --self-test, or --help." ;;
+  --help)         show_help; exit 0 ;;
+  --list-content) list_content; exit 0 ;;
+  --self-test)    self_test ;;
+  *)              die_cannot_run "unknown argument '$1'. Use no argument, --list-content, --self-test, or --help." ;;
 esac
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" \
