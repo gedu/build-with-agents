@@ -146,7 +146,14 @@ integer for three different facts:
 |---|---|---|
 | Has GitHub ever **seen** the file? | `gh api …/actions/workflows \| .total_count` | **1** workflow definition. Was `0` until 2026-10-14 |
 | Has it ever **executed**? | `gh api …/actions/runs \| .total_count`, or `gh run list` | **7** runs |
-| Is any check **required**? | `gh api …/rulesets`, then that ruleset's `rules` | no `status_check` rule |
+| Is any check **required**? | `gh api …/rulesets` **then** `gh api …/rulesets/<id>`; read `rules` off the **detail** call | no `status_check` rule (detail: `deletion`, `non_fast_forward`, `pull_request`) |
+
+The two ruleset calls are not interchangeable, and the cheap one is a trap of this ADR's own making: the
+**list** endpoint returns no `rules` key at all (measured 2026-10-15: its keys are `id`, `name`, `target`,
+`enforcement`, `source`, `source_type`, `created_at`, `updated_at`, `_links`, `node_id`). A filter written
+over the list therefore iterates over nothing and still answers "no `status_check`" — the same shape as a
+commit-range gate reporting clean across 0 messages. An empty `rules` array is *could not run*, never
+satisfied. `OPERATIONS.md` carries the corrected two-call recipe.
 
 `.total_count` from the *workflows* endpoint is the count of **definitions**, not of executions. An earlier
 draft of this amendment called it "runs this repo has ever had", which would tell a reader checking

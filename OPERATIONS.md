@@ -223,9 +223,18 @@ Three limits, stated because each one has already fooled somebody once:
 - **Check protection with the ruleset API, not the legacy branch-protection API.** This repo's protection
   is a *ruleset*, and `gh api repos/<owner>/<repo>/branches/main/protection` answers those with **HTTP 404
   "Branch not protected"** — a wrong answer that reads like evidence. The check that resolves is
-  `gh api repos/<owner>/<repo>/rulesets` and then the ruleset's `rules`: `deletion`, `non_fast_forward`
-  and `pull_request` are present, and the absence of a `status_check` rule is what "no required check"
-  actually means. This was not a theoretical hazard: the PR that shipped this workflow asserted in its own
+  **two calls, not one**: `gh api repos/<owner>/<repo>/rulesets` yields only the ruleset's `id`, and
+  `gh api repos/<owner>/<repo>/rulesets/<id>` is the call that carries `rules`. There, `deletion`,
+  `non_fast_forward` and `pull_request` are present, and the absence of a `status_check` rule is what
+  "no required check" actually means. **The list endpoint has no `rules` key at all** — measured
+  2026-10-15, its keys are `_links`, `created_at`, `enforcement`, `id`, `name`, `node_id`, `source`,
+  `source_type`, `target`, `updated_at` — so `…rulesets | [.[].rules[]?]` iterates over nothing and
+  then answers "no `status_check`" **having read zero rules**. An earlier draft of this bullet said
+  "`gh api …/rulesets` and then the ruleset's `rules`", which reads as one call and is the vacuous pass
+  `gaps/0004` was written about, installed in the command that exists to detect a missing required
+  check: reproduced on this repo, the single-call filter returns an empty array and reports absent. So
+  read the rules from the detail endpoint, and treat an empty `rules` array from the list as *could not
+  run*, never as satisfied — `absent` is not `empty`, one level down. This was not a theoretical hazard: the PR that shipped this workflow asserted in its own
   body that `main` "is **not protected**", from that 404, **58 days** after the ruleset went live
   (created 2026-08-17; the PR merged 2026-10-14 — both read from `gh api`, after I had written "a month"
   here from memory). Both files disagreeing about one fact is the failure `gaps/README.md` records — the
