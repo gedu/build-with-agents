@@ -9,8 +9,16 @@ sources: ["journal/2026-08-26-the-installer-already-exists-split-in-two.md", "MA
 
 # 0017 — A diagnosis ships before its prescription
 
-`status: draft`. Ratification is the operator's act, and this has not been used yet — the same
-standard `0016` is held to.
+`status: draft`. Ratification is the operator's act — the same standard `0016` is held to.
+
+**Amended 2026-10-15.** The sentence here read *"this has not been used yet — the same standard `0016`
+is held to"*, and `MAP.md` carried the same claim as `decided and not yet used`. `skills/guided-diagnosis`
+merged on 2026-10-15 and is this decision's surface, so both sentences became false the moment that
+merge landed — the class `OPERATIONS.md` and this ADR's own `0014` record: a live claim about a fact
+another file changes. `verified:` stays `2026-08-27`, per the `0016` and `0014` precedent — bumping it
+would claim the original sentence still holds, when what holds is only the decision below.
+
+Ratification is still the operator's act, and this amendment changes usage status, not status.
 
 ## Context
 

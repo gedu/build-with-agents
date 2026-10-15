@@ -3,7 +3,7 @@ id: skills/guided-diagnosis
 type: skill
 targets: [any]
 status: draft
-verified: 2026-09-03
+verified: 2026-10-15
 sources: ["decisions/0017-a-diagnosis-ships-before-its-prescription.md", "decisions/0009-redaction-is-a-repo-wide-rule.md", "skills/project-gap-analysis/SKILL.md", "skills/checkout-isolation/SKILL.md", "skills/context-checkpoint/SKILL.md", "gaps/README.md", "ASK.md", "OPERATIONS.md", "MAP.md", "theory/agents/capability-load-cost.md", "theory/agents/instruction-provenance.md", "theory/agents/tool-surface-design.md", "theory/llm/context-degradation-at-length.md", "theory/loops/reading-and-running-find-different-defects.md", "theory/loops/verifier-availability.md", "theory/orchestration/delegation-and-context-boundaries.md"]
 ---
 
@@ -67,8 +67,11 @@ Invoke `skills/project-gap-analysis`. **Do not restate its seven checks here.** 
 the verdict vocabulary, and it owns the two-artifact split that keeps a private project out of a
 public repo. Duplicating any of that creates two copies to keep in step, with nothing enforcing it.
 
-That skill is `draft` and still changing — three runs, two gaps found in itself each time, the rate
-not falling. Expect to find a gap in it, and record that gap in *its* file, not this one.
+That skill is `draft` and still changing: every run recorded in its own *Recorded runs* table has
+found two gaps in the skill itself, and the rate has not fallen. Read the count there, never from this
+sentence — this line said "three runs" when it was written and was stale before it merged, because the
+run count is a fact that file owns and this one does not. Expect to find a gap in it, and record that
+gap in *its* file, not this one.
 
 ### 4. Report each absence with its backing
 

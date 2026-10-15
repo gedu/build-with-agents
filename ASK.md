@@ -3,7 +3,7 @@ id: ask/index
 type: index
 targets: [any]
 status: draft
-verified: 2026-10-14
+verified: 2026-10-15
 sources: ["skills/checkout-isolation/SKILL.md", "skills/context-checkpoint/SKILL.md", "skills/hypothesis-cycle/SKILL.md", "skills/project-gap-analysis/SKILL.md", "skills/guided-diagnosis/SKILL.md", "skills/source-verdict/SKILL.md", "skills/README.md", "journal/2026-08-13-skills-nobody-could-ask-for.md"]
 ---
 
