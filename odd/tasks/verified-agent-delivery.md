@@ -234,7 +234,7 @@ Ordered by dependency, not by discovery. Work the frontier: any task whose block
   - R-F7.2: a cell whose five runs all land in the same green-restore state escalates N. Escalation is
     reported as escalation, not quietly absorbed.
 
-- [ ] **T6 The obligation ledger: enumerate what a change derived, from structure, not from prose**
+- [x] **T6 The obligation ledger: enumerate what a change derived, from structure, not from prose**
   - Blocked by: T2 — reuse its enumeration machinery and its header rules; do not write a second
     enumerator
   - Seams: a new committed executable's own `--self-test` (shape fixed by ADR 0013), plus a planted
@@ -437,7 +437,8 @@ gate below is invoked by hand and its exit code is read.
 | T8 | done, **value unchanged** | `bcb37eb`. **Recorded late by two, measured rather than reasoned.** Its hash was knowable the moment `bcb37eb` itself landed, so the first commit that could carry it was its child `439abbc` (`git rev-parse 439abbc^` = `bcb37eb`) — chance #1, which named it zero times; `1a1fd8e` is chance #2, also zero mentions; this commit is chance #3. A first draft of this cell said "late by one" — a count written from the feel of the sequence instead of from `git show <rev> | grep -c bcb37eb`, which is the same failure L11 and L14 record, arriving again in a sentence about counts. The self-reference note explains why a cell cannot carry its own hash; it does not excuse skipping the next commit, and `439abbc` had both the hash and the free-text space to write | `bash -n rig/run.sh` 0; all eight numbers in the corrected comment re-verified against committed data (pilot six 10990-14586 ms; all-42 10990-51778 ms; 0 rows `void_reason=timeout`; 42 raw captures `timed_out=false` all under `timeout_s=300`; 51778/120000 = 43%; 120/51.778 = 2.32x; ceil(3×51.778/30)×30 = 180; the table already held 42 rows / 27 `t3v2` at `134dbe8`, checked with `git show`). The fix is prose: **`TIMEOUT_S` stays 120**, which is the rule applied to the population the rule names. `rig/check.sh` 20/20, goldens intact. |
 | T9 | done | `439abbc` — knowable only once `1a1fd8e` existed, so this is the first commit that could carry it: on time. **Its evidence figures belong to `bcb37eb`, not to it.** 117 content files, 196 tracked files and 149 messages are values in the tree the battery actually ran against — `439abbc`'s parent — because a task measures the tree *before* its own commit lands, never the commit that records it. The message count is what proves this: `git rev-list --count` gives 149 at `bcb37eb`, 150 at `439abbc`, 151 at `1a1fd8e`, so "149" can only be the parent's tree. A first draft of this cell anchored all three to `439abbc` — a false attribution made by reasoning that "the commit that names them" must be "the commit they were measured in", which is the off-by-one-at-birth class from L11 arriving in my own fresh sentence about staleness. All three are counters over reachable repository state and move with any later commit; read them as value-at-`bcb37eb`, never as standing claims, and they are deliberately not chased forward | `actionlint` 1.7.12 **exit 0** with `shellcheck` 0.11.0 present, and **exit 1 on the first draft** (`SC2329`, dead helper) so the pass is a result not a silence; both inline `run:` blocks `shellcheck` clean; step run in a real clone: baseline **exit 0, 5 ran**, four planted mutants **exit 1/1/2/2**, two guards held (new executable auto-discovered → **6 ran**; empty `untested` under `set -u` → **exit 0**); hermetic in a clone with no `rig/runs/` — **1.74 s**, goldens stay **3 and 42**, `git status` empty; both rig self-tests **exit 2 naming `python3`** on a `PATH` without it; discovery confirmed in a genuine `--depth 1` `file://` clone. Full battery after the edit: `check.sh --self-test` 0, `open-work.sh --self-test` 0, `pre-commit --self-test` 0, `commit-msg --self-test` 0, `./check.sh` 0 (117 content files, 5 skills), `pre-commit --all` 0 (196 tracked files), `commit-msg --range - HEAD` 0 (149 messages), `rig/check.sh` **20/20**, `open-work.sh` 0 |
 | T7 | done, **and the premise it was registered on was false** | `1a1fd8e` | Battery of 22 gate invocations, each run unpiped with `$?` read on the next line, **all exit 0**: `bash -n` × 8 committed executables, `py_compile` × 5 tracked modules, `check.sh --self-test`, `open-work.sh --self-test`, `pre-commit --self-test`, `commit-msg --self-test`, `./check.sh` (**118** content files, 5 skills), `pre-commit --all`, `commit-msg --range - HEAD` (**150** messages, measured at `439abbc` — that range scans every reachable commit, so this task's own commit necessarily advances the number it was measured against; per L8 it is value-at-`439abbc`, not a standing claim, and is not chased), `rig/check.sh` **20/20**, `open-work.sh` (17 items / 7 sources, `gaps/: 4`). **Two holes closed rather than reported green:** (1) `pre-commit --all` scanned 196 tracked files and *missed this task's entire subject* — `gaps/0004` was untracked — so it was re-run with the file in scope (**197**, exit 0) and **mutant-proved on that file, on both trees it was edited on** — before and after this unit's edits to it: a planted home path → **exit 1** naming `gaps/0004-repack-atlas.md:329` both times, file restored **byte-identical** each time (`sha256 01e5be81…` pre-edit, `1a409691…` on the committed final text); (2) the `--range <same> <same>` vacuous pass reproduced on our own gate, **exit 0 on 0 messages**. Goldens stayed **3 and 42 lines**, `git status --short -- rig/` empty. Spec-premise re-check from the records: `0002`'s own Demand row reads *"1 — `0001` only"* and `0003`'s reads ***"First"***, so check 6 sat at **one** occurrence and T7 added **zero** — see S4's amendment and L14. |
-| T5, T6 | not started | — | — |
+| T6 | done | `f1794f8` (the ledger) and `2837365` (its registration and CI), both knowable from this commit | **Mutant sweep v4: 20/20 behavioural mutants FIRED**, each scoped to one function window and diff-verified before its verdict was believed, plus a comment-only control that HELD and a machinery probe cut at exactly 90.0 s. Battery run by hand from this worktree (no hook fires here — `git rev-parse --git-common-dir`/hooks resolves to the *primary* checkout's `hooks/pre-commit`, not this branch's): `sh -n`/`bash -n` × 8, `--self-test` × 6, `./check.sh` 0, `pre-commit --all` 0, `commit-msg --range - HEAD` 0, `rig/check.sh` **20/20** with `rig/runs/` present, goldens intact at **3 and 42** lines. **S8 proved on the new file itself**, twice, with the control that makes it mean something: mutant planted **in scope** → **exit 1** naming the appended line of `obligation-ledger.sh` (the committed file is 1046 lines, so that number exists only in the planted copy); the same mutant with the file **untracked** → **exit 0 across 198 files** (T7's blind spot, reproduced on this unit's own subject). Restored **byte-identical** each time. CI evidence is a **run**, not a lint: the two new steps executed in a real `--depth 1` `file://` clone — baseline 6/6; a newly committed mode-`100755` executable raised it to **7 with no edit to the workflow**; a planted failing executable → **exit 1 naming it while the other six still ran**; empty pathspec → **exit 2**; flag-detection broken → **exit 2** "this job ran nothing"; `set -u` guard → 0; ledger → 0 with `git status` identical before and after; a broken `--list-content` seam → **exit 1**; a ledger exiting 1 → named as a contract defect. `actionlint` 1.7.12 exit 0 with `shellcheck` 0.11.0 present and all four inline `run:` blocks `shellcheck` clean |
+| T5 | not started — **the only credit-spending task, and the operator's funding decision** | — | — |
 
 ## Log
 
@@ -893,6 +894,99 @@ artifacts that mention it, and no check enumerates those.** `OPERATIONS.md`, `MA
 all described the workflow's runtime state; only one of the three was on the diff's radar. The ledger's
 class here is not "stale path citation" — it is **"live claim about a fact another file changed"**, and it
 is harder than the path case because it has no `path:line` form to match.
+
+**L19 — closing T6: the sweep found one real gap, it was in the fixture and not the checker, and my own
+restoration command destroyed the only copy of the file (2026-10-16).**
+
+The sweep was written to prove two gaps closed. It did, and it also produced a survivor that reading
+could not have found.
+
+| Outcome | Measured | What it means |
+|---|---|---|
+| 20/20 behavioural mutants **FIRED** | each scoped to one function window, `sh -n` clean, diff printed and read **before** the verdict was believed | the two gaps the operator closed fire; a survivor is now evidence, not noise |
+| Control: comment-only edit | **HELD** (exit 0) | the sweep does not fire on any diff — without this, 20/20 is decoration |
+| **M13 — dedupe by raw token instead of resolved id** | **SURVIVED**, diff verified | a real gap, but **not where it looked** |
+| Machinery probe: a nested `sleep 600` | cut at **90.0 s**, `TIMEOUT` | v2's 900-second silence cannot recur |
+
+**M13's mechanism, established by running it rather than by reading it.** The C3 class stores the
+*resolved* id in its seen-list, so the fixture's planted pair — a 7-character prefix and the 40-character
+sha of the same blob — collapses to one report under **both** rules: dedupe-by-resolved-id and
+dedupe-by-raw-token. The pair cannot distinguish them, so the mutant survived a fixture that could not
+catch anything. A throwaway probe settled it: prose naming a 7-char **and** a 10-char prefix of one
+object → pristine reports **1**, the mutant reports **2**. The checker was right; the fixture was blind.
+The repair is three spellings at two different lengths, which makes the rule load-bearing — M13 now
+**FIRES**. This is the same lesson the `ab` anchor-length decoy already taught, arriving in a different
+class: **a fixture cannot assert a rule its own input cannot violate.**
+
+**M21 is recorded as un-exercisable, not as debt.** Deleting C4's progress guard survives, and the reason
+is arithmetic, not fixture design: `adv = RSTART + RLENGTH`, with `RSTART ≥ 1` and the smallest token the
+regex can return measured at **7** over **151** live tokens, so `adv ≥ 8` — the guard's branch is
+**unreachable by correct code**. It is a tripwire against the historical bug that clobbered `RSTART`, and
+no input can make it fire. Saying "surviving mutant" here without that measurement would have opened a
+fake hole.
+
+**Two of my harness runs would have been reported as results if I had read the exit codes instead of the
+reasons.** v1 of the CI-step harness exited **127** on three of nine steps because `git clean -qfd`
+deleted the untracked step scripts *from inside the clone*, and its discovery-guard step planted the new
+executable **without `chmod +x`**, so git indexed it `100644` and "6 discovered" was silently not the
+thing under test. Both were fixed by moving the scripts outside the clone and asserting the planted
+commit landed (`commits=2 mode=100755`) before reading any count. Separately, `actionlint` exit 0 on a
+mutant that only changes *which files match* — correctly: that parses. For a discovery job the S8
+argument is running it in a clone, which is what the table above is drawn from.
+
+**The incident, stated as it happened.** To undo a planted redaction mutant I ran `git checkout --
+obligation-ledger.sh` on a path held by `git add -N`. Its index blob **is the empty blob**, so the
+checkout truncated the only copy of a never-committed 1046-line file to **0 bytes**. The gate evidence
+was already good (`exit 1`, naming the appended line of `obligation-ledger.sh` — the committed file is
+1046 lines, so the mutant's line number exists only in the planted copy); the destruction was mine and came from
+using a restore command whose source of truth I had not checked. Recovery was byte-identical because I
+had recorded the sha256 *before* planting (`6c98d087f349757f…`) and a sweep copy matched it exactly; the
+fix for the second repetition was `head -n 1046`, never `checkout`. **`git checkout --` on an
+intent-to-add path is a truncation, not a restore** — the same "a restore command's source of truth" as
+byte-identity in L9, turned on my own hands. Logged to the operator's private incident log, not here, per
+that file's rule.
+
+**What the ledger is worth on live prose, measured at `f1794f8` — and one claim of mine that it refuted.**
+The untracked tree reported **41 cites** = RESOLVE 3 | FAIL 2 | FAIL-range 2 | UNDECIDABLE 13 |
+UNRESOLVED 15 | AMBIGUOUS 5 | HISTORICAL 1. Tracking the file *adds itself to its own corpus*: 11
+sources, **346** symbols (was 290), **72 cites** = RESOLVE 3 | FAIL 3 | FAIL-range 2 | UNDECIDABLE 13 |
+UNRESOLVED 44 | AMBIGUOUS 6 | HISTORICAL 1. The vector is therefore **value-at-a-commit, and it moves
+across the commit that lands the ledger** — 30 of the 55 detail lines are the self-test's own fixtures
+(`tool.sh:1`, `missing.js:12`), whose verdicts are *correct* — those paths really are not tracked — but
+they read as noise. Any golden must state which side of which commit it is from (operator decision open).
+
+| Live finding | Verdict | Correction to what this feature recorded |
+|---|---|---|
+Locations below are named as *file + line N in prose*, deliberately never in the `path:digits` shape —
+see the note under this table, which exists because the first draft of it manufactured new defects.
+
+| Live finding | Verdict | Correction to what this feature recorded |
+|---|---|---|
+| this document, line 434, points at `open-work.sh` line 401 | FAIL — **found by the ledger itself** | both numbers in that clause are the banner, not the definition: `self_test()` sat at **402** pre-T2 and **499** post-T2, blob-verified at `2734451` and `642bb0b`. Line 88 carries the same false pair and is marked HISTORICAL by the age-marker, so one copy fails and one is silently exempt |
+| this document, lines 439 and 741, point at `gaps/0004-repack-atlas.md` line 329 | FAIL | the file is **327 lines** at HEAD, at `1a1fd8e`, at its rebased twin `3522762`, and at `180d82a` — the pointer never existed; the S8 mutant ran and fired |
+| `sdd/measurement-rig/tasks.md` line 419 points at `run.sh` line 62 | FAIL | **T8 never fixed this, and my session notes said it did.** `bcb37eb` touched exactly two files (`rig/run.sh`, this document) — zero lines in `tasks.md`. The false claim is live and unfixed anywhere; `TIMEOUT_S=120` sits at `rig/run.sh` line 83, and line 62 is prose |
+| `journal/2026-08-10-upstream-audit-handoff.md` line 34 points at the same `rig/run.sh` line 62 | **counted as provenance, not listed as an obligation** | the third live copy of the same false claim, and the ledger's own scope rule (`journal/`, `sdd/archive/` = dated records, named never repaired) puts it in the provenance aggregation. Whether to repair a dated record anyway is the operator's call, not this tool's |
+| `rig/run-pipeline.sh` line 1193 points at `rig/run.sh` lines 463-466 | FAIL — **new, recorded nowhere before today** | genuine drift, not born-wrong: at `0c79341` those lines held the `DIRTY_OK` guard that cite names, so it was true when written; `run.sh` is 537 lines now and the guard sits at 307 and 478 |
+
+**Recording a false citation in `path:digits` form creates a new live instance of it — measured on this
+very entry.** The first draft of the table above quoted each defect in the broken shape in order to name
+it, and the ledger's next run over this tree reported **six live FAILs authored by the Log entry whose
+subject is citation discipline** — among them one pointing at `obligation-ledger.sh` line 1047 in a
+1046-line file, the mutant's line number, which never existed in anything committed. That is the
+`journal/2026-08-10` third-copy mechanism arriving in the shortest interval possible: one edit. The fix
+is typographic, not a checker change — C1 can only mistake the `path:digits` shape for a pointer to
+maintain, so prose that says *line N* is findable by a reader and invisible to the class. The false
+cites this table describes stay unrepaired pending the operator's decision; what this entry must not do
+is publish an extra copy of them.
+
+**The derived obligations this unit created, all discharged in the same unit.** `obligation-ledger.sh`
+is a ninth committed executable (was 8), so `MAP.md` gained a row and `OPERATIONS.md` gained a
+decision-table row, a CI-table row and an exit-code section. The committed-executables job named two
+filenames in prose — the exact defect `rig-self-tests` was written to close one directory over — so its
+targets are now discovered across the whole index, and **ADR 0014's Implementation row carried "under
+`rig/`" as though it were the whole rule**; that row now carries a dated amendment and keeps
+`verified: 2026-08-17`, because bumping it would claim the original scope still holds. Neither index
+states a case count or a line count for the ledger — `AGENTS.md`: tables are generated or absent.
 
 **L18 — I published a wrong API semantic on `main`, two paragraphs from the entry warning about exactly
 that class (2026-10-14).**
