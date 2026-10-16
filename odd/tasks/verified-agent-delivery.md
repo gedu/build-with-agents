@@ -256,8 +256,15 @@ Ordered by dependency, not by discovery. Work the frontier: any task whose block
     the number.
   - Report per `(task_id, arm)`, never blended, per the R-F5.4/R-F4.1 discipline the reporter already
     enforces. Report the void rows by name.
-  - R-F7.2: a cell whose five runs all land in the same green-restore state escalates N. Escalation is
-    reported as escalation, not quietly absorbed.
+  - R-F7.2, **quoted, not paraphrased**
+    (`sdd/archive/2026-08-18-failure-flood-triage/spec.md:397-400`): "Each (fixture-version, arm) cell starts at
+    N=5. If all 5 land in the same green-restore verdict AND attribution precision/recall range ≤ one
+    correctly-attributed cause, stop at N=5. Otherwise add one batch of 5 (N→10), then one more if still
+    mixed (N→15, cap). Report final N with the observed min/max range, never a mean alone. Stage-1
+    shakedown rows are excluded from this rule (R-F8)." So **same verdict + tight recall range is the STOP
+    condition, and mixed results are the escalation trigger** — L22 records that this bullet said the
+    exact opposite for two days and that I repeated the inversion while asking the operator to fund the
+    spend. Escalation, when it happens, is reported as escalation, not quietly absorbed.
 
 - [x] **T6 The obligation ledger: enumerate what a change derived, from structure, not from prose**
   - Blocked by: T2 — reuse its enumeration machinery and its header rules; do not write a second
@@ -1215,3 +1222,77 @@ fields — and the operator chose to publish those together with the countable r
 reader can mistake N=1 for having shaped how the campaign was read. They are held in the evidence
 directory and in memory. This entry names their existence and not their contents; the contents arrive
 with the campaign's own numbers, and the disclosure of having seen them arrives at the same time.
+
+**L22 — two incidents of the same shape in one session: I acted on my own summary of a source instead of
+the source, and one of them cost money** (2026-10-16).
+
+**Incident A — a governing rule, inverted in my own task file, for two days.** This task's T5 block said:
+"a cell whose five runs all land in the same green-restore state escalates N." `sdd/archive/2026-08-18-failure-flood-triage/spec.md:397-400` says the opposite — same verdict *plus* a
+recall range ≤ one cause is the condition to
+**stop at N=5**, and *mixed* results are what escalate. The direction of the only rule that decides how
+much the campaign costs was backwards. It was written in `2734451` (2026-10-14), survived every gate in
+this repo, and I **repeated it to the operator verbatim while asking them to fund the spend** — so the
+human's cost decision was made against my inversion, not against the requirement.
+
+It surfaced by accident. I went to *compute* the escalation at the end of the campaign and had to read
+`hypotheses/0002` to get the threshold, and the hypothesis quoted the rule correctly ("escalate to 10 or
+15 on **mixed** results"). Two documents describing one rule disagreed, and mine was the wrong one. The
+bullet is now the requirement's own words in quotation marks with its line range; the paraphrase is gone
+rather than annotated. The general form: **a requirement I am about to act on gets quoted with its
+locator, never summarised from memory**. This file already holds three entries of that class — **L18**
+(asserted what an API field counts), **L20** (took the runner's `state` for the countability authority),
+**L21** (quoted a byte delta computed in my head from two different serializations) — and this is the
+fourth. They are **listed by locator rather than counted**, because "this has happened N times" is itself
+the kind of hand-stated number L8 and L19 record as this repo's recurring defect: an ordinal nobody can
+check rots the moment a fifth entry appears, and nobody notices.
+
+**Incident B — $2.1088 spent in the wrong checkout.** The campaign script began with
+`cd "$(git rev-parse --show-toplevel)"`. That looks self-evidently correct and is wrong here: the bash
+tool's cwd is the **session** working directory, which is the *primary* clone — a different branch at
+`2a817e1`, whose rig predates all three repairs. Both validation cells ran there and burned
+`$1.3044 + $0.8044`. Nothing failed. The pipeline cell even reproduced defect 2 exactly
+(`diagnostician_src_violation=True`) — against a tree that had no `compose_prompt` to prevent it, which is
+inadvertent confirmation that WU5 is what closes that defect. I noticed only because the run directories
+never appeared under the worktree's `rig/runs/`.
+
+Three things about that are worth keeping. **The preserved captures are evidence, not litter**: they name
+`code_commit: 2a817e1…` on a branch nobody is reviewing, so they moved to the evidence directory with a
+README saying what they are. **Deleting them was also not the right instinct at first** — `rig/runs/` in
+that checkout had grown to 5 directories against a published 3-row golden, and `derive.py` is *total*:
+the next person to run it there gets a `derive-reproduce` failure they cannot explain. The mistake is
+not finished until the shared tree is back as-found; that checkout is now 3 directories, 3 rows, clean.
+**And the fix is a check, not a resolution.** The script now takes its root as an argument and refuses to
+spend unless it can assert: root is its own toplevel, root is under `worktrees/`, branch is
+`feat/obligation-ledger-v2`, and — the part that actually matters — **all three repairs are present in
+the tree it is about to run** (`compose_prompt` in `run-pipeline.sh`, `# harness: 2.1.299` in the surface
+preimage, `F0.failures` in the answer key), plus the slots are free and `rig/` is clean. Deriving "which
+repo am I in" from the environment is what failed; asserting the properties I actually need is checkable.
+
+**The cost accounting this changes, stated rather than absorbed.** The operator approved *two* validation
+cells on a ~$1.70 basis. Those two cells are the ones I burned in the wrong tree, so re-running them is
+**new money on a basis the operator no longer has**, and the decision is theirs to take again — not mine
+to continue under a spent approval. Silently paying the same line item twice because the first attempt
+"didn't count" is exactly the quiet absorption L20's escalation sentence forbids.
+
+The restatement, every figure read from a `result.total_cost_usd` and the arithmetic computed rather than
+done in my head (L21's own rule, applied to my own sentence two days later): sunk in the wrong checkout
+**$2.1088** (`$1.3044` pipeline + `$0.8044` monolithic); the best per-cell basis from a **repaired** tree
+is `$1.1847` pipeline (the `e71853b` re-pilot, which is the only post-WU5 pipeline run) + `$0.4903`
+monolithic = **$1.6750 a pair**; so retrying the same two cells costs ~**$1.68** and reaching the
+checkpoint the operator already paid for once totals ~**$3.78**. A full 10-cell campaign on that basis is
+~**$8.38**. Two honest caveats: the wrong-tree cells cost more per pair (`$2.1088`) because that rig still
+had defect 2, so its `diagnose` step did the applier's work — the inflated number is an artifact of the
+bug, which is itself evidence WU5 matters; and `$0.4903` predates the repairs, which is fine for cost but
+not for countability. First draft of this paragraph said "~$3.4", a figure I had carried forward instead
+of recomputed; ~$3.78 is what the numbers give.
+
+**A third thing found while building the comparison, recorded because it is the useful kind.** No
+committed code computes the hypothesis verdicts: `report.py` publishes N/min/max/median per
+`(task_id, arm)` and never compares arms, so the ratio and the non-overlap test live in analysis code.
+Writing it exposed that the two decision tables are **deliberately asymmetric** — 0002 is Refuted when the
+ranges overlap *even if* pipeline's median is lower, while 0003's Refuted clause is median-only, so the
+identical data shape is Refuted for one and Not-testable for the other. Symmetrising them would have been
+the easy, plausible, wrong thing. The comparison ships with a synthetic self-test (15 cases) that pins
+that asymmetry, and that self-test caught a real bug on its first run: an arm with no complete row yields
+an *empty list* which passed a `key in values` guard and reached `statistics.median([])`. That is the
+normal mid-campaign state, not an edge case — it would have crashed on the first real partial run.
