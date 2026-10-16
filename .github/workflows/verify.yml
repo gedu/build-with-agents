@@ -145,25 +145,127 @@ jobs:
   # asserts exit 0 specifically and treats any other code as the failure it is: `set -e` alone would
   # already fail on 2, and it is kept that way on purpose.
   #
-  # WHY THIS JOB IS THE FRESH-CLONE PROOF FOR TWO OF THEM
+  # WHY THIS JOB IS THE FRESH-CLONE PROOF
   # `setup.sh --self-test` asserts the installer's safety contract (a pre-existing real file kept, a
   # foreign symlink kept, no unanchored .gitignore entry surviving, byte-identical re-runs, a dry run
   # that writes nothing). ./setup.sh and ./open-work.sh are POSIX-ish tools with no install step, so a
   # runner that has installed nothing is the most honest environment they can be tested in.
+  #
+  # WHY THE TARGETS ARE DISCOVERED NOW, AND WHAT THAT CHANGED
+  # This job used to name `./setup.sh --self-test` and `./open-work.sh --self-test` in prose, which is
+  # the exact defect `rig-self-tests` below was written to close one directory over: a committed
+  # executable that post-dates the file is covered by nothing, and no self-test of any gate can report
+  # it. `./obligation-ledger.sh` post-dated it the same way on 2026-10-16 and would have needed an edit
+  # here to be tested at all. So the candidates now come from the index — mode `100755`, everything
+  # outside `rig/` (which the next job owns, on a python3 warrant this job must not take on).
+  #
+  # WHY THE THREE GATE EXECUTABLES ARE RUN HERE TOO, THOUGH THEY HAVE THEIR OWN JOBS
+  # `./check.sh`, `./hooks/pre-commit` and `./hooks/commit-msg` are discovered and tested here *and* in
+  # the jobs that pair a self-test with the check it guards. That duplication is deliberate and costs
+  # about two seconds: this job's claim is "no committed executable outside rig/ is untested", and an
+  # exclusion list naming those three would make the claim false the day somebody deletes their job.
+  # ADR 0014's pairing rule is satisfied by their own jobs and is not weakened by a second reading.
   executables:
     name: committed executables
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # All three are properties of the tree. No history is read here.
+          # Every self-test below is a property of the tree. The ledger step reads history for its C3
+          # class and says what that costs, in its own comment.
           fetch-depth: 1
-      - name: Prove the installer's own test passes
-        run: ./setup.sh --self-test
-      - name: Prove the open-work index behaves as specified
-        run: ./open-work.sh --self-test
+      - name: Run every committed executable's own test, discovered from the index
+        run: |
+          set -eu
+
+          executables=()
+          while IFS= read -r p; do
+            executables+=("$p")
+          done < <(git ls-files -s ':(exclude)rig/' | awk '$1 == "100755" { print $4 }')
+
+          if [ "${#executables[@]}" -eq 0 ]; then
+            echo "::error::discovered no committed executable outside rig/ in the index; refusing to report a pass for having tested nothing"
+            exit 2
+          fi
+
+          failed=0
+          ran=0
+          untested=()
+
+          probe() {
+            # $1 = label, rest = the command. Records the verdict and never aborts the loop, so one
+            # red test cannot hide the result of the test after it.
+            local label="$1"; shift
+            local rc=0
+            "$@" || rc=$?
+            ran=$((ran + 1))
+            if [ "$rc" -eq 0 ]; then
+              echo "ok: $label"
+            else
+              echo "::error::$label exited $rc -- non-zero fails, and exit 2 means could-not-run, never passed"
+              failed=1
+            fi
+          }
+
+          # Detection is a mention of the flag, deliberately generous: a file that claims the flag and
+          # does not implement it exits 2 and turns this job red, so detection fails CLOSED toward a
+          # failing job rather than open toward silence. A file with no mention at all is named below as
+          # untested instead of skipped quietly, because `absent` is not `covered`.
+          for p in "${executables[@]}"; do
+            if grep -q -- '--self-test' "$p"; then
+              probe "./$p --self-test" "./$p" --self-test
+            else
+              untested+=("$p (committed executable, mode 100755)")
+            fi
+          done
+
+          for u in ${untested[@]+"${untested[@]}"}; do
+            echo "::warning::$u carries no --self-test, so ADR 0013 is unmet for it. Named rather than counted as covered."
+          done
+
+          if [ "$ran" -eq 0 ]; then
+            echo "::error::${#executables[@]} executable(s) were discovered and none carries a --self-test; this job ran nothing"
+            exit 2
+          fi
+
+          echo "ran $ran self-test(s) across ${#executables[@]} discovered executable(s); ${#untested[@]} named as carrying none"
+          exit "$failed"
       - name: Run the index, and accept nothing but exit 0
         run: ./open-work.sh
+      # WHY THE LEDGER IS RUN AND NOT ONLY SELF-TESTED
+      # Its exit 0 means only "the report was produced"; findings live in the text and never change the
+      # exit code, so this step can never fail a push for what the repository contains. What it does
+      # prove is the thing the self-test cannot: the self-test builds throwaway repositories and never
+      # reads this one (deliberately, or its assertions would rot the moment anything was committed),
+      # so a live scan of this corpus is exercised nowhere else. Exit 2 means the `--list-content` seam
+      # is missing or refusing in a fresh clone, and ADR 0014 forbids reporting could-not-run as a pass.
+      #
+      # WHY THE WALL CLOCK IS BOUNDED
+      # This file's own history records a class here that hung forever (C4's `match()` clobbering
+      # RSTART). A bound converts that into a named could-not-run in seconds instead of a runner timeout
+      # hours later. 300 s is ~21x the 13.8 s this scan measured at f1794f8 over 119 content files; the
+      # purpose is the hang, not the average, so the margin is not tuned to the mean.
+      #
+      # WHAT THE SHALLOW CLONE COSTS THIS STEP, STATED RATHER THAN HIDDEN
+      # Only the exit code is asserted. C3 asks whether a quoted hash resolves from any ref, and at
+      # `fetch-depth: 1` the reachable set is one commit deep, so C3 reports more objects here than a
+      # full clone would. It condemns nothing in any case, and the log is printed so a reader can see
+      # the denominator rather than infer it.
+      - name: Run the obligation ledger, and accept nothing but exit 0
+        run: |
+          set -eu
+          rc=0
+          timeout 300 ./obligation-ledger.sh > "$RUNNER_TEMP/ledger.log" 2>&1 || rc=$?
+          cat "$RUNNER_TEMP/ledger.log"
+          if [ "$rc" -ne 0 ]; then
+            case "$rc" in
+              124) echo "::error::the obligation ledger hit its 300 s bound and produced no report: could not run, not clean" ;;
+              2)   echo "::error::the obligation ledger exited 2 (could not run) — its --list-content seam is missing or refusing in this checkout" ;;
+              *)   echo "::error::the obligation ledger exited $rc; its contract is 0 (report produced) or 2 (could not run), so any other code is a defect" ;;
+            esac
+            exit 1
+          fi
+          echo "ok: the ledger produced a report over this checkout (findings above are the product, not failures)"
 
   # ADR 0014's non-negotiable list says every committed executable carries its own test and CI runs it.
   # The job above applies that to `./setup.sh` and `./open-work.sh`, which post-dated the draft. Two rig

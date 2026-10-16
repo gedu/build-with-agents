@@ -42,6 +42,7 @@ only some sessions need belongs behind a read-on-demand pointer rather than in a
 | Change `hooks/redaction-patterns.sh` | **both** hooks' `--self-test` | Yes. One list, two readers |
 | Change `check.sh` | `./check.sh --self-test` | Yes, same reason |
 | Change `open-work.sh` | `./open-work.sh --self-test` | Yes. Its cases assert the printed output, not only the exit code — for a generator the exit code is not the product |
+| Change `obligation-ledger.sh` | `./obligation-ledger.sh --self-test` | Yes. It asserts what was **printed**, one planted violation per class (ADR 0013, S8), and its verdict vector is asserted as an anchored count — a test that greps for a label cannot see a miscount of that label. Reading its report is not a gate: a finding never changes its exit code |
 | Change `.github/workflows/verify.yml` | `actionlint <file>`, plus a planted mutant | Yes. A workflow that cannot be parsed is an absent gate that reports nothing; verify the linter fires before believing it passed |
 | Change `setup.sh` | `./setup.sh --self-test` | Yes. Its six cases assert the header's safety contract: a pre-existing real file kept, a foreign symlink kept, no unanchored `.gitignore` entry surviving, byte-identical re-runs, a dry run that writes nothing, and a `--hooks`-only run that leaves the managed block alone. Each of those failures is silent, and the first two cost a committed file |
 | Change shell | `sh -n <file>`, or `bash -n` for `setup.sh` and `hooks/pre-commit` | Yes. There is still no test *runner*, by decision — ADR 0013 |
@@ -181,7 +182,7 @@ scanned.
 | redaction gate | `./hooks/pre-commit --self-test` | `./hooks/pre-commit --all` |
 | commit message gate | `./hooks/commit-msg --self-test` | `./hooks/commit-msg --range <from> <to>` |
 | structural invariants | `./check.sh --self-test` | `./check.sh` |
-| committed executables | `./setup.sh --self-test`, `./open-work.sh --self-test` | `./open-work.sh` — accepted only on exit 0 |
+| committed executables | each discovered executable's own `--self-test` — discovered from the index by mode `100755`, everything outside `rig/` | `./open-work.sh` and `./obligation-ledger.sh`, each accepted only on exit 0 |
 | rig self-tests | *(nothing follows it — the rig's real gate must not run here)* | `./rig/check.sh --self-test`, `./rig/run-pipeline.sh --self-test`, `python3 rig/{derive,report,collect}.py --self-test`, discovered from the index |
 
 The rig job runs **`--self-test` dispatches and nothing else**, and that is not an oversight to fix later:
@@ -192,10 +193,37 @@ Its targets are **discovered from the index** rather than written down: committe
 measurement inputs, and the same exclusion `check.sh` and `open-work.sh` already apply). So a new rig
 executable is covered the day it lands; discovering none exits 2 rather than passing.
 
-Each self-test runs in the **same job** as the check it guards. Split across two jobs, a check could
+Most self-tests run in the **same job** as the check they guard. Split across two jobs, a check could
 report clean in a green job while its own self-test failed in a red one — ADR 0014's non-negotiable
 list, and the reason `./open-work.sh` is run rather than merely self-tested: exit 2 there means *could
 not run*, and ADR 0014 forbids reporting that as a pass.
+
+Two jobs have no check to pair, and neither is an oversight. The rig job cannot run the rig's real gate
+(above). The committed-executables job's claim is coverage — "no committed executable outside `rig/` is
+untested" — so its steps are the discovered self-tests plus two reports accepted on exit 0 only.
+
+### `./obligation-ledger.sh` — a report, and the exit codes say so
+
+Enumerates what a change derived: citations that no longer resolve to what they name, hand-stated counts
+of things a generator prints, ranges pinned to moving refs, a tool-output value asserted without its
+endpoint, lockfiles and committed artifacts older than what they derive from. Its exit codes are
+`open-work.sh`'s, on purpose:
+
+| Exit | Meaning | What you must do |
+|---|---|---|
+| 0 | The report was produced | Read it. Findings live in the text, never in the exit code, so this is not a pass and never a failure |
+| 2 | **Could not run** | **Treat as a failure.** The `--list-content` seam is missing or refusing, `--range` names zero commits or an unresolvable revision, or it is not a repository |
+
+Exit 1 exists only inside `--self-test`. Two things to read rather than skim:
+
+- **A zero must be earned.** Every class prints the denominator it scanned; a class with no population
+  prints `ABSENT`, which is not an empty pass, and `UNDECIDABLE` is never folded into the pass column.
+- **Provenance scope is not obligations.** `journal/` and `sdd/archive/` are counted and named, never
+  listed as things to repair — the rule `AGENTS.md` states for dated records.
+
+Run it by hand before a push if your change moved a line or a count that other files quote. CI runs it
+on every push, where it cannot be skipped, and asserts only exit 0 — so it can never fail a push for
+what the repository contains, and it can never be mistaken for a gate.
 
 The rig job is the one row with **no check after its self-tests**, deliberately, and the pairing rule is
 kept by choosing which gate is runnable rather than by skipping one: the check `rig/check.sh --self-test`
