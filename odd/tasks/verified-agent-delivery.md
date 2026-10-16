@@ -1106,10 +1106,15 @@ measurement: with an empty baseline `green_restore_verdict` returns `regressed` 
 returns `no-progress`. Strictly worse, and wrong.
 
 The repair is legitimate rather than convenient, and the reason is citable: the 499-failure set is a
-fact about the fixture, not an observation of mine — the committed `9054` capture (2.1.229) and this
-session's re-pilot (2.1.299) produced **identical signature multisets** (9 signatures, 499 failures),
-and the key's own nine `F0.clusters` sum to the same multiset. So the field is that cluster-compressed
-fact expanded, not invented knowledge. `answer-key/` is never materialised into a model's workspace, so
+fact about the fixture, not an observation of mine. The committed `9054` capture (harness 2.1.229) and
+this session's re-pilot (2.1.299) agree on **all three projections of the same list** — 9 signatures,
+499 distinct `test_id`s, and the full `(signature, test_id, status)` triples: identical multisets every
+way. The `test_id` projection is the one that matters, because that is the only field scoring reads
+(`green_restore_verdict` builds `{f["test_id"] for f in …}` on both sides and never looks at a
+signature), and the key's own nine `F0.clusters` sum to the same 499. So the field is that
+cluster-compressed fact expanded, not invented knowledge. Naming the field rather than a nearby one is
+the L18/L19 rule applied to my own strongest-sounding sentence: had I cross-checked signatures alone
+and called the repair legitimate on that, I would have cited a field the verdict cannot see. `answer-key/` is never materialised into a model's workspace, so
 it cannot bias what any model does, and `prereg.json` pins only hypothesis existence/tracking — no
 digest — so 0002/0003 stay validly pre-registered. **What I am not entitled to decide** is that the
 repaired key and a re-sealed MANIFEST get committed, because those are the fixture bytes the hypotheses
