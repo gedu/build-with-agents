@@ -3,7 +3,7 @@ id: odd/verified-agent-delivery/tasks
 type: journal
 targets: [any]
 status: draft
-verified: 2026-10-14
+verified: 2026-10-16
 sources: ["journal/2026-08-17-three-rules-with-no-verifier.md", "theory/loops/verifier-availability.md", "decisions/0014-a-public-guarantee-cannot-be-opt-in.md", "decisions/0016-open-work-is-enumerated-from-structure.md", "decisions/0013-a-committed-executable-carries-its-own-test.md", "sdd/archive/2026-08-27-run-input-provenance/archive-report.md", "hypotheses/0002-pipeline-shape-lowers-peak-occupancy.md", "hypotheses/0003-serial-triage-compounds-cumulative-tokens.md", "skills/checkout-isolation/SKILL.md", "gaps/0002-expensify-app.md"]
 ---
 
@@ -220,10 +220,25 @@ Ordered by dependency, not by discovery. Work the frontier: any task whose block
     `MAP.md`'s `odd/` row that T4 closing made stale. See L11 — 49 of the drift lines are mine, the rest
     predates this session, and one citation was wrong the day it was written.
 
-- [ ] **T5 Found the first countable run: `failure-flood` stage 2, both arms, N=5 per cell**
-  - Blocked by: ~~T4~~ closed 2026-10-14. Both archives named the timeout placeholders as *the* concrete
-    prerequisite for a countable run; with T4 done, the only thing left is the operator's decision to
-    fund the spend. Nothing in the rig is configured-by-placeholder any more.
+- [ ] **T5 Found the first countable run: `failure-flood` stage 2, both arms, N=5 per cell** —
+  **attempted 2026-10-16, still zero countable rows; this task's own blocking premise was false (L20)**
+  - Blocked by: ~~T4~~ closed 2026-10-14. **The rest of this line was wrong at the time it was read.**
+    It said: "with T4 done, the only thing left is the operator's decision to fund the spend. Nothing in
+    the rig is configured-by-placeholder any more." Funding was never the binding constraint. Three
+    instrument defects stood between a run and a countable row, none of them visible from the runner's
+    exit code, and the first two were only findable by spending runs (L20). What blocks this task now is
+    one operator decision, named in L20: the surviving defect is repaired by editing bytes the
+    hypotheses were registered against, so it is not mine to take.
+  - The two defects already repaired, so they are never rediscovered at $1.24 a run: the frozen
+    tool-surface preimage was stale against the installed CLI (`61cbd15`), and the shared per-task
+    prompt invited the diagnostician to edit `src/`, which made the PIPELINE arm structurally unable to
+    produce a row at any N (`e71853b`). The third — `answer-key/s2.json` carries no `F0.failures`, so
+    `derive.py`'s own shape check voids every `s2` run that reaches `complete` — is **open**.
+  - Pre-registration is **not** the obstacle, checked rather than assumed: `answer-key/prereg.json`
+    pins only that `hypotheses/0002-*.md` and `0003-*.md` exist, are tracked, and match exactly one
+    file each — it pins no fixture or answer-key digest. So a repaired key does not retro-invalidate
+    the hypotheses; it moves fixture bytes they were registered alongside, which is the part worth an
+    operator's signature.
   - Seams: `rig/run-pipeline.sh`, `python3 rig/derive.py`, `python3 rig/report.py --experiment failure-flood-v1`
   - This is the only task here that spends real model credit and needs the `claude` CLI. `s2` exists in
     the fixture (`failure-flood/v2`) and `hypotheses/0002`/`0003` are both **registered and open,
@@ -438,7 +453,9 @@ gate below is invoked by hand and its exit code is read.
 | T9 | done | `439abbc` — knowable only once `1a1fd8e` existed, so this is the first commit that could carry it: on time. **Its evidence figures belong to `bcb37eb`, not to it.** 117 content files, 196 tracked files and 149 messages are values in the tree the battery actually ran against — `439abbc`'s parent — because a task measures the tree *before* its own commit lands, never the commit that records it. The message count is what proves this: `git rev-list --count` gives 149 at `bcb37eb`, 150 at `439abbc`, 151 at `1a1fd8e`, so "149" can only be the parent's tree. A first draft of this cell anchored all three to `439abbc` — a false attribution made by reasoning that "the commit that names them" must be "the commit they were measured in", which is the off-by-one-at-birth class from L11 arriving in my own fresh sentence about staleness. All three are counters over reachable repository state and move with any later commit; read them as value-at-`bcb37eb`, never as standing claims, and they are deliberately not chased forward | `actionlint` 1.7.12 **exit 0** with `shellcheck` 0.11.0 present, and **exit 1 on the first draft** (`SC2329`, dead helper) so the pass is a result not a silence; both inline `run:` blocks `shellcheck` clean; step run in a real clone: baseline **exit 0, 5 ran**, four planted mutants **exit 1/1/2/2**, two guards held (new executable auto-discovered → **6 ran**; empty `untested` under `set -u` → **exit 0**); hermetic in a clone with no `rig/runs/` — **1.74 s**, goldens stay **3 and 42**, `git status` empty; both rig self-tests **exit 2 naming `python3`** on a `PATH` without it; discovery confirmed in a genuine `--depth 1` `file://` clone. Full battery after the edit: `check.sh --self-test` 0, `open-work.sh --self-test` 0, `pre-commit --self-test` 0, `commit-msg --self-test` 0, `./check.sh` 0 (117 content files, 5 skills), `pre-commit --all` 0 (196 tracked files), `commit-msg --range - HEAD` 0 (149 messages), `rig/check.sh` **20/20**, `open-work.sh` 0 |
 | T7 | done, **and the premise it was registered on was false** | `1a1fd8e` | Battery of 22 gate invocations, each run unpiped with `$?` read on the next line, **all exit 0**: `bash -n` × 8 committed executables, `py_compile` × 5 tracked modules, `check.sh --self-test`, `open-work.sh --self-test`, `pre-commit --self-test`, `commit-msg --self-test`, `./check.sh` (**118** content files, 5 skills), `pre-commit --all`, `commit-msg --range - HEAD` (**150** messages, measured at `439abbc` — that range scans every reachable commit, so this task's own commit necessarily advances the number it was measured against; per L8 it is value-at-`439abbc`, not a standing claim, and is not chased), `rig/check.sh` **20/20**, `open-work.sh` (17 items / 7 sources, `gaps/: 4`). **Two holes closed rather than reported green:** (1) `pre-commit --all` scanned 196 tracked files and *missed this task's entire subject* — `gaps/0004` was untracked — so it was re-run with the file in scope (**197**, exit 0) and **mutant-proved on that file, on both trees it was edited on** — before and after this unit's edits to it: a planted home path → **exit 1** naming `gaps/0004-repack-atlas.md:329` both times, file restored **byte-identical** each time (`sha256 01e5be81…` pre-edit, `1a409691…` on the committed final text); (2) the `--range <same> <same>` vacuous pass reproduced on our own gate, **exit 0 on 0 messages**. Goldens stayed **3 and 42 lines**, `git status --short -- rig/` empty. Spec-premise re-check from the records: `0002`'s own Demand row reads *"1 — `0001` only"* and `0003`'s reads ***"First"***, so check 6 sat at **one** occurrence and T7 added **zero** — see S4's amendment and L14. |
 | T6 | done | `f1794f8` (the ledger) and `2837365` (its registration and CI), both knowable from this commit | **Mutant sweep v4: 20/20 behavioural mutants FIRED**, each scoped to one function window and diff-verified before its verdict was believed, plus a comment-only control that HELD and a machinery probe cut at exactly 90.0 s. Battery run by hand from this worktree (no hook fires here — `git rev-parse --git-common-dir`/hooks resolves to the *primary* checkout's `hooks/pre-commit`, not this branch's): `sh -n`/`bash -n` × 8, `--self-test` × 6, `./check.sh` 0, `pre-commit --all` 0, `commit-msg --range - HEAD` 0, `rig/check.sh` **20/20** with `rig/runs/` present, goldens intact at **3 and 42** lines. **S8 proved on the new file itself**, twice, with the control that makes it mean something: mutant planted **in scope** → **exit 1** naming the appended line of `obligation-ledger.sh` (the committed file is 1046 lines, so that number exists only in the planted copy); the same mutant with the file **untracked** → **exit 0 across 198 files** (T7's blind spot, reproduced on this unit's own subject). Restored **byte-identical** each time. CI evidence is a **run**, not a lint: the two new steps executed in a real `--depth 1` `file://` clone — baseline 6/6; a newly committed mode-`100755` executable raised it to **7 with no edit to the workflow**; a planted failing executable → **exit 1 naming it while the other six still ran**; empty pathspec → **exit 2**; flag-detection broken → **exit 2** "this job ran nothing"; `set -u` guard → 0; ledger → 0 with `git status` identical before and after; a broken `--list-content` seam → **exit 1**; a ledger exiting 1 → named as a contract defect. `actionlint` 1.7.12 exit 0 with `shellcheck` 0.11.0 present and all four inline `run:` blocks `shellcheck` clean |
-| T5 | not started — **the only credit-spending task, and the operator's funding decision** | — | — |
+| T5 | **attempted; 3 model runs spent, 0 countable rows.** The task's own premise ("only funding remains") was false | `61cbd15` (surface preimage recaptured) and `e71853b` (the diagnostician's role boundary) close the first two defects; the third is open | Three runs: `s2/monolithic/01` → runner `complete`, `$0.4903`; `s2/pipeline/01` → runner `failed`, `diagnostician_src_violation`, `$1.2440`; re-pilot after both fixes → runner `complete`, `$1.1847`. **Read back through `derive.py`'s own `row_builder`, all three void**: the re-pilot yields `void / input-provenance-mismatch`, `anomalies=['answer-key-drift','rate-limit']`, while its recorded answer-key and fixture digests *match* their live values — only the key's shape fails. Spend read from each run's `result.total_cost_usd` (`$2.9190` for the three; a full 5×2 at these rates ≈ `$8.67`), not estimated. `rig/check.sh` 20/20 throughout, both goldens byte-identical at every step (restored after each probe); tree clean at `e71853b` |
+| T5 → WU4 | done | `61cbd15` | Four real `claude -p` captures — two independent scratch cwds, one adversarial cwd/prompt (space, both quotes, a backtick, non-ASCII) through `run_model_step`'s own composition, and one **without** `--model` — all exit 0, all 26 tools, all digest `1d4e343e…`, compared before any byte was written. The fourth adds the check the original 2.1.229 capture never needed: the surface is model-independent, so one preimage still covers a run set that pins a model. `rig/check.sh` 20/20 with both goldens byte-identical (`481e84dd…`, `938bbc7a…`) |
+| T5 → WU5 | done | `e71853b` | RED observed first (the suite aborted on an undefined `compose_prompt`, exit 127), then GREEN: 37 PASS / 0 FAIL, up from 28 before the change. Byte-level, over both fixtures, against exactly the text `run_model_step` passes: `monolith` and `apply` receive it **identical**, `diagnose` is an exact **suffix**. The composition is exact in bytes, not characters — the task carries one em-dash, so 1,102 *characters* is 1,104 *bytes*: preamble as composed 769 + 2 separator + 1,104 task = **1,875**, and `02-diagnose`'s `prompt.txt` is 1,875. Fixture bytes untouched (`git status --porcelain -- rig/fixtures` empty), so both MANIFESTs stay valid. Re-pilot then proved the mechanism live: `02-diagnose` `src_changed=false`, wrote `fix-plan.txt` (3,057 B) + `root-cause-report.txt`, and `03-apply` received the 1,104-byte task text unprefixed and byte-identical to `$(cat prompts/s2.txt)` |
 
 ## Log
 
@@ -1012,3 +1029,111 @@ count is *generated not typed* (L15). A third property is needed — **a claim a
 name the field and the endpoint whose semantics it asserts**, because "the API returned 1" is unfalsifiable
 about "it ran once". Both defects in this Log entry were caught by the same cheap move: **re-run the
 command and read the field you are citing**, not the number you remember.
+
+**L20 — T5's funding premise was false: three instrument defects stood in front of the money, and the
+runner's own `state` is not the countability authority** (2026-10-16).
+
+T5 read "with T4 done, the only thing left is the operator's decision to fund the spend." I funded it
+and it was wrong. Three runs spent, **zero countable rows**, three defects found — two repaired, one
+open, and the open one is a decision rather than a task. What follows is what each one cost to find.
+
+**The defect that makes the other two findable: `state` from `run-pipeline.sh` is not the authority.**
+The runner writes `status.json` with `state: complete` and exits 0; `derive.py`'s row builder then
+voids that same capture. My re-pilot did both at once — runner `complete`, `derive.py`
+`void / input-provenance-mismatch`. Reading `status.json` after each run, which is the correct
+mid-campaign discipline (`derive.py` rewrites the tracked goldens, so running it between cells dirties
+`rig/` and breaks the next cell's preflight), is therefore **not** a countability check. A campaign
+driven that way spends all ten cells and reports nothing. The cheap version of the authority, at zero
+credit and zero tree mutation: call the experiment's own `row_builder` over one capture directory.
+Two gotchas found doing it: `FAILURE_FLOOD_RUN_ID_RE` silently rejects a suffixed name like
+`01-repilot` and the builder returns `None` (a symlink to a legal id fixes it), and the builder returns
+a `(row, …)` **tuple**, so indexing it directly raises.
+
+**Defect 1 — a stale tool-surface preimage voids every future row.** `rig/surfaces/failure-flood.txt`
+carried `# harness: 2.1.229` over 31 tools; the installed CLI is 2.1.299 reporting 26. `derive.py`'s
+void chain reaches `surface-preimage-stale` before `surface-mismatch`, and its own comment names the fix
+instead of a workaround: the run is not at fault, re-running will not help. Repaired in `61cbd15` with
+the discipline commit `9ba9bec` used for the same file — three real captures, two independent scratch
+cwds plus one adversarial cwd and prompt, digests compared before any byte was written — and one capture
+the original did not need: run **without** `--model`, same digest. This experiment pins a model, so
+"one preimage per experiment" was an untested assumption until now. It holds.
+
+**A recapture voids history, and that is the reason it was free here.** `derive.py`'s Face C drift loop
+compares each model step's run-time `recorded_surface_preimage_sha256` against the *live* digest, so
+after a recapture an earlier capture voids retroactively — measured on a preserved run that had exited
+`complete`. `failure-flood-v1`'s three committed rows are all `void/shakedown` and the void chain only
+consults the preimage inside `state == "complete"`, so nothing moved: `rig/check.sh` re-derived both
+goldens byte-identically. **Before recapturing any preimage, ask whether the experiment holds a
+complete row.** If it does, the commit is a silent re-derivation of published results, not maintenance.
+
+**Defect 2 — the PIPELINE arm could not produce a row at any N, so 0002/0003 were untestable.** One
+prompt file per `task_id` is shared by every role and arm (task 5.4b, deliberately, so the prompt hash
+cannot drift per role), and that prompt says *"investigate the failures… and fix them"*, offering
+`fix-plan.txt` only as the conditional alternative. Editing `src/` is the primary reading, so the
+diagnostician does it — deterministically: the committed `s2-pipeline-9054` row shows 7 write calls from
+`02-diagnose` on harness 2.1.229, and this cycle's pilot made 6 Edits to `src/*.ts` on 2.1.299 and wrote
+no `fix-plan.txt` at all. Two harness versions, same behaviour. design.md sec 2 foresaw the collapse and
+chose **detection over prevention** (narrowing the tool surface being correctly forbidden as the second
+variable). Detection is honest and useless on its own: it fires after the money is spent and can only
+say `failed`, which `report.py` excludes from every figure. Prevention that narrows no tool exists —
+`e71853b` composes a role boundary *around* the identical task bytes, in the harness, the one dimension
+ADR 0010 permits to vary. Only `diagnose` gets it; `apply` already holds a `fix-plan.txt` and MONOLITHIC
+receives the task bytes untouched, so the arm-to-arm comparison stays single-variable — which is the
+whole claim, and it does not need a row count attached to it. The re-pilot then behaved as design.md
+always expected: `src_changed=false`, `fix-plan.txt` 3,057 B handed off, `03-apply` given the 1,104-byte
+task text unprefixed.
+
+**One of my own claims in this cycle was wrong and is logged.** I recorded a fourth defect — "the
+rate-limit detector conflates overage-unavailable with rate-limited, deterministically for this account,
+so every run voids." The detector *is* over-eager (3 of 3 events were `status: "allowed"` with
+`overageStatus: "rejected"`, `overageDisabledReason: "group_zero_credit_limit"`). The consequence was
+invented: the failure-flood builder has **no** generic `elif anomaly_classes:` void clause — only
+tool-surface's `build_row` has one — so on this path `rate-limit` is recording-only, and the probe that
+fixed defect 3 returned `complete` *with* `rate-limit` still listed. I read the detector and asserted
+what it does to a row without checking which builder consumes it. Same shape as L18 and L19: a
+plausible mechanism standing in for the field that decides.
+
+**Defect 3 is open, and it is a signature, not a task.** `answer-key/s2.json` has no `F0.failures`
+(v1's `s1.json` does; v2's key was born at `a03cd2d` with `F0.totals` instead), and `derive.py`'s R-P4.1
+shape check voids any `s2` row that reaches `complete` on that account. **No `s2` run in this repo's
+history has ever been scorable.** Both repairs were measured on disk and restored, not weighed in
+prose. Adding the 499 failures and re-sealing v2's `MANIFEST.sha256` with the repo's own
+`compute_manifest()` moves exactly one field in one void row (`s2-pipeline-9054.fixture_digest`), leaves
+tool-surface's golden untouched, and fails exactly one of 20 gates — `derive-reproduce`, which is that
+gate's job when a golden must be regenerated. Relaxing the shape check instead moves `checker_digest`
+in every row of **both** goldens (`CHECKER_DIGEST` hashes `derive.py`'s own bytes) *and* distorts the
+measurement: with an empty baseline `green_restore_verdict` returns `regressed` where the real baseline
+returns `no-progress`. Strictly worse, and wrong.
+
+The repair is legitimate rather than convenient, and the reason is citable: the 499-failure set is a
+fact about the fixture, not an observation of mine — the committed `9054` capture (2.1.229) and this
+session's re-pilot (2.1.299) produced **identical signature multisets** (9 signatures, 499 failures),
+and the key's own nine `F0.clusters` sum to the same multiset. So the field is that cluster-compressed
+fact expanded, not invented knowledge. `answer-key/` is never materialised into a model's workspace, so
+it cannot bias what any model does, and `prereg.json` pins only hypothesis existence/tracking — no
+digest — so 0002/0003 stay validly pre-registered. **What I am not entitled to decide** is that the
+repaired key and a re-sealed MANIFEST get committed, because those are the fixture bytes the hypotheses
+were registered alongside, and the goldens then need an honest re-seal.
+
+**The method, since it is the transferable part.** One pilot per hypothesis, not one campaign: three
+runs and `$2.9190` (read from each run's `result.total_cost_usd`; a full 5×2 at these rates is ≈$8.67)
+found all three defects. Funding ten cells against an instrument nobody had read end-to-end would have
+bought ten identical voids and a report with no pairs in it. The zero-credit probe that closed defect 3
+— copy a preserved capture, patch `arm.json`'s two recorded digests to the new live values, call the
+real builder — shows the repaired row without spending anything: `complete`, `verdict=green`,
+`suite_state_cause=injection`, 6 of 6 causes claimed correct, `peak_occupancy_tokens` 91,603 and
+`cumulative_occupancy_tokens` 2,714,413 — the exact two quantities 0002 and 0003 are about. Those
+numbers come from a synthetic recording and are **not** evidence about the hypothesis; they are
+evidence the instrument can now produce evidence.
+
+**Two numbers in `e71853b`'s own message are wrong, and it was left un-amended on purpose.** It says
+"all 42 historical rows stay comparable" and "prefix-only, +770 bytes". Both fail the same test the
+paragraph above fails: 42 is `tool-surface-v1`'s table, and `run-pipeline.sh` mentions that experiment
+zero times — `rig/run.sh` drives it; `failure-flood-v1` holds 3 committed rows, all `void/shakedown`.
+And +770 is a character count wearing a byte suffix: the composed preamble is 769 bytes plus a 2-byte
+separator, **+771**. The commit is unpushed, so amending was available and cheap, and I still did not:
+this repository's entire subject is run-input provenance, and the two captures that *prove* WU5 record
+`code_commit: e71853b…` in their own `arm.json`. Rewriting a commit to fix prose would leave that
+provenance pointer naming an object nothing can hold — trading a cosmetic error for a broken reference
+in the one kind of artifact this rig exists to keep honest. The correction lives here, with the
+measurement that produced it, and `e71853b` stays resolvable.
