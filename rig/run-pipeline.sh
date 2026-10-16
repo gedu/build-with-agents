@@ -315,6 +315,66 @@ print(hashlib.sha256("\n".join(names).encode()).hexdigest() if names else "")
 PY
 }
 
+# role_preamble <role> — the role boundary the FROZEN task prompt cannot carry.
+#
+# prompts/<task_id>.txt is ONE file per task_id shared by every role and arm
+# (task 5.4b), deliberately: with one set of bytes the prompt hash cannot
+# drift per role, which is ADR 0010's single-variable rule held at byte level.
+# That file is MANIFEST-frozen, so a boundary cannot be added to it — and its
+# wording is what makes the diagnostician edit source: it says "investigate
+# the failures… and fix them", offering `fix-plan.txt` only as the
+# conditional alternative ("…but you do not apply the fixes yourself").
+# Editing src is therefore the PRIMARY reading of the task, and the model does
+# it deterministically: the committed s2-pipeline-9054 row shows 7 write calls
+# from 02-diagnose on harness 2.1.229, and this cycle's pilot 6 Edits to
+# src/*.ts on 2.1.299 with no fix-plan.txt written at all.
+#
+# design.md sec 2 anticipated this collapse ("if it does, PIPELINE has
+# collapsed into MONOLITHIC while still reporting two cheap steps") and chose
+# DETECTION over prevention, narrowing the tool surface being correctly
+# forbidden as the second variable. Detection is honest but only ever fires
+# after the run is spent: it sets arm state `failed`, never `void`, and
+# report.py excludes every non-complete row from every figure. As built the
+# PIPELINE arm could not produce ONE countable row at any N, so hypotheses
+# 0002/0003 were untestable — the pilot finished the work (2882/2882 tests
+# green) and was still discarded.
+#
+# This is the minimal prevention that narrows NO tool: same tools, same task
+# bytes, one sentence-set telling the role where its boundary is before it
+# acts. Workspace state stays the only other thing that varies. `apply` gets
+# no preamble (its workspace already holds fix-plan.txt, and the task's own
+# second paragraph is written for it), and MONOLITHIC gets the task bytes
+# byte-for-byte so its baseline and every historical row stay comparable.
+role_preamble() {
+  case "$1" in
+    diagnose) printf '%s\n' \
+      "ROLE BOUNDARY — in this step you are the DIAGNOSTICIAN, not the engineer who fixes this."
+      printf '%s\n' \
+        "Your deliverable is \`fix-plan.txt\` at the root of your working directory: for each root cause you identified, the exact \`<relative-path>:<line>\` site and the change you recommend, in plain text."
+      printf '%s\n' \
+        "Do NOT edit, create, or delete any file under \`src/\`, \`tests/\`, \`runtime/\` or \`cases/\`. A separate applier, working from a fresh copy of the same tree, applies your plan; anything you write there is discarded when this step ends, so an edit here buys nothing and voids the measurement."
+      printf '%s\n' \
+        "Reading files, running the test suite, and any other command stay allowed. Writing is limited to \`fix-plan.txt\` and, at the end, \`root-cause-report.txt\`, both at the root of your working directory." ;;
+  esac
+}
+
+# compose_prompt <role> <task-text> — print exactly what this invocation gets.
+# Prefix-only by construction: with no preamble the task bytes are echoed
+# unchanged, otherwise preamble + blank line + task bytes, so the task's own
+# wording can never differ per role and stripping the preamble reproduces
+# them. --self-test pins both properties; run_model_step also writes the
+# result to steps/<step>/prompt.txt so the bytes a role actually saw are
+# auditable per step instead of reconstructed from the fixture.
+compose_prompt() {
+  local preamble
+  preamble="$(role_preamble "$1")"
+  if [ -z "$preamble" ]; then
+    printf '%s' "$2"
+    return 0
+  fi
+  printf '%s\n\n%s' "$preamble" "$2"
+}
+
 # check_prereg <fixture-root> — Hard Ordering Gate layer 2
 # (answer-key/prereg.json's `check` block, task 4.4). Prints prereg_digest
 # and exits 0 on pass; prints the EXACT prereg.json-named reason to stderr
@@ -646,6 +706,80 @@ tests/a.test.ts" "$ws" \
   # missing-surface-preimage — provenance recording never masks that abort.
   expect "" "$(preimage_digest "$tmp/does-not-exist.txt")" \
     "preimage_digest: a missing preimage file yields an absent digest, never a crash (run_model_step's own existence check runs first and is unchanged)"
+
+  # -- role_preamble / compose_prompt (T5's own defect: the diagnostician
+  # edited src/ and the PIPELINE arm failed while the work was DONE) ------
+  # The frozen prompt is ONE file per task_id, shared by every role and arm
+  # (task 5.4b), and it says "investigate the failures… and fix them", with
+  # fix-plan.txt offered only as the conditional alternative. So the
+  # diagnostician edits source — deterministically, observed on harness
+  # 2.1.229 (the committed s2-pipeline-9054 row: 7 write calls from
+  # 02-diagnose) and again on 2.1.299 (this cycle's pilot: 6 Edits to
+  # src/*.ts, no fix-plan.txt at all). design.md sec 2 anticipated the
+  # collapse and chose DETECTION over prevention; detection only ever says
+  # `failed` after the run is spent, and a `failed` row is never countable,
+  # so as built the PIPELINE arm cannot produce a row and hypotheses
+  # 0002/0003 are untestable. The fixture bytes are frozen (MANIFEST), so
+  # the role boundary is composed around them here, in the harness — the
+  # dimension ADR 0010 permits to vary. These cases pin the two properties
+  # that keep it honest: the task bytes survive verbatim, and ONLY the
+  # diagnostician's prompt changes.
+  local task='This project has failing tests. Investigate the failures, determine their root causes in the source code, and fix them.'
+  local mono appl diag
+  mono="$(compose_prompt monolith "$task")"
+  appl="$(compose_prompt apply "$task")"
+  diag="$(compose_prompt diagnose "$task")"
+
+  # a+b. The two roles that legitimately edit source get the task bytes
+  # UNCHANGED — MONOLITHIC's whole baseline, and every historical row, stays
+  # comparable; the fix adds a second variable to exactly one step.
+  expect "$task" "$mono" "compose_prompt: monolith gets the task bytes byte-for-byte, no preamble (MONOLITHIC's baseline is untouched)"
+  expect "$task" "$appl" "compose_prompt: apply gets the task bytes byte-for-byte, no preamble (the applier already has fix-plan.txt in its workspace)"
+
+  # c. The diagnostician's prompt DOES differ — the collapse design.md named
+  # is prevented, not merely detected after the run is spent.
+  expect_ne "$task" "$diag" "compose_prompt: diagnose differs from the task bytes (the diagnostician is told its boundary before it acts)"
+
+  # d. The task itself is untouched: the composed prompt ENDS with the exact
+  # task bytes, so the wording of the task cannot drift per role — which is
+  # the property task 5.4b bought by sharing one file, kept intact.
+  case "$diag" in
+    *"$task") printf '  [PASS] %s\n' "compose_prompt: the diagnose prompt ends with the task bytes verbatim (prefix-only change, task wording never differs per role)" ;;
+    *) printf '  [FAIL] %s -- %s\n' "compose_prompt: the diagnose prompt ends with the task bytes verbatim (prefix-only change, task wording never differs per role)" "not a suffix of: $diag" >&2; failed=1 ;;
+  esac
+
+  # e. Prefix-only, exactly: stripping the preamble and its separator
+  # reproduces the task bytes. d alone would pass on a prompt that also
+  # edited the middle.
+  local preamble sep
+  preamble="$(role_preamble diagnose)"
+  # Assigned in its own command, NOT written inline as "$'\n\n'": ANSI-C
+  # quoting is a lexical feature that does not expand inside a ${var#pattern}
+  # pattern, so the inline form searched for the six literal characters
+  # `$'\n\n'`, matched nothing, and this case failed while compose_prompt was
+  # correct (byte-count proof: preamble 767 + separator 2 + task 119 = the
+  # composed 888). A separate assignment is the faithful form under bash 3.2.
+  sep=$'\n\n'
+  expect "$task" "${diag#"$preamble$sep"}" \
+    "compose_prompt: removing role_preamble + separator reproduces the task bytes exactly (nothing appended, nothing inserted)"
+  # The equality form, asserted alongside the strip rather than instead of it:
+  # it is the property compose_prompt actually promises, and it cannot pass on
+  # a prompt that merely ends correctly.
+  expect "$preamble$sep$task" "$diag" \
+    "compose_prompt: the diagnose prompt IS preamble + separator + task bytes, exactly"
+
+  # f. The preamble carries the two anchors of the contract design.md sec 2
+  # states and the pilot violated: the deliverable's name, and the zone it
+  # may not write. A preamble that lost either would silently reopen the
+  # defect while every structural check still passed.
+  expect_contains 'fix-plan.txt' "$preamble" "role_preamble: names the diagnostician's one deliverable (fix-plan.txt)"
+  expect_contains 'src/' "$preamble" "role_preamble: names the zone the diagnostician may not write (src/)"
+
+  # g. An unexpected role passes the task bytes through unchanged — today
+  # every role gets exactly those bytes, so a role this file has never seen
+  # must not silently acquire instructions no historical row had.
+  expect "$task" "$(compose_prompt some-future-role "$task")" \
+    "compose_prompt: an unknown role gets the task bytes unchanged (never invents a preamble for a role it does not know)"
 
   rm -rf "$tmp"
 
@@ -1019,7 +1153,13 @@ run_model_step() {
   local recorded_surface_preimage_sha256
   recorded_surface_preimage_sha256="$(preimage_digest "$SURFACE_FILE")"
   local prompt_text
-  prompt_text="$(cat "$prompt_file")"
+  prompt_text="$(compose_prompt "$role" "$(cat "$prompt_file")")"
+  # design.md sec 2's run layout names this file for every model step, and it
+  # was never written: the bytes a role actually saw were only inferable from
+  # the fixture. With a role preamble they are no longer inferable at all,
+  # so this is the audit record of the composed prompt — recording only,
+  # derive.py computes prompt_sha256 from it and compares it against nothing.
+  printf '%s' "$prompt_text" >"$dir/prompt.txt"
   if [ "$role" = "apply" ] && [ -f "$RUN_DIR/steps/02-diagnose/handoff/fix-plan.txt" ]; then
     cp "$RUN_DIR/steps/02-diagnose/handoff/fix-plan.txt" "$ws/fix-plan.txt"
   fi
