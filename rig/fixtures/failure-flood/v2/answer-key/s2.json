@@ -39,6 +39,2503 @@
       "suites_reported": 6,
       "tests": 2882
     },
+    "failures": [
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 156: applyKeypadInput(\"0.\", \"0\", 0) -> \"0.\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 157: applyKeypadInput(\"0.\", \"1\", 0) -> \"0.\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 158: applyKeypadInput(\"0.\", \"2\", 0) -> \"0.\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 159: applyKeypadInput(\"0.\", \"3\", 0) -> \"0.\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 160: applyKeypadInput(\"0.\", \"4\", 0) -> \"0.\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 161: applyKeypadInput(\"0.\", \"5\", 0) -> \"0.\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 162: applyKeypadInput(\"0.\", \"6\", 0) -> \"0.\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 163: applyKeypadInput(\"0.\", \"7\", 0) -> \"0.\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 164: applyKeypadInput(\"0.\", \"8\", 0) -> \"0.\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 165: applyKeypadInput(\"0.\", \"9\", 0) -> \"0.\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 233: applyKeypadInput(\"1.123456\", \"0\", 6) -> \"1.123456\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 239: applyKeypadInput(\"1.123456\", \"1\", 6) -> \"1.123456\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 245: applyKeypadInput(\"1.123456\", \"2\", 6) -> \"1.123456\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 251: applyKeypadInput(\"1.123456\", \"3\", 6) -> \"1.123456\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 257: applyKeypadInput(\"1.123456\", \"4\", 6) -> \"1.123456\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 263: applyKeypadInput(\"1.123456\", \"5\", 6) -> \"1.123456\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 269: applyKeypadInput(\"1.123456\", \"6\", 6) -> \"1.123456\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 275: applyKeypadInput(\"1.123456\", \"7\", 6) -> \"1.123456\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 281: applyKeypadInput(\"1.123456\", \"8\", 6) -> \"1.123456\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 287: applyKeypadInput(\"1.123456\", \"9\", 6) -> \"1.123456\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 372: applyKeypadInput(\"12.\", \"0\", 0) -> \"12.\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 373: applyKeypadInput(\"12.\", \"1\", 0) -> \"12.\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 374: applyKeypadInput(\"12.\", \"2\", 0) -> \"12.\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 375: applyKeypadInput(\"12.\", \"3\", 0) -> \"12.\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 376: applyKeypadInput(\"12.\", \"4\", 0) -> \"12.\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 377: applyKeypadInput(\"12.\", \"5\", 0) -> \"12.\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 378: applyKeypadInput(\"12.\", \"6\", 0) -> \"12.\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 379: applyKeypadInput(\"12.\", \"7\", 0) -> \"12.\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 380: applyKeypadInput(\"12.\", \"8\", 0) -> \"12.\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 381: applyKeypadInput(\"12.\", \"9\", 0) -> \"12.\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 445: applyKeypadInput(\"12.5\", \"0\", 1) -> \"12.5\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 447: applyKeypadInput(\"12.5\", \"1\", 1) -> \"12.5\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 449: applyKeypadInput(\"12.5\", \"2\", 1) -> \"12.5\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 451: applyKeypadInput(\"12.5\", \"3\", 1) -> \"12.5\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 453: applyKeypadInput(\"12.5\", \"4\", 1) -> \"12.5\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 455: applyKeypadInput(\"12.5\", \"5\", 1) -> \"12.5\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 457: applyKeypadInput(\"12.5\", \"6\", 1) -> \"12.5\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 459: applyKeypadInput(\"12.5\", \"7\", 1) -> \"12.5\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 461: applyKeypadInput(\"12.5\", \"8\", 1) -> \"12.5\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput (amplified)::case 463: applyKeypadInput(\"12.5\", \"9\", 1) -> \"12.5\""
+      },
+      {
+        "signature": "607220f5cf3e52b9",
+        "status": "failed",
+        "test_id": "../tests/applyKeypadInput.test.ts::applyKeypadInput::ignores digits past the decimal cap"
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 0: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef12345678\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef12345678\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 100: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456dc\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456dc\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 101: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456dd\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456dd\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 102: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456de\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456de\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 103: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456df\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456df\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 104: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456e0\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456e0\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 105: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456e1\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456e1\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 106: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456e2\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456e2\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 107: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456e3\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456e3\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 108: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456e4\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456e4\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 109: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456e5\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456e5\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 10: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef12345682\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef12345682\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 110: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456e6\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456e6\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 111: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456e7\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456e7\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 112: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456e8\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456e8\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 113: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456e9\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456e9\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 114: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456ea\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456ea\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 115: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456eb\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456eb\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 116: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456ec\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456ec\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 117: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456ed\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456ed\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 118: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456ee\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456ee\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 119: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456ef\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456ef\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 11: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef12345683\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef12345683\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 120: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456f0\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456f0\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 121: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456f1\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456f1\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 122: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456f2\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456f2\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 123: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456f3\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456f3\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 124: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456f4\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456f4\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 125: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456f5\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456f5\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 126: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456f6\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456f6\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 127: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456f7\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456f7\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 128: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456f8\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456f8\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 129: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456f9\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456f9\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 12: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef12345684\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef12345684\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 130: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456fa\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456fa\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 131: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456fb\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456fb\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 132: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456fc\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456fc\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 133: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456fd\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456fd\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 134: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456fe\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456fe\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 135: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456ff\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456ff\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 136: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef12345700\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef12345700\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 137: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef12345701\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef12345701\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 138: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef12345702\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef12345702\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 139: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef12345703\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef12345703\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 13: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef12345685\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef12345685\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 140: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef12345704\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef12345704\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 141: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef12345705\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef12345705\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 142: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef12345706\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef12345706\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 143: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef12345707\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef12345707\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 14: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef12345686\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef12345686\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 15: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef12345687\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef12345687\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 16: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef12345688\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef12345688\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 17: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef12345689\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef12345689\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 18: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef1234568a\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef1234568a\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 19: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef1234568b\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef1234568b\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 1: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef12345679\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef12345679\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 20: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef1234568c\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef1234568c\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 21: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef1234568d\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef1234568d\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 22: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef1234568e\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef1234568e\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 23: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef1234568f\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef1234568f\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 24: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef12345690\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef12345690\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 25: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef12345691\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef12345691\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 26: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef12345692\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef12345692\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 27: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef12345693\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef12345693\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 28: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef12345694\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef12345694\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 29: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef12345695\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef12345695\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 2: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef1234567a\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef1234567a\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 30: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef12345696\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef12345696\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 31: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef12345697\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef12345697\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 32: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef12345698\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef12345698\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 33: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef12345699\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef12345699\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 34: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef1234569a\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef1234569a\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 35: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef1234569b\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef1234569b\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 36: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef1234569c\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef1234569c\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 37: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef1234569d\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef1234569d\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 38: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef1234569e\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef1234569e\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 39: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef1234569f\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef1234569f\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 3: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef1234567b\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef1234567b\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 40: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456a0\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456a0\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 41: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456a1\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456a1\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 42: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456a2\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456a2\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 43: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456a3\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456a3\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 44: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456a4\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456a4\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 45: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456a5\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456a5\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 46: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456a6\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456a6\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 47: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456a7\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456a7\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 48: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456a8\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456a8\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 49: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456a9\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456a9\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 4: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef1234567c\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef1234567c\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 50: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456aa\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456aa\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 51: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456ab\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456ab\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 52: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456ac\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456ac\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 53: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456ad\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456ad\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 54: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456ae\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456ae\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 55: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456af\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456af\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 56: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456b0\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456b0\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 57: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456b1\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456b1\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 58: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456b2\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456b2\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 59: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456b3\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456b3\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 5: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef1234567d\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef1234567d\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 60: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456b4\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456b4\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 61: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456b5\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456b5\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 62: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456b6\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456b6\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 63: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456b7\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456b7\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 64: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456b8\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456b8\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 65: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456b9\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456b9\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 66: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456ba\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456ba\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 67: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456bb\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456bb\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 68: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456bc\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456bc\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 69: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456bd\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456bd\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 6: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef1234567e\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef1234567e\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 70: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456be\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456be\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 71: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456bf\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456bf\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 72: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456c0\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456c0\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 73: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456c1\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456c1\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 74: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456c2\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456c2\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 75: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456c3\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456c3\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 76: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456c4\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456c4\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 77: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456c5\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456c5\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 78: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456c6\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456c6\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 79: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456c7\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456c7\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 7: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef1234567f\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef1234567f\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 80: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456c8\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456c8\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 81: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456c9\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456c9\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 82: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456ca\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456ca\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 83: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456cb\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456cb\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 84: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456cc\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456cc\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 85: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456cd\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456cd\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 86: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456ce\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456ce\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 87: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456cf\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456cf\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 88: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456d0\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456d0\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 89: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456d1\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456d1\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 8: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef12345680\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef12345680\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 90: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456d2\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456d2\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 91: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456d3\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456d3\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 92: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456d4\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456d4\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 93: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456d5\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456d5\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 94: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456d6\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456d6\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 95: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456d7\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456d7\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 96: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456d8\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456d8\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 97: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456d9\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456d9\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 98: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456da\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456da\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 99: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef123456db\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef123456db\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf (amplified)::case 9: encodeBalanceOf(\"0x1234567890abcdef1234567890abcdef12345681\") -> \"0x70a082310000000000000000000000001234567890abcdef1234567890abcdef12345681\""
+      },
+      {
+        "signature": "464f20bcf079be21",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf::builds balanceOf calldata: selector + left-padded address"
+      },
+      {
+        "signature": "a9adcb00410c9db2",
+        "status": "failed",
+        "test_id": "../tests/balanceOfCall.test.ts::encodeBalanceOf::produces a 0x + 8 selector + 64 data hex string"
+      },
+      {
+        "signature": "65a9e5f9e5eef040",
+        "status": "failed",
+        "test_id": "../tests/confirmSeed.test.ts::isConfirmCorrect (amplified)::case 546"
+      },
+      {
+        "signature": "65a9e5f9e5eef040",
+        "status": "failed",
+        "test_id": "../tests/confirmSeed.test.ts::isConfirmCorrect (amplified)::case 547"
+      },
+      {
+        "signature": "65a9e5f9e5eef040",
+        "status": "failed",
+        "test_id": "../tests/confirmSeed.test.ts::isConfirmCorrect (amplified)::case 548"
+      },
+      {
+        "signature": "65a9e5f9e5eef040",
+        "status": "failed",
+        "test_id": "../tests/confirmSeed.test.ts::isConfirmCorrect (amplified)::case 549"
+      },
+      {
+        "signature": "65a9e5f9e5eef040",
+        "status": "failed",
+        "test_id": "../tests/confirmSeed.test.ts::isConfirmCorrect (amplified)::case 550"
+      },
+      {
+        "signature": "65a9e5f9e5eef040",
+        "status": "failed",
+        "test_id": "../tests/confirmSeed.test.ts::isConfirmCorrect (amplified)::case 551"
+      },
+      {
+        "signature": "65a9e5f9e5eef040",
+        "status": "failed",
+        "test_id": "../tests/confirmSeed.test.ts::isConfirmCorrect (amplified)::case 552"
+      },
+      {
+        "signature": "65a9e5f9e5eef040",
+        "status": "failed",
+        "test_id": "../tests/confirmSeed.test.ts::isConfirmCorrect (amplified)::case 553"
+      },
+      {
+        "signature": "65a9e5f9e5eef040",
+        "status": "failed",
+        "test_id": "../tests/confirmSeed.test.ts::isConfirmCorrect (amplified)::case 554"
+      },
+      {
+        "signature": "65a9e5f9e5eef040",
+        "status": "failed",
+        "test_id": "../tests/confirmSeed.test.ts::isConfirmCorrect (amplified)::case 555"
+      },
+      {
+        "signature": "65a9e5f9e5eef040",
+        "status": "failed",
+        "test_id": "../tests/confirmSeed.test.ts::isConfirmCorrect (amplified)::case 556"
+      },
+      {
+        "signature": "65a9e5f9e5eef040",
+        "status": "failed",
+        "test_id": "../tests/confirmSeed.test.ts::isConfirmCorrect (amplified)::case 557"
+      },
+      {
+        "signature": "65a9e5f9e5eef040",
+        "status": "failed",
+        "test_id": "../tests/confirmSeed.test.ts::isConfirmCorrect (amplified)::case 558"
+      },
+      {
+        "signature": "65a9e5f9e5eef040",
+        "status": "failed",
+        "test_id": "../tests/confirmSeed.test.ts::isConfirmCorrect (amplified)::case 559"
+      },
+      {
+        "signature": "65a9e5f9e5eef040",
+        "status": "failed",
+        "test_id": "../tests/confirmSeed.test.ts::isConfirmCorrect (amplified)::case 560"
+      },
+      {
+        "signature": "65a9e5f9e5eef040",
+        "status": "failed",
+        "test_id": "../tests/confirmSeed.test.ts::isConfirmCorrect (amplified)::case 561"
+      },
+      {
+        "signature": "65a9e5f9e5eef040",
+        "status": "failed",
+        "test_id": "../tests/confirmSeed.test.ts::isConfirmCorrect (amplified)::case 562"
+      },
+      {
+        "signature": "65a9e5f9e5eef040",
+        "status": "failed",
+        "test_id": "../tests/confirmSeed.test.ts::isConfirmCorrect (amplified)::case 563"
+      },
+      {
+        "signature": "65a9e5f9e5eef040",
+        "status": "failed",
+        "test_id": "../tests/confirmSeed.test.ts::isConfirmCorrect (amplified)::case 564"
+      },
+      {
+        "signature": "65a9e5f9e5eef040",
+        "status": "failed",
+        "test_id": "../tests/confirmSeed.test.ts::isConfirmCorrect (amplified)::case 565"
+      },
+      {
+        "signature": "65a9e5f9e5eef040",
+        "status": "failed",
+        "test_id": "../tests/confirmSeed.test.ts::isConfirmCorrect (amplified)::case 566"
+      },
+      {
+        "signature": "65a9e5f9e5eef040",
+        "status": "failed",
+        "test_id": "../tests/confirmSeed.test.ts::isConfirmCorrect::returns true when all picks match CONFIRM_POSITIONS"
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 103: formatTokenAmount(\"13\", 2) -> \"0.13\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 106: formatTokenAmount(\"13\", 3) -> \"0.01\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 119: formatTokenAmount(\"140\", 2) -> \"1.40\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 122: formatTokenAmount(\"140\", 3) -> \"0.14\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 124: formatTokenAmount(\"140\", 4) -> \"0.01\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 138: formatTokenAmount(\"1500\", 3) -> \"1.50\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 140: formatTokenAmount(\"1500\", 4) -> \"0.15\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 141: formatTokenAmount(\"1500\", 5) -> \"0.01\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 156: formatTokenAmount(\"16000\", 4) -> \"1.60\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 157: formatTokenAmount(\"16000\", 5) -> \"0.16\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 158: formatTokenAmount(\"16000\", 6) -> \"0.01\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 173: formatTokenAmount(\"170000\", 5) -> \"1.70\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 174: formatTokenAmount(\"170000\", 6) -> \"0.17\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 190: formatTokenAmount(\"1800000\", 6) -> \"1.80\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 191: formatTokenAmount(\"1800000\", 8) -> \"0.01\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 199: formatTokenAmount(\"19\", 2) -> \"0.19\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 202: formatTokenAmount(\"19\", 3) -> \"0.01\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 215: formatTokenAmount(\"20\", 2) -> \"0.20\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 218: formatTokenAmount(\"20\", 3) -> \"0.02\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 234: formatTokenAmount(\"200\", 3) -> \"0.20\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 236: formatTokenAmount(\"200\", 4) -> \"0.02\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 250: formatTokenAmount(\"2100\", 3) -> \"2.10\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 252: formatTokenAmount(\"2100\", 4) -> \"0.21\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 253: formatTokenAmount(\"2100\", 5) -> \"0.02\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 266: formatTokenAmount(\"300\", 3) -> \"0.30\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 268: formatTokenAmount(\"300\", 4) -> \"0.03\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 284: formatTokenAmount(\"4000\", 4) -> \"0.40\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 285: formatTokenAmount(\"4000\", 5) -> \"0.04\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 301: formatTokenAmount(\"50000\", 5) -> \"0.50\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 302: formatTokenAmount(\"50000\", 6) -> \"0.05\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 318: formatTokenAmount(\"600000\", 6) -> \"0.60\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 327: formatTokenAmount(\"7\", 2) -> \"0.07\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 343: formatTokenAmount(\"80\", 2) -> \"0.80\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 346: formatTokenAmount(\"80\", 3) -> \"0.08\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 362: formatTokenAmount(\"900\", 3) -> \"0.90\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 364: formatTokenAmount(\"900\", 4) -> \"0.09\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 39: formatTokenAmount(\"1\", 2) -> \"0.01\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 61: formatTokenAmount(\"10000\", 5) -> \"0.10\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 62: formatTokenAmount(\"10000\", 6) -> \"0.01\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 77: formatTokenAmount(\"110000\", 5) -> \"1.10\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 78: formatTokenAmount(\"110000\", 6) -> \"0.11\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 94: formatTokenAmount(\"1200000\", 6) -> \"1.20\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount (amplified)::case 95: formatTokenAmount(\"1200000\", 8) -> \"0.01\""
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount::converts a fractional amount"
+      },
+      {
+        "signature": "fcc39172aca77e8a",
+        "status": "failed",
+        "test_id": "../tests/formatTokenAmount.test.ts::formatTokenAmount::truncates (does not round up) when more than 2 decimal places"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 144: isValidEthereumAddress(\"0x1234567890ABCDEF1234567890ABCDEF12345678\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 145: isValidEthereumAddress(\"0x1234567890ABCDEF1234567890ABCDEF12345679\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 146: isValidEthereumAddress(\"0x1234567890ABCDEF1234567890ABCDEF1234567A\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 147: isValidEthereumAddress(\"0x1234567890ABCDEF1234567890ABCDEF1234567B\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 148: isValidEthereumAddress(\"0x1234567890ABCDEF1234567890ABCDEF1234567C\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 149: isValidEthereumAddress(\"0x1234567890ABCDEF1234567890ABCDEF1234567D\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 150: isValidEthereumAddress(\"0x1234567890ABCDEF1234567890ABCDEF1234567E\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 151: isValidEthereumAddress(\"0x1234567890ABCDEF1234567890ABCDEF1234567F\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 152: isValidEthereumAddress(\"0x1234567890ABCDEF1234567890ABCDEF12345680\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 153: isValidEthereumAddress(\"0x1234567890ABCDEF1234567890ABCDEF12345681\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 154: isValidEthereumAddress(\"0x1234567890ABCDEF1234567890ABCDEF12345682\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 155: isValidEthereumAddress(\"0x1234567890ABCDEF1234567890ABCDEF12345683\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 156: isValidEthereumAddress(\"0x1234567890ABCDEF1234567890ABCDEF12345684\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 157: isValidEthereumAddress(\"0x1234567890ABCDEF1234567890ABCDEF12345685\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 158: isValidEthereumAddress(\"0x1234567890ABCDEF1234567890ABCDEF12345686\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 159: isValidEthereumAddress(\"0x1234567890ABCDEF1234567890ABCDEF12345687\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 160: isValidEthereumAddress(\"0x1234567890ABCDEF1234567890ABCDEF12345688\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 161: isValidEthereumAddress(\"0x1234567890ABCDEF1234567890ABCDEF12345689\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 162: isValidEthereumAddress(\"0x1234567890ABCDEF1234567890ABCDEF1234568A\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 163: isValidEthereumAddress(\"0x1234567890ABCDEF1234567890ABCDEF1234568B\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 164: isValidEthereumAddress(\"0x1234567890ABCDEF1234567890ABCDEF1234568C\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 165: isValidEthereumAddress(\"0x1234567890ABCDEF1234567890ABCDEF1234568D\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 166: isValidEthereumAddress(\"0x1234567890ABCDEF1234567890ABCDEF1234568E\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 167: isValidEthereumAddress(\"0x1234567890ABCDEF1234567890ABCDEF1234568F\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 168: isValidEthereumAddress(\"0x1234567890AbCdEf1234567890AbCdEf12345678\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 169: isValidEthereumAddress(\"0x1234567890AbCdEf1234567890AbCdEf12345679\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 170: isValidEthereumAddress(\"0x1234567890AbCdEf1234567890AbCdEf1234567a\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 171: isValidEthereumAddress(\"0x1234567890AbCdEf1234567890AbCdEf1234567b\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 172: isValidEthereumAddress(\"0x1234567890AbCdEf1234567890AbCdEf1234567c\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 173: isValidEthereumAddress(\"0x1234567890AbCdEf1234567890AbCdEf1234567d\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 174: isValidEthereumAddress(\"0x1234567890AbCdEf1234567890AbCdEf1234567e\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 175: isValidEthereumAddress(\"0x1234567890AbCdEf1234567890AbCdEf1234567f\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 176: isValidEthereumAddress(\"0x1234567890AbCdEf1234567890AbCdEf12345680\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 177: isValidEthereumAddress(\"0x1234567890AbCdEf1234567890AbCdEf12345681\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 178: isValidEthereumAddress(\"0x1234567890AbCdEf1234567890AbCdEf12345682\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 179: isValidEthereumAddress(\"0x1234567890AbCdEf1234567890AbCdEf12345683\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 180: isValidEthereumAddress(\"0x1234567890AbCdEf1234567890AbCdEf12345684\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 181: isValidEthereumAddress(\"0x1234567890AbCdEf1234567890AbCdEf12345685\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 182: isValidEthereumAddress(\"0x1234567890AbCdEf1234567890AbCdEf12345686\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 183: isValidEthereumAddress(\"0x1234567890AbCdEf1234567890AbCdEf12345687\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 184: isValidEthereumAddress(\"0x1234567890AbCdEf1234567890AbCdEf12345688\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 185: isValidEthereumAddress(\"0x1234567890AbCdEf1234567890AbCdEf12345689\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 186: isValidEthereumAddress(\"0x1234567890AbCdEf1234567890AbCdEf1234568a\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 187: isValidEthereumAddress(\"0x1234567890AbCdEf1234567890AbCdEf1234568b\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 188: isValidEthereumAddress(\"0x1234567890AbCdEf1234567890AbCdEf1234568c\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 189: isValidEthereumAddress(\"0x1234567890AbCdEf1234567890AbCdEf1234568d\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 190: isValidEthereumAddress(\"0x1234567890AbCdEf1234567890AbCdEf1234568e\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 191: isValidEthereumAddress(\"0x1234567890AbCdEf1234567890AbCdEf1234568f\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 201: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef12345678\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 202: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef12345678a\") -> false"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 204: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef12345679\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 205: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef12345679a\") -> false"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 207: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef1234567a\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 208: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef1234567aa\") -> false"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 210: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef1234567b\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 211: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef1234567ba\") -> false"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 213: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef1234567c\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 214: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef1234567ca\") -> false"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 216: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef1234567d\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 217: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef1234567da\") -> false"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 219: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef1234567e\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 220: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef1234567ea\") -> false"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 222: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef1234567f\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 223: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef1234567fa\") -> false"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 249: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef12345680\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 250: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef12345680a\") -> false"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 252: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef12345681\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 253: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef12345681a\") -> false"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 255: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef12345682\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 256: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef12345682a\") -> false"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 258: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef12345683\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 259: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef12345683a\") -> false"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 261: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef12345684\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 262: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef12345684a\") -> false"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 264: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef12345685\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 265: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef12345685a\") -> false"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 267: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef12345686\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 268: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef12345686a\") -> false"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 270: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef12345687\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 271: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef12345687a\") -> false"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 273: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef12345688\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 274: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef12345688a\") -> false"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 276: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef12345689\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 277: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef12345689a\") -> false"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 279: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef1234568a\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 280: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef1234568aa\") -> false"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 282: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef1234568b\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 283: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef1234568ba\") -> false"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 285: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef1234568c\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 286: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef1234568ca\") -> false"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 288: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef1234568d\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 289: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef1234568da\") -> false"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 291: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef1234568e\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 292: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef1234568ea\") -> false"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 294: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef1234568f\") -> true"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress (amplified)::case 295: isValidEthereumAddress(\"0x1234567890abcdef1234567890abcdef1234568fa\") -> false"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress::accepts a 0x-prefixed 40-hex-char address"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress::accepts a mixed-case (checksummed) address without enforcing the checksum"
+      },
+      {
+        "signature": "eee64871f44abb2b",
+        "status": "failed",
+        "test_id": "../tests/isValidEthereumAddress.test.ts::isValidEthereumAddress::rejects an address that is too long"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 0"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 1"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 100"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 101"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 104"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 105"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 108"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 109"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 112"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 113"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 116"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 117"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 12"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 120"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 121"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 124"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 125"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 128"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 129"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 13"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 132"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 133"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 136"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 137"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 140"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 141"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 144"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 145"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 148"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 149"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 152"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 153"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 156"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 157"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 16"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 160"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 161"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 164"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 165"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 168"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 169"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 17"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 172"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 173"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 176"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 177"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 180"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 181"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 184"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 185"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 188"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 189"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 192"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 193"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 196"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 197"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 20"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 200"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 201"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 204"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 205"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 208"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 209"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 21"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 212"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 213"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 216"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 217"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 220"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 221"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 224"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 225"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 228"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 229"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 232"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 233"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 236"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 237"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 24"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 240"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 241"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 244"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 245"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 248"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 249"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 25"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 252"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 253"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 256"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 257"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 260"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 261"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 264"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 265"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 268"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 269"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 272"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 273"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 276"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 277"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 28"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 280"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 281"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 284"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 285"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 29"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 32"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 33"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 36"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 37"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 4"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 40"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 41"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 44"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 45"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 48"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 49"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 5"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 52"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 53"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 56"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 57"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 60"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 61"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 64"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 65"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 68"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 69"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 72"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 73"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 76"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 77"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 8"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 80"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 81"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 84"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 85"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 88"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 89"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 9"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 92"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 93"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 96"
+      },
+      {
+        "signature": "fa149f8182fc2048",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers (amplified)::case 97"
+      },
+      {
+        "signature": "7f2043443e4b144b",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers::maps an incoming transfer (to === account)"
+      },
+      {
+        "signature": "04933d1bde59e977",
+        "status": "failed",
+        "test_id": "../tests/parseTransfers.test.ts::parseTransfers::matches the account address case-insensitively"
+      }
+    ],
     "clusters": [
       {
         "cluster_id": "c1",

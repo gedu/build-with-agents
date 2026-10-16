@@ -232,8 +232,18 @@ Ordered by dependency, not by discovery. Work the frontier: any task whose block
   - The two defects already repaired, so they are never rediscovered at $1.24 a run: the frozen
     tool-surface preimage was stale against the installed CLI (`61cbd15`), and the shared per-task
     prompt invited the diagnostician to edit `src/`, which made the PIPELINE arm structurally unable to
-    produce a row at any N (`e71853b`). The third — `answer-key/s2.json` carries no `F0.failures`, so
-    `derive.py`'s own shape check voids every `s2` run that reaches `complete` — is **open**.
+    produce a row at any N (`e71853b`). The third — `answer-key/s2.json` carried no `F0.failures`, so
+    `derive.py`'s own shape check voided every `s2` run that reached `complete` — ~~is open~~ **is
+    repaired, under the operator's explicit sign-off, by the commit the Progress table names for WU6**
+    (L21). All three instrument defects are now closed; what remains on this task is the campaign itself.
+  - Two of the three pilots this session spent are **permanently un-salvageable** and the campaign pays
+    for them: `run-pipeline.sh` records the fixture, answer-key and surface-preimage digests *at run
+    time*, and Face C compares them against the live values at derive time, so repairing a fixture
+    retroactively voids every capture made before it. Measured, both ways: the monolithic pilot carries
+    `surface-preimage-drift` from the recapture *and* the key drift; the re-pilot survived the recapture
+    (its preimage matches) but drifts on answer-key and fixture once the key moved. Ten fresh cells, not
+    eight or nine. This is the same one-way door L20 records for a preimage recapture, arriving again on
+    the fixture side, and it is the reason a fixture repair is a bigger commitment than a checker fix.
   - Pre-registration is **not** the obstacle, checked rather than assumed: `answer-key/prereg.json`
     pins only that `hypotheses/0002-*.md` and `0003-*.md` exist, are tracked, and match exactly one
     file each — it pins no fixture or answer-key digest. So a repaired key does not retro-invalidate
@@ -455,6 +465,7 @@ gate below is invoked by hand and its exit code is read.
 | T6 | done | `f1794f8` (the ledger) and `2837365` (its registration and CI), both knowable from this commit | **Mutant sweep v4: 20/20 behavioural mutants FIRED**, each scoped to one function window and diff-verified before its verdict was believed, plus a comment-only control that HELD and a machinery probe cut at exactly 90.0 s. Battery run by hand from this worktree (no hook fires here — `git rev-parse --git-common-dir`/hooks resolves to the *primary* checkout's `hooks/pre-commit`, not this branch's): `sh -n`/`bash -n` × 8, `--self-test` × 6, `./check.sh` 0, `pre-commit --all` 0, `commit-msg --range - HEAD` 0, `rig/check.sh` **20/20** with `rig/runs/` present, goldens intact at **3 and 42** lines. **S8 proved on the new file itself**, twice, with the control that makes it mean something: mutant planted **in scope** → **exit 1** naming the appended line of `obligation-ledger.sh` (the committed file is 1046 lines, so that number exists only in the planted copy); the same mutant with the file **untracked** → **exit 0 across 198 files** (T7's blind spot, reproduced on this unit's own subject). Restored **byte-identical** each time. CI evidence is a **run**, not a lint: the two new steps executed in a real `--depth 1` `file://` clone — baseline 6/6; a newly committed mode-`100755` executable raised it to **7 with no edit to the workflow**; a planted failing executable → **exit 1 naming it while the other six still ran**; empty pathspec → **exit 2**; flag-detection broken → **exit 2** "this job ran nothing"; `set -u` guard → 0; ledger → 0 with `git status` identical before and after; a broken `--list-content` seam → **exit 1**; a ledger exiting 1 → named as a contract defect. `actionlint` 1.7.12 exit 0 with `shellcheck` 0.11.0 present and all four inline `run:` blocks `shellcheck` clean |
 | T5 | **attempted; 3 model runs spent, 0 countable rows.** The task's own premise ("only funding remains") was false | `61cbd15` (surface preimage recaptured) and `e71853b` (the diagnostician's role boundary) close the first two defects; the third is open | Three runs: `s2/monolithic/01` → runner `complete`, `$0.4903`; `s2/pipeline/01` → runner `failed`, `diagnostician_src_violation`, `$1.2440`; re-pilot after both fixes → runner `complete`, `$1.1847`. **Read back through `derive.py`'s own `row_builder`, all three void**: the re-pilot yields `void / input-provenance-mismatch`, `anomalies=['answer-key-drift','rate-limit']`, while its recorded answer-key and fixture digests *match* their live values — only the key's shape fails. Spend read from each run's `result.total_cost_usd` (`$2.9190` for the three; a full 5×2 at these rates ≈ `$8.67`), not estimated. `rig/check.sh` 20/20 throughout, both goldens byte-identical at every step (restored after each probe); tree clean at `e71853b` |
 | T5 → WU4 | done | `61cbd15` | Four real `claude -p` captures — two independent scratch cwds, one adversarial cwd/prompt (space, both quotes, a backtick, non-ASCII) through `run_model_step`'s own composition, and one **without** `--model` — all exit 0, all 26 tools, all digest `1d4e343e…`, compared before any byte was written. The fourth adds the check the original 2.1.229 capture never needed: the surface is model-independent, so one preimage still covers a run set that pins a model. `rig/check.sh` 20/20 with both goldens byte-identical (`481e84dd…`, `938bbc7a…`) |
+| T5 → WU6 | done, **the fixture repair the operator signed** | hash not knowable from this commit — the self-reference note below resolves it, and `97d45eb`'s row shows the same shape; recorded by its child | Key edit is provably additive: removing the new `F0.failures` key reproduces the original `s2.json` **byte-for-byte** (19,302 B). Re-seal with the repo's own `compute_manifest()` moved exactly one MANIFEST line. Golden regenerated and idempotent (a second `rig/check.sh` is byte-stable): 3 rows before and after, one field moved, in one void row (`s2-pipeline-9054.fixture_digest`), tool-surface's golden untouched — so the "3 and 42" counts elsewhere do not rot. Battery 11 gates green incl. `rig/check.sh` 20/20, `pre-commit --all` over 199 files |
 | T5 → WU5 | done | `e71853b` | RED observed first (the suite aborted on an undefined `compose_prompt`, exit 127), then GREEN: 37 PASS / 0 FAIL, up from 28 before the change. Byte-level, over both fixtures, against exactly the text `run_model_step` passes: `monolith` and `apply` receive it **identical**, `diagnose` is an exact **suffix**. The composition is exact in bytes, not characters — the task carries one em-dash, so 1,102 *characters* is 1,104 *bytes*: preamble as composed 769 + 2 separator + 1,104 task = **1,875**, and `02-diagnose`'s `prompt.txt` is 1,875. Fixture bytes untouched (`git status --porcelain -- rig/fixtures` empty), so both MANIFESTs stay valid. Re-pilot then proved the mechanism live: `02-diagnose` `src_changed=false`, wrote `fix-plan.txt` (3,057 B) + `root-cause-report.txt`, and `03-apply` received the 1,104-byte task text unprefixed and byte-identical to `$(cat prompts/s2.txt)` |
 
 ## Log
@@ -1093,7 +1104,8 @@ fixed defect 3 returned `complete` *with* `rate-limit` still listed. I read the 
 what it does to a row without checking which builder consumes it. Same shape as L18 and L19: a
 plausible mechanism standing in for the field that decides.
 
-**Defect 3 is open, and it is a signature, not a task.** `answer-key/s2.json` has no `F0.failures`
+**Defect 3 is ~~open~~ — closed by L21 the same day, on the operator's signature; the analysis below
+stands as the measurement that justified it.** `answer-key/s2.json` has no `F0.failures`
 (v1's `s1.json` does; v2's key was born at `a03cd2d` with `F0.totals` instead), and `derive.py`'s R-P4.1
 shape check voids any `s2` row that reaches `complete` on that account. **No `s2` run in this repo's
 history has ever been scorable.** Both repairs were measured on disk and restored, not weighed in
@@ -1142,3 +1154,64 @@ this repository's entire subject is run-input provenance, and the two captures t
 provenance pointer naming an object nothing can hold — trading a cosmetic error for a broken reference
 in the one kind of artifact this rig exists to keep honest. The correction lives here, with the
 measurement that produced it, and `e71853b` stays resolvable.
+
+**L21 — the operator signed the fixture repair; the interesting part is what it costs, which is not the
+bytes** (2026-10-16).
+
+L20 closed by refusing to decide this one: repairing `answer-key/s2.json` moves fixture bytes the
+hypotheses were registered alongside, so it went to the operator with both repairs measured. The answer
+was to commit path (a) on this branch, fund **two** validation cells before the rest, and withhold the
+indicative N=1 figures until the campaign closes. What follows is only what those decisions revealed.
+
+**Provenance had to be closed before the bytes could move, and L20 had it wrong in a way I did not
+notice while writing it.** The 499 `test_id`s came from `rig/runs/failure-flood-v1/s2-pipeline-9054/`
+— and `rig/runs/` is gitignored, so that file is not in the repository. Writing them into a tracked
+answer key would have published a list whose only citation resolves on one machine: precisely the class
+`AGENTS.md`'s citability rule forbids, committed by the agent that cited the rule two lines earlier. The
+fix was not to soften the claim but to make it true: re-run the collector over committed bytes with
+`run-pipeline.sh`'s own sequence — `npm ci` (its `cd`-first form, never `--prefix`), `generate-cases.py`
+with the digest checked against the committed freeze, `materialize_step`'s copy-and-symlink, then
+`collect.py` with `--expected-suites 6`. Result: 499 failures, 9 clusters, and
+**`identifier_set_digest` identical to the committed capture** (`a2fa993bd9…`), plus identical
+`(signature, test_id, status)` multisets. So the field is *regeneration*, not observation — a reader
+holding only this repo can produce it.
+
+One number deliberately did **not** match, named rather than smoothed: `report_bytes` 2,814,799 committed
+vs 2,502,480 regenerated. `report.json` differs in exactly two keys, `startTime` and `testResults` (which
+carries per-test timings); all fourteen counters are identical, `report_bytes` is never a comparand
+anywhere in `derive.py`, and the answer key never mentions it. A byte-size of a jest report is a
+wall-clock artifact. Had I reported "regenerated identically", the one field that would have shown a
+reader this is a *re-run* and not a copy would have been gone.
+
+**The repair is provably additive, and that is a check worth keeping.** Removing the new `F0.failures`
+key reproduces the original `s2.json` byte-for-byte at 19,302 B — so nothing else in the file moved,
+which no diff review of a 2,497-line addition would catch by eye. The key was inserted before `clusters`
+to match v1's `s1.json` relative order, and the round-trip proves the insertion is the only edit.
+Re-sealing moved exactly one `MANIFEST.sha256` line. The regenerated golden holds 3 rows with one field
+moved in one void row, so the "3 and 42" counts stated elsewhere in the repo do not rot. `rig/check.sh`
+went 19/20 (the expected `derive-reproduce` refusal) and then 20/20, idempotent on a second pass.
+
+**What the sign-off actually costs is ten fresh cells, not eight.** `run-pipeline.sh` records the
+fixture, answer-key and surface-preimage digests *at run time*, and Face C compares them against live
+values at derive time — so a fixture repair retroactively voids every earlier capture, the same one-way
+door L20 records for preimage recaptures, arriving again on the fixture side. Measured on both preserved
+pilots: the monolithic one carries `surface-preimage-drift` *and* `answer-key-drift`; the re-pilot's
+preimage matches but it drifts on answer-key and fixture now that the key moved. Neither can be
+re-scored. The cheap version of this lesson, for next time: **before repairing a fixture, count the
+captures you are about to orphan** — the repair and the campaign are one bill, not two.
+
+**A third unit error in one session, recorded because the class is the point.** L20's analysis quoted
+"+102,161 B" for this key edit; the real delta is **+123,272 B**. The earlier figure subtracted a
+`json.dumps` *compact* serialization from an *indented* file. It appears nowhere in tracked markdown —
+only in the memory record, which now carries the corrected figure — so nothing published rotted. The
+pattern across all three (bytes/characters for the prompt, characters/bytes for the preamble,
+compact/indented here) is not carelessness about arithmetic: each time I computed a quantity from a
+*serialization I had chosen* and read it as a property of the *file*. The check that catches it is
+`git diff --numstat`, i.e. ask the file, not my construction of it.
+
+**On the withheld figures, so this entry does not imply a blindness I do not have.** A pre-campaign
+direction exists — one pipeline run and one monolithic run, read through `derive.py`'s own occupancy
+fields — and the operator chose to publish those together with the countable rows rather than now, so no
+reader can mistake N=1 for having shaped how the campaign was read. They are held in the evidence
+directory and in memory. This entry names their existence and not their contents; the contents arrive
+with the campaign's own numbers, and the disclosure of having seen them arrives at the same time.
