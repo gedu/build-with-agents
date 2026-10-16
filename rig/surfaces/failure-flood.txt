@@ -1,4 +1,4 @@
-# harness: 2.1.229 (Claude Code)
+# harness: 2.1.299 (Claude Code)
 Bash
 CronCreate
 CronDelete
@@ -19,12 +19,7 @@ SendMessage
 ShareOnboardingGuide
 Skill
 Task
-TaskCreate
-TaskGet
-TaskList
-TaskOutput
 TaskStop
-TaskUpdate
 ToolSearch
 WebFetch
 WebSearch
