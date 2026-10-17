@@ -33,6 +33,11 @@
 #   it would report pre-existing context lines as commit-message findings on every commit.
 #   Everything from the scissors line onward is therefore cut off.
 #
+#   The message FILE'S OWN PATH is not scanned, only its content. Findings are labelled
+#   `commit message:<line>` rather than by path, because a linked worktree makes git pass an
+#   absolute path and a path label would put the operator's home directory into the haystack —
+#   which is the shape this gate exists to find. See the note in `scan_file`.
+#
 # WHAT THIS DELIBERATELY DOES NOT CATCH
 #   Exactly what pre-commit does not catch, because the pattern list is the same one: a
 #   private project or client name written as a bare word. No pattern separates a public
@@ -44,10 +49,11 @@
 #   2  the check could not run. NOT a pass. Never conflate with 0.
 #
 # SELF-TEST
-#   `--self-test` asserts: a clean message passes; an assembled home path is reported; a
-#   missing message file escalates; a leak below a `commit -v` scissors line is out of
-#   scope; a copy of this script with no pattern file beside it escalates; and, over a
-#   throwaway repository, that `--range` reports a leaked commit message, passes a clean
+#   `--self-test` asserts: a clean message passes; a clean message whose FILE PATH looks like a
+#   home path still passes (the worktree case); an assembled home path in the content is reported
+#   even from such a file; a missing message file escalates; a leak below a `commit -v` scissors
+#   line is out of scope; a copy of this script with no pattern file beside it escalates; and, over
+#   a throwaway repository, that `--range` reports a leaked commit message, passes a clean
 #   range, and escalates on an unresolvable revision. ADR 0013 — a committed executable
 #   carries its own test. Run it whenever this file or the pattern list changes.
 #
@@ -174,7 +180,15 @@ scan_file() {
   [ -f "$1" ] || die_cannot_run "no commit message file at '$1'"
   [ -r "$1" ] || die_cannot_run "the commit message file '$1' is unreadable"
   load_patterns
-  HAYSTACK="$(message_lines "$1" "$1")" \
+  # The label is a CONSTANT, never `$1`. The label is composed into every scanned line, so a
+  # path label puts the operator's own home directory into the text this gate hunts for — and
+  # git hands this hook an absolute path from a linked worktree (measured: `…/.git/worktrees/
+  # <name>/COMMIT_EDITMSG`; the primary checkout gets the relative `.git/COMMIT_EDITMSG`). With
+  # a path label, EVERY message committed from a worktree is rejected on the gate's own plumbing,
+  # every line flagged at once — the exact noise that trains a human to ignore a security gate.
+  # `--range` never had this: its label is a short SHA, which matches nothing. Excluding the path
+  # must not exclude the message; the self-test pins both halves.
+  HAYSTACK="$(message_lines "commit message" "$1")" \
     || die_cannot_run "could not read the commit message file '$1'"
   scan_haystack
   report_and_exit
@@ -256,11 +270,44 @@ self_test() {
   # its own commit. That constraint doubles as a test that the fragments really are inert.
   LEAK="$(printf '%s/%s/project' '/Users' 'someone')"
 
+  # A second string assembled the same way, because a literal home path in this file would make the
+  # gate correctly block this commit. It names a DIRECTORY, so the case that needs it does not trust
+  # the spelling: it checks the path against the live pattern first (below).
+  HOMELIKE="$TMP/$(printf '%s/%s' '/home' 'someone')"
+
   printf 'docs(hooks): add the commit message gate\n\nNo forbidden shape here.\n' > "$TMP/clean.msg"
   expect 0 "a clean message passes" "$SELF" "$TMP/clean.msg"
 
+  # A LINKED WORKTREE makes git pass an absolute path to this hook: measured, git hands over
+  # `/…/.git/worktrees/<name>/COMMIT_EDITMSG`, where the primary checkout gets the relative
+  # `.git/COMMIT_EDITMSG`. So the message file's own path must never enter the scanned text, or
+  # every commit made from a worktree is rejected because of the gate's plumbing — and this repo
+  # recommends both worktrees (skills/checkout-isolation) and installing this hook.
+  #
+  # The fixture path MUST really trip the pattern, or this case passes whether the bug is present or
+  # not. That is this repo's recurring failure mode — a green that cannot fail is not evidence, see
+  # the vacuous-pass note in OPERATIONS.md — so the assumption is verified against the shared
+  # pattern list and escalates rather than reporting a meaningless ok. $HOME is never touched.
+  load_patterns
+  POSIX_RE="$(redaction_patterns | sed -n 's/^absolute home path (POSIX)|//p')"
+  [ -n "$POSIX_RE" ] || die_cannot_run "could not read the POSIX home-path pattern from '$PATTERN_FILE'"
+  printf '%s\n' "$HOMELIKE" | grep -Eq -- "$POSIX_RE" \
+    || die_cannot_run "fixture path '$HOMELIKE' does not match the live pattern '$POSIX_RE' — the worktree case below would prove nothing"
+  mkdir -p "$HOMELIKE/.git/worktrees/wt"
+  printf 'docs(hooks): also clean\n\nNothing forbidden here either.\n' \
+    > "$HOMELIKE/.git/worktrees/wt/COMMIT_EDITMSG"
+  expect 0 "the message file's own path is not scanned (worktrees pass an absolute path)" \
+    "$SELF" "$HOMELIKE/.git/worktrees/wt/COMMIT_EDITMSG"
+
   printf 'fix: repair the path\n\nseen at %s\n' "$LEAK" > "$TMP/leak.msg"
   expect 1 "an absolute home path in the message is reported" "$SELF" "$TMP/leak.msg"
+
+  # The pair to the case above: excluding the path must not exclude the message. Same leaked
+  # bytes as `leak.msg`, in a file whose path ALSO looks like a home path — so a "fix" that
+  # simply stopped scanning files under such a directory would turn this into a silent pass.
+  printf 'fix: repair the path\n\nseen at %s\n' "$LEAK" > "$HOMELIKE/leak.msg"
+  expect 1 "a leak is still reported when the message file's path also looks like a home path" \
+    "$SELF" "$HOMELIKE/leak.msg"
 
   expect 2 "a missing message file escalates instead of scanning nothing" \
     "$SELF" "$TMP/does-not-exist.msg"

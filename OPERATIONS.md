@@ -3,7 +3,7 @@ id: operations
 type: index
 targets: [any]
 status: validated
-verified: 2026-08-13
+verified: 2026-10-17
 sources: ["AGENTS.md", "MAP.md", "decisions/0009-redaction-is-a-repo-wide-rule.md", "decisions/0010-measurements-vary-the-harness-not-the-model.md", "decisions/0011-rig-produces-evidence-not-truth.md", "theory/agents/capability-load-cost.md"]
 ---
 
@@ -100,13 +100,26 @@ whole reason this runs at `commit-msg` rather than after a push.
 Two modes, and the second is the one you need in a worktree or a fresh clone:
 
 ```sh
-./hooks/commit-msg <file>          # what git calls. Never run by hand
+./hooks/commit-msg <file>          # what git calls; fine to run by hand on a saved message
 ./hooks/commit-msg --range <A> <B> # every commit message in A..B. `-` for A means "no lower bound"
 ```
 
 `--range` refuses an unresolvable revision with exit 2 rather than scanning an empty range, and it
 prints the number of messages it actually scanned, including zero. **Read that number**: a range that
 turns out to be empty and a range that was clean look identical otherwise.
+
+Findings are labelled `commit message:<line>`, **not by file path**. That is deliberate. A linked
+worktree makes git pass this hook an **absolute** path (`…/.git/worktrees/<name>/COMMIT_EDITMSG`, where
+the primary checkout gets the relative `.git/COMMIT_EDITMSG`), and the label is composed into every
+scanned line — so a path label would put the operator's own home directory into the text this gate hunts
+for and reject **every** message committed from a worktree, flagging every line at once including blank
+ones. Only the message's **content** is scanned. Measured 2026-10-17 with real git over a throwaway
+repo: clean message from a linked worktree accepted, leak from that same worktree still blocked.
+
+In a worktree the same caveat as `pre-commit` applies, and it is **not** "the hook does not run":
+worktrees share the common `.git/hooks`, so an installed hook **does** fire on your commit — using
+whichever copy the **original checkout** has on its current branch. Run `--range` yourself before
+pushing rather than trusting which copy fired.
 
 ### `./check.sh`
 
