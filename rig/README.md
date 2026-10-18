@@ -27,6 +27,17 @@ spread, its anomaly count, and the honesty contract attached.** Cite the promoti
 row from this directory — the same rule this repo already applies to `research/` ("cite the
 verdict, never the link") and to `journal/` under ADR 0002.
 
+**Committed rows are not, by themselves, re-derivable from this repository.** `derive.py` is a pure
+function of the run directories under `runs/`, and `runs/` is gitignored (`.gitignore:40`, zero tracked
+files), so the committed `results/<experiment>/runs.jsonl` is the only copy of its own input's *output*.
+Both experiments ship this way — `tool-surface-v1` publishes 42 rows and `failure-flood-v1` publishes 13
+(2026-10-17) over **zero tracked inputs** — so a fresh clone cannot reproduce either table, and
+`rig/check.sh`'s real gate there does not merely fail, it truncates both committed goldens to zero bytes
+and then reports green against the wipe (`OPERATIONS.md`, `.github/workflows/verify.yml`). The gate
+reproduces only in a checkout that holds the captures, which is why a worktree must copy `runs/` in
+before running it. This is the rig's standing condition, stated here so no reader mistakes a published
+median for a clone-reproducible one: **the rows are re-derivable only where the captures live.**
+
 ## Layout
 
 ```

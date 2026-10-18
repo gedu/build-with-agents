@@ -296,7 +296,22 @@ jobs:
   # CI checks out a tree with no gitignored `rig/runs/`. There, `rig/check.sh` fails 5/18 AND truncates
   # both committed `rig/results/*/runs.jsonl` to zero bytes, reproducing the wipe in a clean checkout and
   # then reporting green against it. Only `--self-test` dispatches are hermetic: all five run in a clean
-  # clone in 1.74 s, leave both goldens at 3 and 42 lines, and leave `git status` empty. Keep it that way.
+  # clone in 1.74 s, leave both goldens at their committed line counts, and leave `git status` empty.
+  # Keep it that way.
+  #
+  # WHY NO GOLDEN LINE COUNT IS STATED HERE ANY MORE
+  # This comment used to assert the goldens stay "at 3 and 42 lines". The 3 moved to 13 on 2026-10-17
+  # when the first countable campaign landed, and nothing in this repository generates that pair — so it
+  # was a hand-carried figure rotting inside a file whose whole subject is honest measurement. What the
+  # job actually claims is that the dispatches leave the goldens *unchanged*, which is what stays.
+  # Re-measured 2026-10-17 in an isolated `git archive` copy with no `rig/runs/` and the 13-row golden in
+  # place: the real gate still fails exactly 5/18 and still truncates both goldens to zero bytes, and the
+  # five dispatches still exit clean with `git status` empty and both goldens byte-identical.
+  # `1.74 s` is deliberately NOT restated as current: it is ubuntu-latest's clean clone, and replaying the
+  # same job logic locally took 3.39 s including discovery — a different population, so it neither
+  # confirms nor refutes 1.74. The five dispatches read synthetic heredoc fixtures and never the goldens
+  # (measured: goldens byte-identical after all five run), so their runtime does not track a golden's
+  # row count.
   #
   # WHY A JOB OF ITS OWN AND NOT MORE STEPS IN THE JOB ABOVE
   # ADR 0014 rejects running unrelated checks in one job in sequence: a failing early step skips the rest,

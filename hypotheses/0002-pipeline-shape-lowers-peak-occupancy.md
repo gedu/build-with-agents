@@ -82,6 +82,53 @@ against `rig/report.py`'s own `state=="complete"` filter.
 | Refuted | The mechanism named above does not hold at the measured scale — `theory/agents/tool-surface-design.md` and any future runway advice must not assume pipelining lowers peak occupancy without re-deriving why |
 | Not testable at this budget | Stays open, with the medians, ranges and the N that would need to grow (R-F7.2's own escalation path) to resolve it |
 
+## Result — 2026-10-17
+
+**Refuted on the fixture and task class tested. PIPELINE's peak is not lower — it is the same height, 1.4 per cent above.**
+
+Stage 2 (`task_id: s2`, `failure-flood/v2`), N=5 per arm. All ten rows `state=complete`, `void_reason=null`. Excluded rows named, never silently dropped (this file's own pre-registered guard, and `rig/report.py`'s reporting rule): `s1-monolithic-01`, `s1-monolithic-9054`, `s2-pipeline-9054` — all `void`, `void_reason=shakedown`, none entering either distribution.
+
+| peak occupancy tokens, N=5 | MONOLITHIC | PIPELINE |
+|---|---|---|
+| min / max / **median** | 83,420 / 92,813 / **85,224** | 82,834 / 89,242 / **86,423** |
+
+PIPELINE median ÷ MONOLITHIC median = **1.0141** against the **0.5×** threshold, and the observed ranges **overlap** (82,834–89,242 against 83,420–92,813).
+
+**The row that fired, quoted from this file's own pre-registered table:**
+
+> | The two arms' ranges overlap, OR PIPELINE's median peak ≥ MONOLITHIC's median peak | **Refuted** |
+
+**Both disjuncts hold at once** — the ranges overlap *and* PIPELINE's median is the higher one — so the verdict does not depend on which side of the disjunction is read. The third row cannot apply: the ratio is not between 0.5× and 1.0×, and the overlap is total rather than partial.
+
+### Why the mechanism did not show up, measured rather than narrated
+
+The claimed mechanism (per-step context reset bounds the max turn) is arithmetically real and simply had nothing to bound. PIPELINE's two model steps **finish at nearly the same level as each other**:
+
+| per-step peak, N=5 | min / max / median |
+|---|---|
+| `02-diagnose` | 81,372 / 89,242 / **86,423** |
+| `03-apply` | 81,966 / 84,474 / **82,834** |
+
+The run-level peak is whichever step ends higher, and that is not stable — `02-diagnose` holds it in 3 of 5 runs, `03-apply` in 2. Every row in both arms carries `occupancy_is_monotone: true`, so a run's peak is where its longest step *finished*, never an intermediate spike. A reset buys nothing when neither stage grows its context much: this task ends near 85k tokens by either harness shape, and MONOLITHIC gets there in one conversation. The prediction was not wrong about the mechanism; it was wrong that the mechanism was **load-bearing at this task size**.
+
+### What that does and does not license
+
+Refuted means: **at this task size, on this fixture, splitting into two separately-invoked steps produced no peak reduction the design could detect.** R-F7.2 stopped the cell at N=5, so no larger N was purchased and none is claimed. It does **not** mean pipelining never bounds peak occupancy: the design never tests a task where one stage grows context far past where the other ends, which is precisely the regime where the mechanism would bite. Saying otherwise would be the over-reach this file was written to prevent.
+
+### Disclosures that ship with this verdict
+
+- **A pre-campaign direction existed and was withheld until the campaign closed**, per the operator's decision recorded in `odd/tasks/verified-agent-delivery.md` L21, so no reader can mistake N=1 for having shaped how N=5 was read. The disclosure of having seen it arrives here, with the countable numbers, as L21 promised.
+- **The N=5 stop was decided under a reading of R-F7.2 that this repo does not implement.** `sdd/archive/2026-08-18-failure-flood-triage/verify-report.md` records R-F7.2 as *"Not implemented / not yet applicable… nothing enforces or reports it"*, so the requirement's `attribution precision/recall range ≤ one correctly-attributed cause` had no code to disambiguate it and the reading is mine: **recall taken as primary, precision published alongside rather than decided between**. Here they coincide exactly — both ranges are 0.1667 for MONOLITHIC (`causes_present: 6`, so one cause of six) and 0.0000 for PIPELINE — so no tie-break was needed and the stop holds under either reading. The green-restore condition also holds: 5/5 `green` in both arms.
+- **Reproducibility boundary.** The published 13-row golden `rig/results/failure-flood-v1/runs.jsonl` is derived from captures under gitignored `rig/runs/` (`.gitignore:40`, zero tracked files there). A fresh clone and CI therefore cannot re-derive these medians; they reproduce only in a checkout holding the captures. `tool-surface-v1` already publishes 42 rows the same way, and `.github/workflows/verify.yml` records that a clean checkout makes `rig/check.sh` truncate both goldens to zero bytes. This is the rig's existing condition, not a new defect — stated so the figure is not mistaken for a clone-reproducible one.
+
+The companion `hypotheses/0003` is reported separately, with its own mechanism and its own verdict. Per R-F5.4 and that file's own prohibition, the two are never composited into one "pipeline is better/worse" line; **this file licenses nothing about cumulative token cost.**
+
 ## Status
 
-**Registered 2026-08-13**, before any `s2` comparison run exists. Open.
+**Registered 2026-08-13**, before any `s2` comparison run existed.
+
+**Closed for this fixture and task class on 2026-10-17: refuted** — predicted a materially lower peak (≤ 0.5×), measured 1.0141× with overlapping ranges. Deliberately **not** `rejected`: a null at one task size on one fixture is not a refutation of the general mechanism, and `status: draft` is kept because ADR 0012 gives a hypothesis zero citability whatever its verdict. Promotion to `theory/` is the only route this figure becomes citable, and this result does not support one — the mechanism was found inert here, not bounded elsewhere.
+
+It remains open for the regime the design cannot reach: a task whose stages grow context by different amounts. Testing that is a different fixture and a different change.
+
+Frontmatter `verified:` **stays at 2026-08-13**, the registration date. Bumping it would move a pre-registration; the date of this result lives in the heading above. Precedent: `hypotheses/0001` does exactly this.

@@ -3,7 +3,7 @@ id: odd/verified-agent-delivery/tasks
 type: journal
 targets: [any]
 status: draft
-verified: 2026-10-16
+verified: 2026-10-17
 sources: ["journal/2026-08-17-three-rules-with-no-verifier.md", "theory/loops/verifier-availability.md", "decisions/0014-a-public-guarantee-cannot-be-opt-in.md", "decisions/0016-open-work-is-enumerated-from-structure.md", "decisions/0013-a-committed-executable-carries-its-own-test.md", "sdd/archive/2026-08-27-run-input-provenance/archive-report.md", "hypotheses/0002-pipeline-shape-lowers-peak-occupancy.md", "hypotheses/0003-serial-triage-compounds-cumulative-tokens.md", "skills/checkout-isolation/SKILL.md", "gaps/0002-expensify-app.md"]
 ---
 
@@ -106,7 +106,10 @@ Ordered by dependency, not by discovery. Work the frontier: any task whose block
     commit in the Progress table below — the same self-reference `run-input-provenance` exists to make
     visible, met on the first document this feature wrote. Checks: `./check.sh` exit 0,
     `./check.sh --self-test` exit 0, `./hooks/pre-commit --all` exit 0, all run from this worktree
-    because the hook does not fire here (see Log L4). `type: journal` chosen deliberately: `check.sh:132`
+    because the hook does not fire here (see Log L4). **Corrected 2026-10-17:** the reason in that
+    sentence was false — `pre-commit` is installed in the shared common directory and does fire from a
+    linked worktree, using the primary checkout's copy (L22). What the sentence reports — that these
+    checks were run by hand — is true, and stays the rule; only its stated cause was wrong. `type: journal` chosen deliberately: `check.sh:132`
     holds a closed enum and adding a type means editing `AGENTS.md` and `check.sh` in the same commit —
     a schema change, not a doc task.
   - Not done by T1: `open-work.sh` cannot see `odd/`. That gap is T2, and it is Log L5.
@@ -220,8 +223,12 @@ Ordered by dependency, not by discovery. Work the frontier: any task whose block
     `MAP.md`'s `odd/` row that T4 closing made stale. See L11 — 49 of the drift lines are mine, the rest
     predates this session, and one citation was wrong the day it was written.
 
-- [ ] **T5 Found the first countable run: `failure-flood` stage 2, both arms, N=5 per cell** —
-  **attempted 2026-10-16, still zero countable rows; this task's own blocking premise was false (L20)**
+- [x] **T5 Found the first countable run: `failure-flood` stage 2, both arms, N=5 per cell** —
+  **done 2026-10-17: 10 countable rows (N=5 per arm), both hypotheses refuted by their own pre-registered
+  tables, R-F7.2 STOP at N=5 in both cells (L23).** The attempt of 2026-10-16 spent 3 runs and produced
+  **zero** countable rows, because this task's own blocking premise was false (L20) — the history of that
+  attempt stays in the bullets below exactly as it was written, because two of them are what keeps the
+  three instrument defects from being rediscovered at $1.24 a run.
   - Blocked by: ~~T4~~ closed 2026-10-14. **The rest of this line was wrong at the time it was read.**
     It said: "with T4 done, the only thing left is the operator's decision to fund the spend. Nothing in
     the rig is configured-by-placeholder any more." Funding was never the binding constraint. Three
@@ -251,9 +258,17 @@ Ordered by dependency, not by discovery. Work the frontier: any task whose block
     operator's signature.
   - Seams: `rig/run-pipeline.sh`, `python3 rig/derive.py`, `python3 rig/report.py --experiment failure-flood-v1`
   - This is the only task here that spends real model credit and needs the `claude` CLI. `s2` exists in
-    the fixture (`failure-flood/v2`) and `hypotheses/0002`/`0003` are both **registered and open,
-    written before any `s2` run existed** — so the verdict is decidable, not a choice made after seeing
-    the number.
+    the fixture (`failure-flood/v2`) and `hypotheses/0002`/`0003` were both **registered and open,
+    written before any `s2` run existed** — so the verdict was decidable, not a choice made after seeing
+    the number. **Status now: both files closed for this fixture and task class on 2026-10-17, both
+    refuted**, each in its own `## Result` section (peak ratio **1.0141** against a 0.5× threshold;
+    cumulative ratio **2.9539** against a 0.6× threshold). The pre-registration is what makes those
+    verdicts worth anything, which is why both files keep frontmatter `verified: 2026-08-13`: the
+    registration date is the claim's, not the result's. Per ADR 0012 neither file is citable, whatever
+    its verdict — the numbers are quoted here as this feature's outcome, and promotion into `theory/` is
+    the only route to a citable figure. Neither result supports one: 0002 found its mechanism inert at
+    this task size rather than bounded, and 0003's ratio is a property of a prompt large relative to the
+    per-step work.
   - Report per `(task_id, arm)`, never blended, per the R-F5.4/R-F4.1 discipline the reporter already
     enforces. Report the void rows by name.
   - R-F7.2, **quoted, not paraphrased**
@@ -444,8 +459,20 @@ Ordered by dependency, not by discovery. Work the frontier: any task whose block
 
 ## Checks
 
-Run from this worktree, in this order, after any task. The hook does **not** fire here (L4), so every
-gate below is invoked by hand and its exit code is read.
+Run from this worktree, in this order, after any task. Every gate below is invoked by hand and its exit
+code is read.
+
+**Amended 2026-10-17 — the sentence this heading used to open with was false.** It read "The hook does
+**not** fire here (L4), so every gate below is invoked by hand". Measured at `89b942b`: `git rev-parse
+--git-common-dir` resolves to the primary checkout's `.git`, whose `hooks/` holds
+`pre-commit -> ../../hooks/pre-commit`, so **`pre-commit` DOES fire on a commit made from this worktree**
+— running the *primary checkout's* copy, not this branch's, which is the hazard L4 actually named. Only
+`commit-msg` is absent there (`commit-msg.sample` is not a hook), so **the message gate is the one that
+must be run by hand**: `./hooks/commit-msg "$(git rev-parse --git-path COMMIT_EDITMSG)"`. Running every
+gate by hand remains correct for `pre-commit` too — the reason changed from "it cannot fire" to "when it
+fires it is a different branch's file, so its verdict is not this branch's evidence". `OPERATIONS.md`
+had this right all along; the belief that worktrees skip hooks was mine, it is recorded in L22, and a
+commit message bug it hid got fixed at `89b942b`.
 
 | Check | Command | Expected |
 |---|---|---|
@@ -459,6 +486,32 @@ gate below is invoked by hand and its exit code is read.
 | Index honesty | `./open-work.sh` | reads its COVERAGE block; `absent` distinguished from `0` |
 
 ## Progress and evidence
+
+**Read every golden line count in the table below as value-at-the-commit that row names, never as a
+standing figure (amended 2026-10-17).** The committed golden is **13 and 42** rows as of 2026-10-17; every
+"3 and 42" still standing in this document is a **dated record of a check that really observed 3**, and
+rewriting those to say 13 would publish checks that never ran — the failure class L11, L14 and L19 all
+record, wearing the costume of a housekeeping edit. Which ones they are is **enumerated, not counted
+here**: run `grep -nE '(^|[^0-9])3 and 42'` over this file and classify each hit by the section it sits
+in. The leading `[^0-9]` is load-bearing: a bare `3 and 42` also matches the `13 and 42` above, so the
+naive pattern returns a larger set than it names and silently swallows the line that corrects it — found
+by running both, not by reasoning about them. A hit in the `Tasks` block, in a Progress row, or inside a
+`**L#` entry is a dated record and stays; **a hit in this paragraph is this paragraph talking about
+itself**, which is why the honest reading is "what the pattern lists, minus the prose discussing the
+phrase" and never a total transcribed into a sentence. Six of the dated hits carry the commit they
+measured at on the same line, which is what makes them checkable; the other three sit one in the `Tasks`
+block and two in Log entries, dated records by `AGENTS.md`'s own citability rule, and none is live status.
+That split was re-run after it was written — a first draft said "the rest sit inside Log entries", which
+is false because one is a `Tasks` bullet. This paragraph deliberately states no total:
+a number here would be hand-typed, and it would rot the way L8 and L19 describe — including while this
+very edit was in flight, where an earlier draft of this paragraph asserted both a count and a line number
+that its own insertion had just moved.
+
+The two files where the figure *was* a standing claim rather than a dated record —
+`.github/workflows/verify.yml` and `decisions/0014-a-public-guarantee-cannot-be-opt-in.md` — stopped
+stating a golden line count at all on 2026-10-17 and now state the property they actually claim (the
+self-test dispatches leave the goldens unchanged); `MAP.md`'s "zero countable runs" and "none exists yet"
+were scoped *at archival* the same day. See L23 for what moved the number.
 
 | Task | Outcome | Commit | Check observed |
 |---|---|---|---|
@@ -474,6 +527,7 @@ gate below is invoked by hand and its exit code is read.
 | T5 → WU4 | done | `61cbd15` | Four real `claude -p` captures — two independent scratch cwds, one adversarial cwd/prompt (space, both quotes, a backtick, non-ASCII) through `run_model_step`'s own composition, and one **without** `--model` — all exit 0, all 26 tools, all digest `1d4e343e…`, compared before any byte was written. The fourth adds the check the original 2.1.229 capture never needed: the surface is model-independent, so one preimage still covers a run set that pins a model. `rig/check.sh` 20/20 with both goldens byte-identical (`481e84dd…`, `938bbc7a…`) |
 | T5 → WU6 | done, **the fixture repair the operator signed** | hash not knowable from this commit — the self-reference note below resolves it, and `97d45eb`'s row shows the same shape; recorded by its child | Key edit is provably additive: removing the new `F0.failures` key reproduces the original `s2.json` **byte-for-byte** (19,302 B). Re-seal with the repo's own `compute_manifest()` moved exactly one MANIFEST line. Golden regenerated and idempotent (a second `rig/check.sh` is byte-stable): 3 rows before and after, one field moved, in one void row (`s2-pipeline-9054.fixture_digest`), tool-surface's golden untouched — so the "3 and 42" counts elsewhere do not rot. Battery 11 gates green incl. `rig/check.sh` 20/20, `pre-commit --all` over 199 files |
 | T5 → WU5 | done | `e71853b` | RED observed first (the suite aborted on an undefined `compose_prompt`, exit 127), then GREEN: 37 PASS / 0 FAIL, up from 28 before the change. Byte-level, over both fixtures, against exactly the text `run_model_step` passes: `monolith` and `apply` receive it **identical**, `diagnose` is an exact **suffix**. The composition is exact in bytes, not characters — the task carries one em-dash, so 1,102 *characters* is 1,104 *bytes*: preamble as composed 769 + 2 separator + 1,104 task = **1,875**, and `02-diagnose`'s `prompt.txt` is 1,875. Fixture bytes untouched (`git status --porcelain -- rig/fixtures` empty), so both MANIFESTs stay valid. Re-pilot then proved the mechanism live: `02-diagnose` `src_changed=false`, wrote `fix-plan.txt` (3,057 B) + `root-cause-report.txt`, and `03-apply` received the 1,104-byte task text unprefixed and byte-identical to `$(cat prompts/s2.txt)` |
+| T5 → WU7 | done — **the campaign, and the first countable rows this rig has ever produced** | hash not knowable from this commit (the self-reference note below resolves it; recorded by its child) | **10 countable rows, N=5 per arm**, all `state=complete`, `void_reason=null`, all `code_commit` `89b942b`; 3 shakedown rows excluded **by name**, never dropped. **Both hypotheses refuted by their own pre-registered tables**: peak ratio **1.0141** (0002's threshold 0.5×, ranges *overlap*), cumulative ratio **2.9539** (0003's threshold 0.6×, pipeline *higher*). **R-F7.2 STOP at N=5 in both cells, no escalation to N=10** — same green-restore verdict (5/5 `green`, both arms) and recall range ≤ one cause of `causes_present: 6` (monolithic 0.1667 from one run scoring 5/6; pipeline 0.0000). Every figure re-read from the 13-row golden and from `report.py`'s own tables at close-out, not carried from the campaign: peak medians 85,224 / 86,423; cumulative 908,026 / 2,682,256. Cost **$8.6008**, re-summed run by run from each `result.total_cost_usd` in `stream.jsonl` (median $0.5001 monolithic, $1.1980 pipeline). Battery green with the 13-row golden in place; the reproducibility boundary (captures are gitignored, so no clone re-derives it) is stated in `rig/README.md` and in both `## Result` sections rather than shipped silently |
 
 ## Log
 
@@ -1296,3 +1350,99 @@ the easy, plausible, wrong thing. The comparison ships with a synthetic self-tes
 that asymmetry, and that self-test caught a real bug on its first run: an arm with no complete row yields
 an *empty list* which passed a `key in values` guard and reached `statistics.median([])`. That is the
 normal mid-campaign state, not an edge case — it would have crashed on the first real partial run.
+
+**L23 — the campaign closed, both hypotheses came back refuted, and the close-out found the stale claims
+in places my own instructions did not name (2026-10-17).**
+
+T5 is done. **10 countable rows, N=5 per arm**, all `state=complete`, `void_reason=null`, all
+`code_commit` `89b942b`; the 3 `shakedown` rows excluded **by name**. Both hypotheses are refuted by their
+own pre-registered tables, and **R-F7.2 says STOP at N=5 in both cells** — the reading L22 corrected.
+Peak **1.0141×** (0002's threshold 0.5×, ranges *overlap*); cumulative **2.9539×** (0003's threshold 0.6×,
+pipeline *higher*). The mechanisms are unrelated, which is why they ship as two results: peak is flat
+because pipeline's two steps finish at nearly the same level (per-step peaks 81,372–89,242 and
+81,966–84,474; `02-diagnose` holds the run's max in 3 of 5), and cumulative is ~3× because each fresh
+invocation re-pays the fixed prompt. In all ten runs the model steps' `cumulative_occupancy_tokens` sum to
+the run's figure **exactly**, so the run total *is* the two conversations added — that identity is the
+measurement, not a narration.
+
+**Every published figure was re-read at close-out rather than carried forward, and one did not survive
+being checked.** Peak medians 85,224 / 86,423, cumulative 908,026 / 2,682,256, and the excluded-row list
+came from `report.py`'s own tables over the 13-row golden; cost came from re-summing each
+`result.total_cost_usd` out of `stream.jsonl` (**$8.6008**, median $0.5001 monolithic against $1.1980
+pipeline — the recorded $8.60 was right, and is now derived rather than remembered). The claim that did
+**not** survive: I wrote that `02-diagnose` "already costs more cumulative tokens than an entire
+MONOLITHIC run." At the median it is true (1,126,306 against 908,026); **run by run it holds in only 3 of
+5** — the two cheapest diagnoses came in at 856,941 and 606,931, below it. A per-arm median comparison and
+a per-run comparison are different claims, and I had stated the stronger one in the weaker one's
+clothes. It ships qualified, with the 3-of-5 named, because the arms are separate runs and no same-run
+cross-arm pair exists to compare.
+
+**Three instructions I was handed turned out to rest on a measurement nobody had taken, and the closest
+one to being wrong cost nothing to catch.**
+
+| Instructed | Measured | What shipped |
+|---|---|---|
+| `rig/check.sh` "fails 5/18 on a clean checkout" may be stale now that the gate enumerates 30 checks over 13 run dirs | **Not stale.** In an isolated `git archive` copy with no `rig/runs/`, the real gate fails **exactly 5/18 in both the committed 3-row tree and the candidate 13-row tree**, truncating both goldens to zero bytes. The 30-check total is the *with-captures* population (measured **30/30, exit 0** in an isolated copy holding the captures, goldens byte-identical after) | `5/18` left untouched. The two populations differ by which checks can run at all, not by the count drifting |
+| Fix "leave both goldens at **3 and 42** lines" to 13 and 42 in two live files *and* in two `odd/tasks` sites | The two live files were right to fix. **The `odd/tasks` sites were dated evidence records** — of the nine, six carry the commit they measured at on the same line, and the other three sit one in the `Tasks` block and two in Log entries, so none is live status; `AGENTS.md` forbids rewriting a dated record. Rewriting them to 13 would publish checks that never ran. (That split is stated as a classification I re-ran after writing it: a first draft said "the rest sit inside Log entries", which is false — one is a `Tasks` bullet, caught by the same script that produced the six.) | Live claims **stopped stating a golden line count at all** and now state the property they actually claim (the dispatches leave the goldens unchanged). The dated records keep 3, scoped by one added note |
+| `MAP.md` was not on the list | Its `sdd/` row asserted **"zero countable runs… none exists yet"** as live status. My 10 rows made that false | Scoped *at archival*, with the result named and ADR 0012's zero-citability stated beside it |
+
+**The stale belief my own file was carrying, found because a gate refused me.** `rig/check.sh` came back
+**1/30**, and the one refusal was `preflight:v2` → `tracked_but_dirty: hypotheses/0002` — the Hard
+Ordering Gate refusing my uncommitted Result edits, the same dirty-tree precondition T4's row documents.
+Reading *why* it refused is what surfaced a live-false sentence in this file's own `## Checks` heading:
+"The hook does **not** fire here (L4)." Measured at `89b942b`: `git rev-parse --git-common-dir` resolves to
+the primary checkout's `.git`, whose `hooks/` holds `pre-commit -> ../../hooks/pre-commit`, so
+**`pre-commit` does fire on a commit made from this worktree** — running the *primary checkout's* copy,
+which is the hazard L4 actually named (`OPERATIONS.md` had this right the whole time). Only `commit-msg`
+is absent there, so the message gate is the one that must be run by hand. Running every gate by hand
+remains the rule; **the reason I had been giving for it was false**, and L22 had already recorded that
+belief as mine. The `## Checks` heading and T1's row now carry the corrected reason, marked as a
+correction rather than silently reworded.
+
+**Two of my own close-out drafts reproduced this file's oldest defect, caught before either landed.**
+The note that scopes the dated records first asserted *how many* such records exist **and a `:683` line
+number** — both hand-typed, both invalidated by that same note's insertion, in the paragraph whose subject
+is not hand-typing counts. It now names a command instead of a number, and says why the naive version of
+that command misleads: `grep '3 and 42'` also matches `13 and 42`, so it reports a **larger** set than it
+names and swallows the line that does the correcting (measured: 13 against 12; found by running both, not
+by reasoning about them). Second: I wrote into `hypotheses/0003` that a theory file had "12 terms
+searched, zero hits" — `harness` and `shape` are in that list and are **not** zero. Re-measured over the
+whole file at 15 terms, 13 zero, and the two hits named with what they are actually about. Both are the
+L18/L19/L21 shape arriving in a sentence about L18/L19/L21: **the count that describes a discipline is not
+exempt from the discipline.**
+
+**What the two `## Result` sections refuse to do, so it is on the record and not in a chat.** Frontmatter
+`verified:` stays at **2026-08-13** in both — it is the registration date, and bumping it moves a
+pre-registration; the result's date lives in its heading, as `hypotheses/0001` already does. `status`
+stays **`draft`, not `rejected`**: refuted *for this fixture and task class* is not a refutation of the
+general claim, and ADR 0012 gives a hypothesis zero citability whatever its verdict. The two verdicts are
+**never composited**, which `0003` forbids in its own text — two mechanisms, two published results, no
+"pipeline is worse" line. Both disclose that the pre-campaign direction existed and was withheld until
+the campaign closed (L21's promise, kept), and that the R-F7.2 reading is **mine** — recall primary,
+precision published alongside — because `verify-report.md` records the rule as *not implemented*, so
+nothing in the code disambiguates it; both readings agree here (recall range 0.1667 monolithic, one cause
+of six; 0.0000 pipeline), so no tie-break was needed. Neither result supports a `theory/` promotion, and
+`0003`'s registered consequence for that is applied rather than quietly skipped.
+
+**Reproducibility boundary, stated rather than shipped silent.** The 13-row golden is derived from
+captures under gitignored `rig/runs/` (`.gitignore:40`, zero tracked files), so **no fresh clone and no CI
+job can re-derive it** — `tool-surface-v1` already publishes 42 rows the same way, and a clean checkout
+makes `rig/check.sh` truncate both goldens to zero bytes and then report green against the wipe. New
+paragraph in `rig/README.md` beside the citability table, since a reader who cannot reproduce a median is
+entitled to know which of the rig's two claims about a published number is load-bearing.
+
+**Cost, re-derived at close-out instead of inherited.** Countable campaign **$8.6008** (10 runs, summed
+from `result.total_cost_usd`). Non-countable: pre-repair void pilots $2.9190 (L20), wrong-checkout cells
+$2.1088 (L22). **Total ~$13.63**, all four figures now traceable to a file in this tree.
+
+**Battery with the 13-row golden in place.** `./check.sh`, `./check.sh --self-test`,
+`./open-work.sh --self-test`, `python3 rig/{derive,report,collect}.py --self-test`,
+`./hooks/pre-commit --self-test`, `./hooks/commit-msg --self-test` all **exit 0**; `./hooks/pre-commit
+--all` clean over **199** tracked files; `./hooks/commit-msg --range - HEAD` clean over **176** messages;
+`actionlint` **exit 0**; `./obligation-ledger.sh` **exit 0**. `rig/check.sh` **29/30** pre-commit — the one
+refusal is its own ordering gate refusing the dirty tree this commit fixes, and **30/30** in an isolated
+copy carrying the identical golden on a committed tree. Both goldens stayed byte-identical across every
+run (`e90a9932…`, `938bbc7a…`). `./open-work.sh` now reports `odd/tasks/: 0`: **T5 was the last open
+checkbox, so this feature document is closed** — and `MAP.md`'s `odd/` row, which deliberately states no
+count because `open-work.sh` derives it, needed no edit to become true, which is the whole argument for
+generated indexes.
